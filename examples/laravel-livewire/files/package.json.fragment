@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@reports-web/core": "file:../../../packages/core",
+    "chart.js": "^4.5.0",
+    "qrcode": "^1.5.4",
+    "jsbarcode": "^3.12.3"
+  }
+}

@@ -1,0 +1,2 @@
+Route::get('/reports/invoices', \App\Livewire\InvoiceSummaryReport::class)->name('reports.invoices');
+Route::get('/reports/builder', \App\Livewire\ReportBuilderDemo::class)->name('reports.builder');

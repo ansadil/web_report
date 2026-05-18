@@ -1,0 +1,24 @@
+{
+  "name": "@reports-web/playground",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@reports-web/core": "workspace:*",
+    "@reports-web/shared": "workspace:*",
+    "chart.js": "^4.5.0",
+    "exceljs": "^4.4.0",
+    "html-to-image": "^1.11.13",
+    "lit": "^3.2.1",
+    "pdf-lib": "^1.17.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}

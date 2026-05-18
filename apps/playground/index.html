@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reports Web · Demo</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        background: #f1f5f9;
+        color: #0f172a;
+        font-size: 14px;
+      }
+      #app {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        grid-template-rows: 56px 1fr;
+        grid-template-areas: 'header header' 'sidebar main';
+        height: 100vh;
+      }
+      header.top {
+        grid-area: header;
+        background: linear-gradient(90deg, #0f172a, #1e293b);
+        color: #f8fafc;
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      header.top h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        flex: 1;
+        letter-spacing: 0.3px;
+      }
+      header.top .badge {
+        font-size: 11px;
+        background: #2563eb;
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+      }
+      header.top .tabs {
+        display: flex;
+        gap: 4px;
+        background: #1e293b;
+        padding: 4px;
+        border-radius: 8px;
+      }
+      header.top .tabs button {
+        background: transparent;
+        color: #cbd5e1;
+        border: none;
+        padding: 6px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      header.top .tabs button.active {
+        background: #2563eb;
+        color: #fff;
+      }
+      header.top .locale-switch {
+        display: flex;
+        gap: 4px;
+      }
+      header.top .locale-switch button {
+        background: transparent;
+        color: #cbd5e1;
+        border: 1px solid #334155;
+        padding: 5px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      header.top .locale-switch button.active {
+        background: #2563eb;
+        color: #fff;
+        border-color: #2563eb;
+      }
+      aside.sidebar {
+        grid-area: sidebar;
+        background: #fff;
+        border-inline-end: 1px solid #e5e7eb;
+        overflow: auto;
+        padding: 16px;
+      }
+      aside.sidebar h3 {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #64748b;
+        letter-spacing: 0.8px;
+        margin: 16px 0 8px;
+        font-weight: 600;
+      }
+      aside.sidebar h3:first-child { margin-top: 0; }
+      .report-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .report-card:hover {
+        background: #eff6ff;
+        border-color: #93c5fd;
+      }
+      .report-card.active {
+        background: #eff6ff;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 1px #2563eb;
+      }
+      .report-card .name { font-weight: 600; color: #1e293b; }
+      .report-card .desc { font-size: 12px; color: #64748b; margin-top: 2px; line-height: 1.4; }
+      .report-card .dataset { font-size: 10px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .saved-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+      .saved-item .name { color: #14532d; font-weight: 500; flex: 1; }
+      .saved-item button {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: none;
+        padding: 2px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+      }
+      .saved-item .open-btn {
+        background: #dbeafe;
+        color: #1d4ed8;
+        margin-inline-end: 4px;
+      }
+      .empty-msg { color: #94a3b8; font-size: 12px; font-style: italic; padding: 8px; text-align: center; }
+      .info-box {
+        background: #f1f5f9;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: #475569;
+        line-height: 1.5;
+      }
+      .info-box kbd {
+        background: #e2e8f0;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+        border: 1px solid #cbd5e1;
+      }
+      main.main {
+        grid-area: main;
+        overflow: auto;
+        background: #f1f5f9;
+      }
+      #view-viewer reports-viewer { display: block; min-height: calc(100vh - 56px); }
+      #view-builder reports-builder { display: grid; height: calc(100vh - 56px); }
+      [hidden] { display: none !important; }
+      .toast {
+        position: fixed;
+        bottom: 20px;
+        inset-inline-end: 20px;
+        background: #16a34a;
+        color: #fff;
+        padding: 10px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        animation: slideIn 0.2s ease-out;
+      }
+      .toast.error { background: #b91c1c; }
+      @keyframes slideIn {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header class="top">
+        <h1>Reports Web</h1>
+        <span class="badge">v0.1.0</span>
+
+        <div class="tabs" role="tablist">
+          <button id="tab-viewer" class="active">Viewer</button>
+          <button id="tab-builder">Builder</button>
+        </div>
+
+        <div class="locale-switch">
+          <button id="btn-en" class="active">EN · LTR</button>
+          <button id="btn-ar">AR · RTL</button>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <h3>Sample Reports</h3>
+        <div id="reports-list"></div>
+
+        <h3>My Saved Reports</h3>
+        <div id="saved-list"></div>
+
+        <h3>Datasets</h3>
+        <div id="datasets-list" class="info-box"></div>
+
+        <h3>Tips</h3>
+        <div class="info-box">
+          Drag elements from the toolbox in <strong>Builder</strong> onto bands.
+          Click an element to edit its properties on the right panel.
+          Use <kbd>Save</kbd> to persist to localStorage and open it later from the sidebar.
+        </div>
+      </aside>
+
+      <main class="main">
+        <div id="view-viewer">
+          <reports-viewer id="viewer"></reports-viewer>
+        </div>
+        <div id="view-builder" hidden>
+          <reports-builder id="builder"></reports-builder>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

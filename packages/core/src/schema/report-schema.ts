@@ -261,6 +261,11 @@ const ReportMetaSchema = z.object({
   locale: Locale.default('en'),
   /** When omitted, inferred from locale: 'ar' means 'rtl'. */
   dir: Direction.optional(),
+  /**
+   * Digits for {page}/{pages} tokens: 'locale' (default) follows the report locale
+   * (Arabic-Indic for Arabic), 'latn' forces Western digits.
+   */
+  pageNumberDigits: z.enum(['locale', 'latn']).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 }).transform((m) => ({ ...m, dir: m.dir ?? (m.locale === 'ar' ? 'rtl' : 'ltr') }));

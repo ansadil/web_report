@@ -68,6 +68,8 @@ export interface RenderTree {
   readonly margins: { top: number; right: number; bottom: number; left: number };
   readonly dir: 'rtl' | 'ltr';
   readonly locale: 'ar' | 'en';
+  /** Digits for page-number tokens (schema `meta.pageNumberDigits`, default 'locale'). */
+  readonly pageNumberDigits?: 'locale' | 'latn';
   readonly sections: RenderSection[];
   readonly watermark?: RenderWatermark;
 }
@@ -351,6 +353,7 @@ export function interpret({ schema, rows, printedAt }: InterpretInput): RenderTr
     margins: schema.page.margins,
     dir: schema.meta.dir,
     locale: schema.meta.locale,
+    ...(schema.meta.pageNumberDigits ? { pageNumberDigits: schema.meta.pageNumberDigits } : {}),
     sections,
     ...(watermark ? { watermark } : {}),
   };

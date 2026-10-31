@@ -186,7 +186,39 @@ describe('PDF page tokens', () => {
     });
     const lines = await readDrawnLines(await pdfBytes(s));
     const footers = lines.filter((l) => l.visual.includes('صفحة') || l.visual.includes('ةحفص'));
+    expect(footers.map((l) => l.visual)).toEqual([expectedVisual('صفحة ١ من ٢', 'rtl'), expectedVisual('صفحة ٢ من ٢', 'rtl')]);
+  });
+
+  const twoPages = (meta: AnyObj, footer: string): ReportSchemaV1 =>
+    schema([text('a', 'أ', 0)], meta, {
+      reportHeader: { height: 10, elements: [text('a', 'أ', 0)], pageBreakAfter: true },
+      pageFooter: { height: 8, elements: [text('pf', footer, 0)] },
+    });
+
+  it('page numbers follow the report locale: Arabic-Indic in ar (also via the Arabic aliases)', async () => {
+    const lines = await readDrawnLines(await pdfBytes(twoPages({ name: 'T', locale: 'ar', dir: 'rtl' }, 'صفحة {صفحة} من {صفحات}')));
+    const footers = lines.filter((l) => l.visual.includes('ةحفص') || l.visual.includes('صفحة'));
+    expect(footers.map((l) => l.visual)).toEqual([expectedVisual('صفحة ١ من ٢', 'rtl'), expectedVisual('صفحة ٢ من ٢', 'rtl')]);
+  });
+
+  it('meta.pageNumberDigits = "latn" forces Western page numbers in an Arabic report', async () => {
+    const lines = await readDrawnLines(await pdfBytes(twoPages({ name: 'T', locale: 'ar', dir: 'rtl', pageNumberDigits: 'latn' }, 'صفحة {page} من {pages}')));
+    const footers = lines.filter((l) => l.visual.includes('ةحفص') || l.visual.includes('صفحة'));
     expect(footers.map((l) => l.visual)).toEqual([expectedVisual('صفحة 1 من 2', 'rtl'), expectedVisual('صفحة 2 من 2', 'rtl')]);
+  });
+
+  it('page numbers are Western in an en report', async () => {
+    const lines = await readDrawnLines(await pdfBytes(twoPages({ name: 'T', locale: 'en', dir: 'ltr' }, 'Page {page} of {pages}')));
+    const all = lines.map((l) => l.visual).join('\n');
+    expect(all).toContain('Page 1 of 2');
+    expect(all).toContain('Page 2 of 2');
+    expect(all).not.toMatch(/[\u0660-\u0669]/);
+  });
+
+  it('rejects an invalid pageNumberDigits value; old templates without it still validate', () => {
+    const base = { version: '1', id: 'x', dataset: { adapter: 'static', source: 't' }, fields: [], bands: { detail: { height: 0, elements: [] } } };
+    expect(validateReport({ ...base, meta: { name: 'T', locale: 'ar', pageNumberDigits: 'hindi' } }).ok).toBe(false);
+    expect(validateReport({ ...base, meta: { name: 'T', locale: 'ar' } }).ok).toBe(true);
   });
 
   it('never replaces tokens inside data values', async () => {

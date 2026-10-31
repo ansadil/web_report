@@ -118,6 +118,9 @@ interface DrawCtx {
   readonly pages: number | null;
   /** Draw calls postponed until the page count is known. */
   readonly deferred: ((pages: number) => Promise<void>)[];
+  /** Report locale and digit mode for {page}/{pages}. */
+  readonly locale: RenderTree['locale'];
+  readonly pageNumberDigits: 'locale' | 'latn';
 }
 
 /* ------------------------------------------------------------------------------------------ */
@@ -398,7 +401,12 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
   if (el.kind === 'text' || el.kind === 'field' || el.kind === 'aggregate' || el.kind === 'expr' || el.kind === 'richtext') {
     let text = el.kind === 'richtext' ? stripHtmlToPlainText(el.html ?? '') : (el.text ?? '');
     if (ctx.pages !== null && (el.kind === 'text' || el.kind === 'richtext')) {
-      text = replacePageTokens(text, { page: ctx.pageNo, pages: ctx.pages });
+      text = replacePageTokens(text, {
+        page: ctx.pageNo,
+        pages: ctx.pages,
+        locale: ctx.locale,
+        digits: ctx.pageNumberDigits,
+      });
     }
     if (!text) return;
     const bold = !!el.style?.bold;
@@ -620,6 +628,8 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
     pageNo: pageNumber,
     pages: null,
     deferred,
+    locale: tree.locale,
+    pageNumberDigits: tree.pageNumberDigits ?? 'locale',
   });
   if (tree.watermark) await drawWatermark(page, tree.watermark);
 

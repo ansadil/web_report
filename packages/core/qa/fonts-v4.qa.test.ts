@@ -891,32 +891,110 @@ describe.skipIf(!HAS_API)('PdfWarning delivery: throwing onWarning, dedupe', () 
   });
 });
 
-describe.skipIf(!HAS_API)('BUG-25 /W widths: no negative advance in any face', () => {
-  /** Every number inside each CIDFontType2 /W array, per BaseFont. */
-  async function widths(bytes: Uint8Array): Promise<Map<string, number[]>> {
+// BUG-25 /W policy (revised for BUG-26, 36da624): a base glyph must never have a negative /W —
+// that is what made pdf.js drop leading letters on long Naskh lines (ffb99e3). BUG-26 gives
+// advanceless glyphs (every mapped code point Mn or Cf, incl. U+200B placeholders) a small
+// NEGATIVE /W so poppler orders marks after their base; pdf.js never advances its pen over
+// Mn/Cf glyphs, so those are exempt. The pdf.js no-loss corpus below guards the BUG-25 symptom
+// directly, whatever the /W technique.
+const MARK_ONLY = /^[\p{Mn}\p{Cf}]+$/u;
+const utf16be = (h: string) => { const u: number[] = []; for (let k = 0; k < h.length; k += 4) u.push(parseInt(h.slice(k, k + 4), 16)); return String.fromCharCode(...u); };
+describe.skipIf(!HAS_API)('BUG-25 /W widths: no negative advance on base glyphs (Mn/Cf-only glyphs exempt)', () => {
+  /** Per CIDFontType2 (BaseFont): CID → /W width, and CID → ToUnicode text (from the parent Type0). */
+  async function cidInfo(bytes: Uint8Array) {
     const doc = await PDFDocument.load(bytes);
-    const out = new Map<string, number[]>();
-    const flat = (o: unknown): number[] => {
-      const v = o && typeof o === 'object' && 'asArray' in o ? (o as { asArray(): unknown[] }).asArray() : null;
-      if (v) return v.flatMap((x) => flat(doc.context.lookup(x as never) ?? x));
-      const n = Number(String(o));
-      return Number.isFinite(n) ? [n] : [];
-    };
+    const num = (o: unknown) => Number(String(o));
+    const arr = (o: unknown): unknown[] => { const v = doc.context.lookup(o as never) ?? o; return (v as { asArray(): unknown[] }).asArray(); };
+    const out = new Map<string, { w: Map<number, number>; uni: Map<number, string> }>();
     for (const [, obj] of doc.context.enumerateIndirectObjects()) {
-      if (!(obj instanceof PDFDict) || obj.get(PDFName.of('Subtype'))?.toString() !== '/CIDFontType2') continue;
-      const w = obj.get(PDFName.of('W'));
-      out.set(fontName(obj.get(PDFName.of('BaseFont'))!.toString()), w ? flat(doc.context.lookup(w) ?? w) : []);
+      if (!(obj instanceof PDFDict) || obj.get(PDFName.of('Subtype'))?.toString() !== '/Type0') continue;
+      const cid = doc.context.lookup(arr(obj.get(PDFName.of('DescendantFonts')))[0] as never) as PDFDict;
+      const w = new Map<number, number>();
+      const W = cid.get(PDFName.of('W'));
+      if (W) {
+        const a = arr(W);
+        for (let k = 0; k < a.length;) {
+          const c0 = num(a[k]);
+          const nxt = doc.context.lookup(a[k + 1] as never) ?? a[k + 1];
+          if (nxt && typeof nxt === 'object' && 'asArray' in nxt) { arr(nxt).forEach((x, j) => w.set(c0 + j, num(x))); k += 2; }
+          else { const c1 = num(a[k + 1]), v = num(a[k + 2]); for (let c = c0; c <= c1; c++) w.set(c, v); k += 3; }
+        }
+      }
+      const uni = new Map<number, string>();
+      const tu = doc.context.lookup(obj.get(PDFName.of('ToUnicode'))!);
+      const cmap = tu instanceof PDFRawStream ? new TextDecoder('latin1').decode(decodePDFRawStream(tu).decode()) : '';
+      for (const blk of cmap.matchAll(/beginbfchar([\s\S]*?)endbfchar/g))
+        for (const e of blk[1]!.matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]*)>/g)) uni.set(parseInt(e[1]!, 16), utf16be(e[2]!));
+      for (const blk of cmap.matchAll(/beginbfrange([\s\S]*?)endbfrange/g))
+        for (const e of blk[1]!.matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(<[0-9A-Fa-f]*>|\[[^\]]*\])/g)) {
+          const lo = parseInt(e[1]!, 16), hi = parseInt(e[2]!, 16);
+          if (e[3]!.startsWith('[')) [...e[3]!.matchAll(/<([0-9A-Fa-f]*)>/g)].forEach((m, j) => uni.set(lo + j, utf16be(m[1]!)));
+          else { const base = utf16be(e[3]!.slice(1, -1)); for (let c = lo; c <= hi; c++) uni.set(c, base.slice(0, -1) + String.fromCharCode(base.charCodeAt(base.length - 1) + c - lo)); }
+        }
+      out.set(fontName(cid.get(PDFName.of('BaseFont'))!.toString()), { w, uni });
     }
     return out;
   }
-  it('8 faces × dotted / tashkeel / mixed lines: every /W entry ≥ 0', async () => {
+  it('8 faces × dotted / tashkeel / mixed lines: /W ≥ 0 for every CID that maps to a base character; negatives only on Mn/Cf-only CIDs and > -1 em', async () => {
     const text = [...Object.values(LINES), ...Object.values(DOTTED)];
     const els = [...SELECTABLE, undefined].flatMap((f) => [false, true].flatMap((b) => text.map((t) => [f, b, t] as const)));
-    const w = await widths(await toBytes(await exportPdf({ schema: multi(els), rows: [] })));
-    expect([...w.keys()].map(psOf).sort()).toEqual(Object.values(PS).flat().sort((x, y) => x.localeCompare(y)));
-    for (const [font, nums] of w) {
-      expect(nums.length, font).toBeGreaterThan(10);
-      expect(nums.filter((x) => x < 0), font).toEqual([]);
+    const info = await cidInfo(await toBytes(await exportPdf({ schema: multi(els), rows: [] })));
+    expect([...info.keys()].map(psOf).sort()).toEqual(Object.values(PS).flat().sort((x, y) => x.localeCompare(y)));
+    for (const [font, { w, uni }] of info) {
+      expect(w.size, font).toBeGreaterThan(10);
+      const baseNeg: string[] = [], unmappedNeg: number[] = [], markTooNeg: string[] = [];
+      let baseCids = 0;
+      for (const [cid, width] of w) {
+        const u = uni.get(cid);
+        if (u === undefined) { if (width < 0) unmappedNeg.push(cid); continue; }
+        if (MARK_ONLY.test(u)) { if (width <= -1000) markTooNeg.push(`${cid}:${width}`); continue; }
+        baseCids++;
+        if (width < 0) baseNeg.push(`${cid} ${[...u].map((c) => 'U+' + c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')).join(' ')} W=${width}`);
+      }
+      expect(baseCids, font).toBeGreaterThan(5);
+      expect(baseNeg, `${font}: base glyphs with negative /W`).toEqual([]);
+      expect(unmappedNeg, `${font}: unmapped CIDs with negative /W`).toEqual([]);
+      expect(markTooNeg, `${font}: Mn/Cf CIDs with /W ≤ -1 em`).toEqual([]);
     }
   });
+});
+
+// BUG-25 symptom guard (independent of the /W technique): pdf.js must keep every base character
+// (anything that is not whitespace / Mn / Cf / bidi control) on every corpus line, 8 faces × rtl/ltr
+// × 7 lines = 112, incl. the long Noto Naskh lines where ffb99e3 dropped the leading letters.
+const CORPUS = [
+  'بيت ثابت جنة خشب شجن نية يثبت تخت قضيت غيث فيض ظبي',
+  'مُحَمَّدٌ وَعَلِيٌّ يَدْرُسَانِ فِي الْمَدْرَسَةِ الْكَبِيرَةِ',
+  'تقرير المبيعات Sales Report للربع Q3 من عام 2026 بقيمة 12,345.50 SAR',
+  '١٢٣٤٫٥٦ و ١٬٢٣٤٫٥٠ و 0123456789 و ٠١٢٣٤٥٦٧٨٩ نسبة ٪٥٠',
+  'الموعد ١٥ رمضان ١٤٤٧ هـ الموافق 2026-03-05 م يوم الخميس',
+  'Invoice INV-2026-0042 issued to شركة الإدارة الحديثة on 15/03/2026',
+  'لا إلا الإدارة ثلاثة تفتيش نشيج ضيق شيخ غنيمة يتنبأ بثبات',
+] as const;
+const baseChars = (s: string) => [...norm(s)].filter((c) => !/[\s\p{Mn}\p{Cf}]/u.test(c));
+/** Base characters of `src` that are missing from `got` (multiset difference). */
+const lostBase = (src: string, got: string) => {
+  const m = new Map<string, number>();
+  for (const c of baseChars(got)) m.set(c, (m.get(c) ?? 0) + 1);
+  return baseChars(src).filter((c) => { const n = m.get(c) ?? 0; if (n) m.set(c, n - 1); return !n; }).join('');
+};
+describe.skipIf(!HAS_API)('BUG-25 pdf.js: no base letters lost across the 112-line corpus', () => {
+  it('8 faces × rtl/ltr × 7 lines: pdf.js text keeps every base character', async () => {
+    const lost: string[] = [];
+    let n = 0;
+    for (const font of [...SELECTABLE, undefined]) for (const bold of [false, true]) for (const dir of ['rtl', 'ltr'] as const) for (const text of CORPUS) {
+      const schema = mustValidate({
+        version: '1', id: 'qa-corpus', meta: { name: 'c', locale: dir === 'rtl' ? 'ar' : 'en', dir },
+        page: { size: 'A4', orientation: 'portrait', margins: { top: 12, right: 12, bottom: 12, left: 12 } },
+        dataset: { adapter: 'static', source: 'x' }, fields: [],
+        bands: { reportHeader: { height: 20, elements: [{ id: 'a', kind: 'text', value: text, style: { fontSize: 12, ...(bold ? { bold: true } : {}), ...(font ? { font } : {}) }, pos: { x: 0, y: 0, w: 186, h: 10 } }] }, detail: { height: 0, elements: [] } },
+      });
+      const t = await extractPdfText(await toBytes(await exportPdf({ schema, rows: [] })));
+      const miss = lostBase(text, t.items.map((i) => i.str).join(' '));
+      n++;
+      if (miss) lost.push(`${font ?? 'default'}-${bold ? 700 : 400} ${dir} "${text.slice(0, 20)}…" lost "${miss}"`);
+    }
+    expect(n).toBe(112);
+    expect(lost).toEqual([]);
+  }, 120_000);
 });

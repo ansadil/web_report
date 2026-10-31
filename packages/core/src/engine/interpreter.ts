@@ -3,7 +3,6 @@ import { applyPattern } from '@reports-web/shared';
 import type {
   Band,
   Element as ReportElement,
-  Group,
   ReportSchemaV1,
   Style,
   Watermark,

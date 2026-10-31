@@ -44,6 +44,7 @@ export function ReportViewer(props: ReportViewerProps) {
 }
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- augment React JSX intrinsic elements
   namespace JSX {
     interface IntrinsicElements {
       'reports-viewer': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;

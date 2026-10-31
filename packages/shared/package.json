@@ -1,6 +1,14 @@
 {
   "name": "@reports-web/shared",
   "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ansadil/web_report.git",
+    "directory": "packages/shared"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -20,10 +28,11 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "LICENSE", "!dist/**/*.tsbuildinfo"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "lint": "pnpm --dir ../.. exec eslint packages/shared/src",
     "test": "vitest",
     "test:run": "vitest run"
   },

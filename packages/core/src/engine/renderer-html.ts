@@ -1,6 +1,7 @@
 import { escapeHtml, MM_TO_PX } from '@reports-web/shared';
 import type { Style } from '../schema/report-schema.js';
 import type { RenderElement, RenderSection, RenderTree, RenderWatermark } from './interpreter.js';
+import { replacePageTokens, type PageTokenContext } from './page-tokens.js';
 
 function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: number; h: number }): string {
   const css: string[] = [
@@ -53,10 +54,14 @@ function renderElementToHtml(
   el: RenderElement,
   chartId: (id: string) => string,
   codeId: (id: string) => string,
+  pageCtx?: PageTokenContext,
 ): string {
   const style = styleToCss(el.style, el.pos);
   switch (el.kind) {
-    case 'text':
+    case 'text': {
+      const text = pageCtx ? replacePageTokens(el.text ?? '', pageCtx) : (el.text ?? '');
+      return `<div class="rw-el rw-${el.kind}" data-id="${escapeHtml(el.id)}" style="${style}"><span>${escapeHtml(text)}</span></div>`;
+    }
     case 'field':
     case 'aggregate':
     case 'expr':
@@ -116,12 +121,13 @@ function renderSection(
   contentWidth: number,
   chartId: (id: string) => string,
   codeId: (id: string) => string,
+  pageCtx?: PageTokenContext,
 ): string {
   const breakRules: string[] = ['page-break-inside:avoid', 'break-inside:avoid'];
   if (s.pageBreakBefore) { breakRules.push('page-break-before:always', 'break-before:page'); }
   if (s.pageBreakAfter) { breakRules.push('page-break-after:always', 'break-after:page'); }
   const sectionStyle = `position:relative;width:${contentWidth}mm;height:${s.height}mm;${breakRules.join(';')}`;
-  const body = s.elements.map((e) => renderElementToHtml(e, chartId, codeId)).join('');
+  const body = s.elements.map((e) => renderElementToHtml(e, chartId, codeId, pageCtx)).join('');
   return `<section class="rw-section rw-${s.band}" data-band="${s.band}" style="${sectionStyle}">${body}</section>`;
 }
 
@@ -231,18 +237,23 @@ export function renderHtml(
     'overflow:hidden',
   ].join(';');
 
+  const budgetMm = Math.max(10, tree.height - tree.margins.top - tree.margins.bottom);
+  const chunks = chunkSectionsForVisualPages(tree.sections, budgetMm);
+  const pages = Math.max(1, chunks.length);
+
   if (!opts.visualPages) {
-    const sections = tree.sections.map((s) => renderSection(s, contentWidth, chartId, codeId)).join('');
+    // Continuous scroll: number each section by the visual page it would fall on.
+    const sections = chunks
+      .flatMap((chunkSecs, i) => chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages })))
+      .join('');
     const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
     const html = `<article class="rw-report" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleScroll}">${watermark}${sections}</article>`;
     return { html, chartIds, codeIds };
   }
 
-  const budgetMm = Math.max(10, tree.height - tree.margins.top - tree.margins.bottom);
-  const chunks = chunkSectionsForVisualPages(tree.sections, budgetMm);
   const sheets = chunks
-    .map((chunkSecs) => {
-      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId)).join('');
+    .map((chunkSecs, i) => {
+      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages })).join('');
       const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
       return `<div class="rw-page-visual-sheet"><article class="rw-report rw-report-page" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleSheet}">${watermark}${secHtml}</article></div>`;
     })

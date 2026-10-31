@@ -41,6 +41,16 @@
       "types": "./dist/adapters/data/*.d.ts",
       "import": "./dist/adapters/data/*.js"
     },
+    "./adapters/storage/*": {
+      "@reports-web/source": "./src/adapters/storage/*.ts",
+      "types": "./dist/adapters/storage/*.d.ts",
+      "import": "./dist/adapters/storage/*.js"
+    },
+    "./schema/*": {
+      "@reports-web/source": "./src/schema/*.ts",
+      "types": "./dist/schema/*.d.ts",
+      "import": "./dist/schema/*.js"
+    },
     "./exporters/*": {
       "@reports-web/source": "./src/exporters/*.ts",
       "types": "./dist/exporters/*.d.ts",
@@ -64,6 +74,14 @@
       "./adapters/data/*": {
         "types": "./dist/adapters/data/*.d.ts",
         "import": "./dist/adapters/data/*.js"
+      },
+      "./adapters/storage/*": {
+        "types": "./dist/adapters/storage/*.d.ts",
+        "import": "./dist/adapters/storage/*.js"
+      },
+      "./schema/*": {
+        "types": "./dist/schema/*.d.ts",
+        "import": "./dist/schema/*.js"
       },
       "./exporters/*": {
         "types": "./dist/exporters/*.d.ts",

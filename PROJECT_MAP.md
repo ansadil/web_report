@@ -115,7 +115,7 @@ reports_web/
 │   │       ├── components/           # reports-viewer.ts, reports-builder.ts (Lit WC)
 │   │       ├── adapters/
 │   │       │   ├── data/             # rest, graphql, sql-proxy, static, custom, registry
-│   │       │   ├── storage/          # callback, local (StorageAdapter)
+│   │       │   ├── storage/          # callback, local (StorageAdapter); template-store (TemplateStore, InMemoryTemplateStore, contract suite)
 │   │       │   └── chart/            # chartjs (default), abstract types
 │   │       ├── exporters/            # pdf, excel (xlsx+csv), image, print
 │   │       ├── schema/               # ReportSchemaV1 (Zod)
@@ -123,7 +123,8 @@ reports_web/
 │   │       ├── logging/              # async logger (Protocol 4)
 │   │       └── templates/            # blank, tabular, grouped
 │   ├── react/                         @reports-web/react   (thin wrapper)
-│   └── vue/                           @reports-web/vue     (thin wrapper)
+│   ├── vue/                           @reports-web/vue     (thin wrapper)
+│   └── convex/                        @reports-web/convex  (optional: Convex template storage + data adapter)
 │
 ├── apps/
 │   └── playground/                    Vite sandbox مع EN/AR + Viewer/Builder toggle

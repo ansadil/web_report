@@ -15,10 +15,14 @@ export const propertiesStyles = css`
     .prop-search { margin: 0 10px 6px; }
     .prop-search input { width: 100%; height: 30px; border: 1px solid var(--rb-border); border-radius: 7px; padding: 0 8px; }
     .cat { border-top: 1px solid var(--rb-border); }
-    .cat-h { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f7f9fc; font-weight: 700; font-size: 12px; }
+    .cat-h { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 10px; background: #f7f9fc; font: inherit; font-weight: 700; font-size: 12px; border: 0; cursor: pointer; user-select: none; text-align: start; color: inherit; }
+    .cat-h svg { width: 13px; height: 13px; color: var(--rb-muted); transition: transform .15s; flex: none; }
+    .cat.closed .cat-h svg { transform: rotate(90deg); }
+    .cat.closed .cat-b { display: none; }
     .cat-h .cnt { margin-inline-start: auto; color: var(--rb-muted); font-weight: 500; font-size: 10.5px; }
-    .prow { display: grid; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); border-top: 1px solid #eef1f6; min-height: 27px; }
-    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; overflow: hidden; }
+    .prow { display: grid; grid-template-columns: minmax(0, 44%) minmax(0, 56%); border-top: 1px solid #eef1f6; min-height: 27px; }
+    .prow[hidden] { display: none !important; }
+    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
     .prow .v { position: relative; padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%; }
     .prow .v input, .prow .v select {
       width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; height: 24px;

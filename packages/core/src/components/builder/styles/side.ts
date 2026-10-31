@@ -98,7 +98,8 @@ export const sideStyles = css`    aside.left {
     }
     .side-section[data-section='properties'] {
       flex: 1 1 auto;
-      min-height: 160px;
+      min-height: 0;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
     }

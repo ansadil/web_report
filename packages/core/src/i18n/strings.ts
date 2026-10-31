@@ -200,7 +200,14 @@ type StringKey =
   | 'propXRight'
   | 'propYTop'
   | 'propWidth'
-  | 'propHeight';
+  | 'propHeight'
+  | 'dataConnected'
+  | 'searchProperties'
+  | 'sortAlpha'
+  | 'categorize'
+  | 'highlight'
+  | 'relation'
+  | 'listTag';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -291,7 +298,7 @@ const en: Record<StringKey, string> = {
   when: 'When',
   description: 'Description',
   locale: 'Locale',
-  direction: 'Direction',
+  direction: 'Text direction',
   hide: 'Hide',
   show: 'Show',
   customize: 'Customize',
@@ -374,7 +381,7 @@ const en: Record<StringKey, string> = {
   localeRtl: 'Arabic · right to left',
   reportParameters: 'Parameters',
   elements: 'Elements',
-  savedState: 'Saved',
+  savedState: 'Saved just now',
   propertyGrid: 'Property grid',
   events: 'Events',
   positionSize: 'Position & size',
@@ -404,6 +411,13 @@ const en: Record<StringKey, string> = {
   propYTop: 'Top',
   propWidth: 'Width',
   propHeight: 'Height',
+  dataConnected: 'Data source connected',
+  searchProperties: 'Search properties…',
+  sortAlpha: 'Sort',
+  categorize: 'Categorize',
+  highlight: 'Highlight',
+  relation: 'Relation',
+  listTag: 'List',
 };
 
 const ar: Record<StringKey, string> = {
@@ -495,7 +509,7 @@ const ar: Record<StringKey, string> = {
   when: 'عندما',
   description: 'الوصف',
   locale: 'اللغة',
-  direction: 'الاتجاه',
+  direction: 'اتجاه النص',
   hide: 'إخفاء',
   show: 'إظهار',
   customize: 'تخصيص',
@@ -578,7 +592,7 @@ const ar: Record<StringKey, string> = {
   localeRtl: 'العربية · من اليمين لليسار',
   reportParameters: 'المعاملات',
   elements: 'العناصر',
-  savedState: 'تم الحفظ',
+  savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',
   events: 'الأحداث',
   positionSize: 'الموضع والحجم',
@@ -608,6 +622,13 @@ const ar: Record<StringKey, string> = {
   propYTop: 'الأعلى (Y)',
   propWidth: 'العرض',
   propHeight: 'الارتفاع',
+  dataConnected: 'مصدر البيانات متصل',
+  searchProperties: 'ابحث عن خاصية…',
+  sortAlpha: 'ترتيب',
+  categorize: 'تصنيف',
+  highlight: 'لون التعبئة',
+  relation: 'علاقة',
+  listTag: 'قائمة',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

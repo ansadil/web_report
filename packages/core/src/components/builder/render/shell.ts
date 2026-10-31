@@ -1,5 +1,6 @@
 import { html, nothing } from 'lit';
-import { icon, t } from '../api.js';
+import { icon, resolveLabel, t } from '../api.js';
+import { elementStatusName } from '../status-bar.js';
 import { renderBands } from './canvas.js';
 import { renderContextMenu } from './context-menu.js';
 import type { BuilderViewCallbacks, BuilderViewState } from './model.js';
@@ -115,6 +116,8 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
     </aside>
 
     <main class="center" @contextmenu=${cb.onHostContextMenu}>
+      ${renderCrumb(state)}
+      <div class="center-scroll">
       <div class="sheet">
         <div class="ruler-corner" data-testid="ruler-corner"></div>
         ${renderHorizontalRuler(rulers)}
@@ -130,6 +133,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
             ${renderBands(state.canvas, cb.canvas)}
           </div>
         </div>
+      </div>
       </div>
       ${renderContextMenu(state.contextMenu, cb.contextMenu)}
     </main>
@@ -153,6 +157,35 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       ${renderStatusBar(state.status, { onIn: cb.actions.onZoomIn, onOut: cb.actions.onZoomOut, onReset: cb.actions.onZoomReset, onSet: cb.onSetZoom })}
     </div>
   `;
+}
+
+const PAPER_CM: Record<string, readonly [string, string]> = {
+  A4: ['21', '29.7'],
+  A5: ['14.8', '21'],
+  Letter: ['21.6', '27.9'],
+};
+
+function renderCrumb(state: BuilderViewState) {
+  const band = state.canvas.selectedBand;
+  const selected = band
+    ? state.canvas.bands[band]?.elements.find((el) => state.canvas.selectedIds.has(el.id))
+    : undefined;
+  const element = selected ? elementStatusName(selected, state.uiLocale) : t(state.uiLocale, band ?? 'reportHeader');
+  const page = state.properties.schema.page;
+  const dims = PAPER_CM[page.size] ?? PAPER_CM.A4!;
+  const paper = page.orientation === 'landscape' ? `${dims[1]} × ${dims[0]}` : `${dims[0]} × ${dims[1]}`;
+  return html`<div class="crumb-bar" data-testid="crumb-bar">
+    <span class="crumb">
+      <b>${t(state.uiLocale, 'pageOne')}</b>
+      <span class="sep">›</span>
+      <span>${state.name}</span>
+      <span class="sep">›</span>
+      <b>${element}</b>
+    </span>
+    <span class="sp"></span>
+    <span class="chip"><span class="dot"></span>${t(state.uiLocale, 'dataConnected')}</span>
+    <span class="chip">${page.size} · ${t(state.uiLocale, page.orientation === 'landscape' ? 'landscape' : 'portrait')} · ${paper} ${t(state.uiLocale, 'unitCm')}</span>
+  </div>`;
 }
 
 function fieldBadge(type: string): string {
@@ -196,10 +229,12 @@ function renderDictionary(state: BuilderViewState) {
       <details open>
         <summary class="dict-node root">${icon('sectionDown')}${icon('folder')}<span>${t(state.uiLocale, 'dataSources')}</span></summary>
         <details open>
-          <summary class="dict-node source">${icon('sectionDown')}${icon('table')}<span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
-          ${fields.map(
-            (field, index) => html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.type}">${fieldBadge(field.type)}</span><span>${field.name}</span><span class="tmeta">${typeLabel(state, field.type)}</span></div>`,
-          )}
+          <summary class="dict-node source">${icon('sectionDown')}<span class="tic tic-table">${icon('table')}</span><span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
+          ${fields.map((field, index) => {
+            const relation = field.isList ? t(state.uiLocale, 'listTag') : field.children?.length ? t(state.uiLocale, 'relation') : '';
+            return html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.isList || field.children?.length ? 'relation' : field.type}">${fieldBadge(field.type)}</span><span>${resolveLabel(field.label, state.uiLocale, field.name)}</span><span class="tmeta">${relation || typeLabel(state, field.type)}</span></div>`;
+          })}
+          ${state.properties.schema.groups.map((group) => html`<div class="dict-node field"><span class="tic tic-relation">${icon('folder')}</span><span>${group.key}</span><span class="tmeta">${t(state.uiLocale, 'relation')}</span></div>`)}
         </details>
       </details>
       <details open>

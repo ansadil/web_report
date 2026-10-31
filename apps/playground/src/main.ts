@@ -31,7 +31,7 @@ builder.fontsBaseUrl = FONTS_BASE_URL;
 viewer.fontsBaseUrl = FONTS_BASE_URL;
 
 const state = {
-  locale: 'en' as Locale,
+  locale: 'ar' as Locale,
   view: 'builder' as View,
   activeReportId: SAMPLE_REPORTS[0]!.id,
 };
@@ -209,7 +209,4 @@ $('tab-builder').addEventListener('click', () => switchView('builder'));
 $('btn-en').addEventListener('click', () => switchLocale('en'));
 $('btn-ar').addEventListener('click', () => switchLocale('ar'));
 
-applySchema(getSampleReport(state.activeReportId).build());
-renderReportsList();
-renderDatasets();
-void renderSavedList();
+switchLocale('ar');

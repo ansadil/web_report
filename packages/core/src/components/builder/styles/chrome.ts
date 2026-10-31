@@ -62,24 +62,25 @@ export const chromeStyles = css`
   .ribbon-fontcol { display: flex; flex-direction: column; gap: 4px; }
   .ribbon .row { display: flex; gap: 3px; align-items: center; }
   .titlebar {
-    height: 34px; max-height: 34px; overflow: hidden; background: #15233a; color: #e8eef8;
+    height: 34px; max-height: 34px; overflow: hidden; background: #fff; color: #1b2433;
     display: flex; align-items: center; gap: 12px; padding: 0 10px; min-width: 0; z-index: 3;
+    border-bottom: 1px solid #dfe4ec;
   }
   .titlebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; white-space: nowrap; flex: none; }
-  .titlebar .brand .product { font-weight: 500; color: #9fb0c8; }
+  .titlebar .brand .product { font-weight: 500; color: #4a5568; }
   .titlebar .qa { display: flex; gap: 2px; flex: none; }
   .titlebar .qa-btn {
-    width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #c6d2e4;
+    width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #334155;
     display: grid; place-items: center; padding: 0; cursor: pointer;
   }
   .titlebar .qa-btn:disabled { opacity: 0.35; cursor: default; }
   .titlebar .doc-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .titlebar .doc-center input {
-    width: min(280px, 46%); border: 0; background: transparent; color: #fff; text-align: center; font: inherit; font-weight: 600;
+    width: min(280px, 46%); border: 0; background: transparent; color: #1b2433; text-align: center; font: inherit; font-weight: 600;
   }
-  .titlebar .saved { color: #b7c4d8; font-size: 12px; white-space: nowrap; }
-  .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #b7c4d8; font-size: 11.5px; white-space: nowrap; flex: none; }
-  .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #2d4466; color: #fff; display: grid; place-items: center; }
+  .titlebar .saved { color: #7a8699; font-size: 12px; white-space: nowrap; }
+  .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #4a5568; font-size: 11.5px; white-space: nowrap; flex: none; }
+  .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #e7f0fb; color: #1f5fa8; display: grid; place-items: center; }
   .status-spacer { flex: 1; }
   .status-bar .toolbar { background: transparent; padding: 0; gap: 4px; flex: none; }
   .status-bar .zoom input[type='range'] { width: 110px; accent-color: #1f5fa8; }
@@ -104,9 +105,16 @@ export const chromeStyles = css`
   .tmeta { margin-inline-start: auto; color: #7a8699; font-size: 10.5px; background: #f4f6fa; border-radius: 8px; padding: 0 6px; font-weight: 500; }
   .dict-node.root { font-weight: 700; margin-top: 6px; }
   .dict-node.source, .dict-node.field { padding-inline-start: 18px; }
-  .tic { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 800; background: #fdf1dc; color: #b86b06; }
+  .tic { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 800; background: #fdf1dc; color: #b86b06; flex: none; }
+  .tic svg { width: 12px; height: 12px; }
+  .tic-string { background: #fdf1dc; color: #b86b06; }
   .tic-number { background: #e0f5f1; color: #0e8173; }
   .tic-date { background: #fde7ec; color: #c2304f; }
+  .tic-bool { background: #e8ecf3; color: #334155; }
+  .tic-image { background: #e6f0fc; color: #1f5fa8; }
+  .tic-table { background: #e3f6e8; color: #1f8a43; }
+  .tic-relation, .tic-list { background: #efeafd; color: #6740c9; }
+  .tic-static { background: #e8ecf3; color: #334155; }
   .dict-hint {
     margin: 6px 10px 10px; padding: 8px 10px; border: 1px dashed #c8d6ea; border-radius: 8px; background: #f7faff; color: #4a5568; font-size: 11.5px; line-height: 1.5;
   }
@@ -122,9 +130,11 @@ export const chromeStyles = css`
   .ribbon-insert-btn { cursor: grab; flex-direction: column; min-width: 64px; }
   .band-strip { display: flex; flex-direction: column; }
   .band-head {
-    height: ${BAND_HEAD_PX}px; display: flex; align-items: center; padding-inline: 6px;
+    height: ${BAND_HEAD_PX}px; display: flex; align-items: center; gap: 6px; padding-inline: 6px;
     background: #334155; color: #fff; font-size: 10px; font-weight: 700; flex: none;
   }
+  .band-head svg { width: 12px; height: 12px; flex: none; }
+  .band-head .band-settings { margin-inline-start: auto; border: 0; background: transparent; color: inherit; padding: 0; cursor: pointer; display: grid; }
   .band-strip[data-band='reportHeader'] .band-head { background: #6b4fc8; }
   .band-strip[data-band='reportHeader'] .band { background-color: #faf8ff; border-color: #c9bdf0; }
   .band-strip[data-band='pageHeader'] .band-head { background: #2f6fc0; }
@@ -132,6 +142,8 @@ export const chromeStyles = css`
   .band-strip[data-band='dataHeader'] .band-head { background: #0f8a7c; }
   .band-strip[data-band='detail'] .band-head { background: #c47a12; }
   .band-strip[data-band='detail'] .band { background-color: #fffaf0; border-color: #efd4a6; }
+  .band-strip[data-band='groupFooter'] .band-head { background: #be3a5a; }
+  .band-strip[data-band='groupFooter'] .band { background-color: #fff7f9; border-color: #f1c1cd; }
   .band-strip[data-band='reportFooter'] .band-head { background: #be3a5a; }
   .band-strip[data-band='reportFooter'] .band { background-color: #fff7f9; border-color: #f1c1cd; }
   .band-strip[data-band='pageFooter'] .band-head { background: #536176; }

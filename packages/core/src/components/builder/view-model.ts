@@ -40,7 +40,7 @@ import { arrangeSelected } from './ops/arrange.js';
 import { exportJson, newReport, openReportText, saveAsCopy, saveReport } from './ops/io.js';
 import { previewExprText } from './ops/preview.js';
 import { canBringForward, canBringToFront, canSendBackward, canSendToBack } from './ops/zorder.js';
-import { canvasHeightPx, pageContentWidthMm } from './geometry.js';
+import { bandPixelHeight, canvasHeightPx, pageContentWidthMm } from './geometry.js';
 import { BAND_HEAD_PX } from './metrics.js';
 import { elementStatusName } from './status-bar.js';
 import { BAND_KEYS } from './types.js';
@@ -60,10 +60,13 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
   const bandHeightsMm = BAND_KEYS.flatMap((key) => {
     const band = session.schema.bands[key];
     if (!band) return [];
-    return key === 'detail' ? [0, band.height] : [band.height];
+    const own = key === 'detail' ? [0, band.height] : [band.height];
+    if (key !== 'detail') return own;
+    return [...own, ...session.schema.groups.flatMap((group) => (group.footer ? [group.footer.height] : []))];
   });
   const heightMm = bandHeightsMm.reduce((sum, height) => sum + height, 0);
-  const heightPx = canvasHeightPx(session.schema.bands) + bandHeightsMm.length * BAND_HEAD_PX;
+  const groupFooterPx = session.schema.groups.reduce((sum, group) => sum + (group.footer ? bandPixelHeight(group.footer) : 0), 0);
+  const heightPx = canvasHeightPx(session.schema.bands) + groupFooterPx + bandHeightsMm.length * BAND_HEAD_PX;
   const selectedOnly = session.selectedIds.size === 1 && session.selectedBand
     ? session.schema.bands[session.selectedBand]?.elements.find((el) => session.selectedIds.has(el.id))
     : undefined;
@@ -121,6 +124,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
         underline: Boolean(selectedOnly?.style?.underline),
         strike: Boolean(selectedOnly?.style?.strike),
         color: selectedOnly?.style?.color ?? '#111111',
+        highlight: selectedOnly?.style?.background ?? '#f6c344',
         align: selectedOnly?.style?.align ?? '',
       },
     },
@@ -147,6 +151,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     canvas: {
       locale,
       bands: session.schema.bands,
+      groups: session.schema.groups,
       hoverBand: session.hoverBand,
       marquee: session.marquee,
       selectedIds: session.selectedIds,

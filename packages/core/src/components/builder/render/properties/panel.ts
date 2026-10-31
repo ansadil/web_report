@@ -4,7 +4,7 @@ import { lineThicknessMm, t } from '../../api.js';
 import type { ConditionalFormatRule, ReportElement, Style } from '../../api.js';
 import { elementStatusName, formatLocalizedNumber, parseLocalizedNumber } from '../../status-bar.js';
 import type { BandKey } from '../../types.js';
-import { renderDocumentProperties, type DocumentCallbacks, type DocumentState } from './document.js';
+import { renderDocumentProperties, renderInspectorChrome, type DocumentCallbacks, type DocumentState } from './document.js';
 import { renderKindSpecific } from './kinds/index.js';
 
 export interface PropertiesState extends DocumentState {
@@ -89,7 +89,7 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
         <button type="button" class="on" @click=${(e: Event) => toggleInspector(e, false)}>${t(state.locale, 'properties')}</button>
         <button type="button" @click=${(e: Event) => toggleInspector(e, true)}>${t(state.locale, 'events')}</button>
       </div>
-      <div class="prop-search"><input placeholder=${t(state.locale, 'properties')} @input=${filterRows} /></div>
+      ${renderInspectorChrome(state.locale, filterRows)}
       <div class="props-body">
       <section class="cat">
         <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">5</span></div>
@@ -100,9 +100,13 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
         ${gridRow(t(state.locale, 'propHeight'), html`<input data-testid="prop-height" .value=${el.kind === 'line' ? formatLocalizedNumber(lineThicknessMm(el.thickness ?? 1) / 10, fmt, 2) : cm(el.pos.h)} ?disabled=${el.kind === 'line' && el.orientation === 'horizontal'} @input=${(e: Event) => setCm('h', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
       </section>
       <section class="cat">
-        <div class="cat-h">${t(state.locale, 'textAndFont')}<span class="cnt">6</span></div>
+        <div class="cat-h">${t(state.locale, 'textAndFont')}<span class="cnt">7</span></div>
         ${gridRow(t(state.locale, 'fontFamily'), html`<input data-testid="prop-font-family" .value=${family} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} />`)}
         ${gridRow(t(state.locale, 'fontSize'), html`<input data-testid="prop-font-size" .value=${formatLocalizedNumber(el.style?.fontSize ?? 10, fmt, 0)} @input=${(e: Event) => { const n = parseLocalizedNumber((e.target as HTMLInputElement).value); if (Number.isFinite(n)) updateStyle({ fontSize: n }); }} />`, t(state.locale, 'unitPt'))}
+        ${gridRow(t(state.locale, 'direction'), html`<span class="pick"><span class="pick-label">${t(state.locale, state.schema.meta.dir === 'rtl' ? 'dirRtl' : 'dirLtr')}</span><select data-testid="prop-text-direction" @change=${(e: Event) => cb.updateMeta({ dir: (e.target as HTMLSelectElement).value as 'rtl' | 'ltr' })}>
+          <option value="ltr" ?selected=${state.schema.meta.dir !== 'rtl'}>${t(state.locale, 'dirLtr')}</option>
+          <option value="rtl" ?selected=${state.schema.meta.dir === 'rtl'}>${t(state.locale, 'dirRtl')}</option>
+        </select></span>`)}
         ${gridRow(t(state.locale, 'align'), html`<span class="pick"><span class="pick-label">${alignLabel}</span><select data-testid="prop-align" @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
           <option value="">-</option>
           <option value="start" ?selected=${el.style?.align === 'start'}>${t(state.locale, 'alignStart')}</option>

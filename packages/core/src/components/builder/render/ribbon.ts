@@ -19,6 +19,7 @@ export interface RibbonFontState {
   underline: boolean;
   strike: boolean;
   color: string;
+  highlight?: string;
   align: Style['align'] | '';
 }
 
@@ -137,7 +138,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               <div class="ribbon-smallcol">
                 ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
                 ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
-                <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-format-painter" ?disabled=${!state.canCut}><span>${t(state.locale, 'formatPainter')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-format-painter" ?disabled=${!state.canCut}>${icon('wand')}<span>${t(state.locale, 'formatPainter')}</span></button>
               </div>
             `,
           )}
@@ -152,8 +153,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
                     ?disabled=${!font.enabled}
                     @change=${(ev: Event) => cb.onStyle({ font: (ev.target as HTMLSelectElement).value || undefined })}
                   >
-                    <option value="" ?selected=${font.family === ''}>—</option>
-                    ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family}>${family}</option>`)}
+                    ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family || (font.family === '' && family === 'Cairo') || font.family.startsWith(`${family},`)}>${family}</option>`)}
                   </select>
                   <input
                     data-testid="ribbon-font-size"
@@ -177,6 +177,10 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
                   <label class="color-swatch" title=${t(state.locale, 'color')}>
                     <span class="bar" style=${`background:${colorInputValue(font.color)}`}></span>
                     <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
+                  </label>
+                  <label class="color-swatch" title=${t(state.locale, 'highlight')}>
+                    <span class="bar" style=${`background:${colorInputValue(font.highlight ?? '#f6c344')}`}></span>
+                    <input data-testid="ribbon-font-highlight" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.highlight ?? '#f6c344')} @input=${(ev: Event) => cb.onStyle({ background: (ev.target as HTMLInputElement).value })} />
                   </label>
                 </div>
               </div>

@@ -9,6 +9,9 @@ export const propertiesStyles = css`
     .ptoggle { display: flex; gap: 4px; margin: 0 10px 6px; }
     .ptoggle button { flex: 1; border: 1px solid var(--rb-border); background: #fff; border-radius: 6px; height: 26px; cursor: pointer; color: #4a5568; }
     .ptoggle button.on { background: #e7f0fb; border-color: #b9d2f1; color: #1f5fa8; font-weight: 600; }
+    .prop-tools { display: flex; justify-content: flex-end; gap: 4px; margin: 0 10px 6px; }
+    .prop-tools button { border: 1px solid var(--rb-border); background: #fff; border-radius: 6px; height: 24px; padding: 0 8px; cursor: pointer; color: #4a5568; font: inherit; font-size: 11px; }
+    .prop-tools button.on { background: #e7f0fb; border-color: #b9d2f1; color: #1f5fa8; font-weight: 600; }
     .prop-search { margin: 0 10px 6px; }
     .prop-search input { width: 100%; height: 30px; border: 1px solid var(--rb-border); border-radius: 7px; padding: 0 8px; }
     .cat { border-top: 1px solid var(--rb-border); }

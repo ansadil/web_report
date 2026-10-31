@@ -53,10 +53,14 @@ const url = await resolveFontUrl({ family: '"Cairo", sans-serif', weight: 700 },
 
 ```sh
 python3 -m venv .venv-fonts
-.venv-fonts/bin/pip install fonttools==4.68.0 brotli==1.2.1
+.venv-fonts/bin/pip install fonttools==4.65.0 brotli==1.2.1
 .venv-fonts/bin/python scripts/subset-fonts.py           # TTFs + fonts.json + OFL texts
 .venv-fonts/bin/python scripts/subset-fonts.py --woff2   # also the UI .woff2 files
 .venv-fonts/bin/python scripts/subset-fonts.py --check   # verify the committed files reproduce
 ```
+
+fonttools is pinned to **4.65.0**, the version the committed TTFs are verified against
+(`--check` in a fresh venv; QA saw different bytes with 4.68.0). The script refuses other
+versions unless `--any-fonttools` is passed.
 
 Licenses: SIL OFL 1.1, see `OFL-*.txt` here and `THIRD_PARTY_NOTICES.md` at the repo root.

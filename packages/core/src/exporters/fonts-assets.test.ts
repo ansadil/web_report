@@ -47,7 +47,6 @@ describe('assets/fonts manifest', () => {
       expect([400, 700]).toContain(e.weight);
       expect(e.style).toBe('normal');
       expect(e.ttf).toMatch(/^[A-Za-z0-9][A-Za-z0-9._-]*\.ttf$/);
-      // woff2 is the expected UI file name; the files themselves come with the UI PR.
       expect(e.woff2).toBe(e.ttf.replace(/\.ttf$/, '.woff2'));
     }
   });
@@ -62,7 +61,10 @@ describe('assets/fonts manifest', () => {
   });
 
   it('every ttf exists; every ttf in the folder is in the manifest; one OFL text per font project', () => {
-    for (const e of manifest) expect(existsSync(DIR + e.ttf), e.ttf).toBe(true);
+    for (const e of manifest) {
+      expect(existsSync(DIR + e.ttf), e.ttf).toBe(true);
+      expect(existsSync(DIR + e.woff2), e.woff2).toBe(true);
+    }
     const files = readdirSync(DIR);
     expect(files.filter((f) => f.endsWith('.ttf')).sort()).toEqual(manifest.map((e) => e.ttf).sort());
     expect(files.filter((f) => /^OFL-.+\.txt$/.test(f)).sort()).toEqual(['OFL-Cairo.txt', 'OFL-NotoNaskhArabic.txt', 'OFL-NotoSans.txt', 'OFL-Tajawal.txt']);

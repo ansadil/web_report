@@ -1,7 +1,7 @@
 import type { LocaleTag } from '@reports-web/shared';
 import { html } from 'lit';
 import { t } from '../api.js';
-import { formatCursorMm, formatPageIndicator, formatSelectionSummary, formatZoomPercent } from '../status-bar.js';
+import { formatPageIndicator, formatSelectionSummary, formatZoomPercent } from '../status-bar.js';
 
 export interface StatusBarState {
   locale: LocaleTag;
@@ -16,7 +16,7 @@ export function renderStatusBar(state: StatusBarState) {
   return html`
     <footer class="status-bar" data-testid="status-bar">
       <span class="status-item" data-testid="status-zoom"><b>${formatZoomPercent(state.zoom)}</b></span>
-      <span class="status-item" data-testid="status-cursor">${t(state.locale, 'statusCursor')} ${formatCursorMm(state.cursor)}</span>
+      <span class="status-item" data-testid="status-cursor">${t(state.locale, 'statusCursor')} <span data-testid="status-cursor-value"></span></span>
       <span class="status-item" data-testid="status-selection">${t(state.locale, 'statusSelection')} ${formatSelectionSummary(state.selection)}</span>
       <span class="status-item" data-testid="status-page">${t(state.locale, 'statusPage')} ${formatPageIndicator(state.page, state.pages)}</span>
     </footer>

@@ -90,8 +90,8 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
           </div>
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'page'}>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-portrait" @click=${cb.onPortrait}>${icon('toolBox')}<span>${t(state.locale, 'portrait')}</span></button>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-landscape" @click=${cb.onLandscape}>${icon('fitWidth')}<span>${t(state.locale, 'landscape')}</span></button>
+          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-portrait" @click=${cb.onPortrait}>${icon('portrait')}<span>${t(state.locale, 'portrait')}</span></button>
+          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-landscape" @click=${cb.onLandscape}>${icon('landscape')}<span>${t(state.locale, 'landscape')}</span></button>
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'view'}>
           <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-out" @click=${cb.actions.onZoomOut}>${icon('zoomOut')}<span>${t(state.locale, 'zoomOut')}</span></button>
@@ -99,7 +99,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
           <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-reset" @click=${cb.actions.onZoomReset}>${icon('fitWidth')}<span>${t(state.locale, 'zoomReset')}</span></button>
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'preview'}>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview" @click=${cb.actions.onPreview}>${icon('eye')}<span>${t(state.locale, 'preview')}</span></button>
+          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-tab" @click=${cb.actions.onPreview}>${icon('eye')}<span>${t(state.locale, 'preview')}</span></button>
         </div>
       </div>
     </div>

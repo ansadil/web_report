@@ -36,6 +36,8 @@ import { exportJson, saveReport } from './ops/io.js';
 import { previewExprText } from './ops/preview.js';
 import { canBringForward, canBringToFront, canSendBackward, canSendToBack } from './ops/zorder.js';
 import { canvasHeightPx, pageContentWidthMm } from './geometry.js';
+import { BAND_HEAD_PX } from './metrics.js';
+import { elementStatusName } from './status-bar.js';
 import { BAND_KEYS } from './types.js';
 import type { BuilderViewCallbacks, BuilderViewState } from './render/model.js';
 import type { BuilderSession } from './session.js';
@@ -49,9 +51,12 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
   const locale = session.uiLocale;
   const widthMm = pageContentWidthMm(session.schema.page);
   const widthPx = widthMm * MM_TO_PX;
-  const strips = BAND_KEYS.filter((key) => session.schema.bands[key]).length;
-  const heightMm = BAND_KEYS.reduce((sum, key) => sum + (session.schema.bands[key]?.height ?? 0), 0);
-  const heightPx = canvasHeightPx(session.schema.bands) + strips * 18;
+  const bandHeightsMm = BAND_KEYS.flatMap((key) => {
+    const band = session.schema.bands[key];
+    return band ? [band.height] : [];
+  });
+  const heightMm = bandHeightsMm.reduce((sum, height) => sum + height, 0);
+  const heightPx = canvasHeightPx(session.schema.bands) + bandHeightsMm.length * BAND_HEAD_PX;
   const selectedOnly = session.selectedIds.size === 1 && session.selectedBand
     ? session.schema.bands[session.selectedBand]?.elements.find((el) => session.selectedIds.has(el.id))
     : undefined;
@@ -75,6 +80,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     zoom: session.zoom,
     widthMm,
     heightMm,
+    bandHeightsMm,
     collapsed: session.collapsedSections,
     ribbon: {
       locale,
@@ -99,7 +105,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       locale,
       zoom: session.zoom,
       cursor: session.cursorMm,
-      selection: selectedOnly ? { name: selectedOnly.id, w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
+      selection: selectedOnly ? { name: elementStatusName(selectedOnly), w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
       page: 1,
       pages: 1,
     },
@@ -148,6 +154,9 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     onToggleLeft: () => toggleLeft(session),
     onToggleSection: (key) => toggleSection(session, key),
     onHostContextMenu: ports.pointer.onHostContextMenu,
+    onCanvasPointerLeave: () => {
+      session.cursorMm = null;
+    },
     actions: {
       onNameInput: (value) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, name: value } }),
       onUndo: () => performUndo(session),

@@ -15,6 +15,8 @@ import { t } from '../i18n/strings.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
+import { DEFAULT_FONTS_BASE_URL } from '../exporters/fonts-manifest.js';
+import { ensureReportFonts } from './web-fonts.js';
 
 type ViewerAction = 'print' | 'pdf' | 'excel' | 'csv' | 'image';
 const VIEWER_ACTION_KIND: Record<ViewerAction, 'print' | 'pdf' | 'excel' | 'csv' | 'png'> = {
@@ -47,7 +49,7 @@ export class ReportsViewerElement extends LitElement {
       --rw-button-text: #111111;
       --rw-accent: #2563eb;
       --rw-error: #b91c1c;
-      --rw-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --rw-font: Cairo, Tajawal, 'Noto Naskh Arabic', 'Segoe UI', system-ui, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: stretch;
@@ -201,6 +203,8 @@ export class ReportsViewerElement extends LitElement {
   @property({ type: String }) locale: LocaleTag | undefined = undefined;
   /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
   @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
+  /** Folder of fonts.json and the woff2 faces. Default: the bundled assets/fonts directory. */
+  @property({ type: String, attribute: 'fonts-base-url' }) fontsBaseUrl = DEFAULT_FONTS_BASE_URL;
   private _syncingDir = false;
 
   override attributeChangedCallback(name: string, old: string | null, value: string | null): void {
@@ -256,6 +260,7 @@ export class ReportsViewerElement extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    void ensureReportFonts(this.schema, this.fontsBaseUrl);
     void this._renderReport();
   }
 
@@ -275,8 +280,10 @@ export class ReportsViewerElement extends LitElement {
       changed.has('params') ||
       changed.has('locale') ||
       changed.has('dir') ||
-      changed.has('hidePageBoundaries')
+      changed.has('hidePageBoundaries') ||
+      changed.has('fontsBaseUrl')
     ) {
+      if (changed.has('fontsBaseUrl') || changed.has('schema')) void ensureReportFonts(this.schema, this.fontsBaseUrl);
       void this._renderReport();
     }
     if (changed.has('_zoom')) {
@@ -613,7 +620,7 @@ export class ReportsViewerElement extends LitElement {
       }
       if (kind === 'pdf') {
         const { exportPdf } = await import('../exporters/pdf.js');
-        const blob = await exportPdf({ schema: finalSchema, rows });
+        const blob = await exportPdf({ schema: finalSchema, rows, fontsBaseUrl: this.fontsBaseUrl });
         this.dispatchEvent(new CustomEvent('export', { detail: { kind, blob, filename: `${finalSchema.id}.pdf` } }));
       } else if (kind === 'excel') {
         const { exportExcel } = await import('../exporters/excel.js');

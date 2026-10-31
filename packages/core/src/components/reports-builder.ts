@@ -11,6 +11,7 @@ import {
   buildViewModel,
   emptySchema,
   loadFields,
+  formatCursorMm,
   logger,
   renderBuilder,
   replaceSchema,
@@ -30,6 +31,8 @@ import type {
   StorageAdapter,
 } from './builder/index.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
+import { DEFAULT_FONTS_BASE_URL } from '../exporters/fonts-manifest.js';
+import { ensureReportFonts } from './web-fonts.js';
 
 export class ReportsBuilderElement extends LitElement {
   static override styles = builderStyles;
@@ -43,6 +46,8 @@ export class ReportsBuilderElement extends LitElement {
   /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
   @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
   @property({ attribute: false }) actions: readonly BuilderAction[] = BUILDER_DEFAULT_ACTIONS;
+  /** Folder of fonts.json and the woff2 faces. Default: the bundled assets/fonts directory. */
+  @property({ type: String, attribute: 'fonts-base-url' }) fontsBaseUrl = DEFAULT_FONTS_BASE_URL;
 
   @state() private _schema: ReportSchemaV1 = emptySchema();
   @state() private _selectedIds: ReadonlySet<string> = new Set();
@@ -65,7 +70,9 @@ export class ReportsBuilderElement extends LitElement {
   };
   @state() private _contextMenu: ContextMenuState | null = null;
   @state() private _ribbonTab: RibbonTab = 'home';
-  @state() private _cursorMm: { x: number; y: number } | null = null;
+  /** Painted into the status bar directly so a pointer move does not re-render the designer. */
+  private _cursorMm: { x: number; y: number } | null = null;
+  private _cursorFrame = 0;
 
   private _clipboard: ElementClipboard | null = null;
   private readonly _history = new HistoryStore(() => {
@@ -110,6 +117,7 @@ export class ReportsBuilderElement extends LitElement {
     if (!this.hasAttribute('tabindex')) this.tabIndex = 0;
     if (this.schema) replaceSchema(this.session, structuredClone(this.schema), { resetHistory: true });
     void loadFields(this.session);
+    void ensureReportFonts(this._schema, this.fontsBaseUrl);
   }
 
   override disconnectedCallback(): void {
@@ -129,7 +137,29 @@ export class ReportsBuilderElement extends LitElement {
       }
     }
     if (changed.has('dataAdapter') || schemaChanged) void loadFields(this.session);
+    if (changed.has('fontsBaseUrl') || schemaChanged) void ensureReportFonts(this._schema, this.fontsBaseUrl);
     if (changed.has('_leftCollapsed')) this.setAttribute('data-left-collapsed', String(this._leftCollapsed));
+    this._paintCursor();
+  }
+
+  private _paintCursor(): void {
+    const node = this.renderRoot.querySelector('[data-testid="status-cursor-value"]');
+    if (!node) return;
+    node.textContent = formatCursorMm(this._cursorMm);
+  }
+
+  private _queueCursor(point: { x: number; y: number } | null): void {
+    this._cursorMm = point;
+    if (this._cursorFrame) return;
+    const raf = globalThis.requestAnimationFrame?.bind(globalThis);
+    if (!raf) {
+      this._paintCursor();
+      return;
+    }
+    this._cursorFrame = raf(() => {
+      this._cursorFrame = 0;
+      this._paintCursor();
+    });
   }
 
   override render(): unknown {
@@ -202,7 +232,7 @@ export class ReportsBuilderElement extends LitElement {
     };
     const cursorMm = () => this._cursorMm;
     const setCursorMm = (v: { x: number; y: number } | null) => {
-      this._cursorMm = v;
+      this._queueCursor(v);
     };
     const actions = () => this.actions;
     const setActions = (v: readonly BuilderAction[]) => {

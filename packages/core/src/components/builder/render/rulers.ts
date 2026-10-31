@@ -1,9 +1,11 @@
 import { html } from 'lit';
-import { rulerMarks, rulerTickInsetPx } from '../ruler.js';
+import { rulerMarks, rulerTickInsetPx, verticalRulerTickTopPx } from '../ruler.js';
 
 export interface RulerState {
   widthMm: number;
   heightMm: number;
+  /** Content height of each visible band, in order. Headers are inserted by the tick offset. */
+  bandHeightsMm: readonly number[];
   zoom: number;
   dir: 'ltr' | 'rtl';
 }
@@ -28,7 +30,7 @@ export function renderVerticalRuler(state: RulerState) {
     <div class="ruler ruler-v" data-testid="ruler-v">
       ${rulerMarks(state.heightMm).map(
         (mark) => html`
-          <span class="ruler-tick ${mark.major ? 'major' : ''}" style="top:${rulerTickInsetPx(mark.mm, state.zoom)}px"
+          <span class="ruler-tick ${mark.major ? 'major' : ''}" style="top:${verticalRulerTickTopPx(mark.mm, state.bandHeightsMm, state.zoom)}px"
             >${mark.major ? String(mark.mm) : ''}</span
           >
         `,

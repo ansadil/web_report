@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCursorMm, formatPageIndicator, formatSelectionSummary, formatZoomPercent } from './status-bar.js';
+import { elementStatusName, formatCursorMm, formatPageIndicator, formatSelectionSummary, formatZoomPercent } from './status-bar.js';
 
 describe('designer status bar', () => {
   it('formats zoom as a whole percent', () => {
@@ -15,7 +15,16 @@ describe('designer status bar', () => {
 
   it('formats the selected element name and size', () => {
     expect(formatSelectionSummary(null)).toBe('—');
-    expect(formatSelectionSummary({ name: 'text-1', w: 30, h: 8 })).toBe('text-1 · 30.0 × 8.0 mm');
+    expect(formatSelectionSummary({ name: 'Title', w: 30, h: 8 })).toBe('Title · 30.0 × 8.0 mm');
+  });
+
+  it('uses a label when the element has one, otherwise the kind', () => {
+    expect(elementStatusName({ kind: 'text', value: 'Hello' })).toBe('Hello');
+    expect(elementStatusName({ kind: 'text', value: '  ' })).toBe('text');
+    expect(elementStatusName({ kind: 'field', field: 'amount' })).toBe('amount');
+    expect(elementStatusName({ kind: 'aggregate', fn: 'sum', field: 'amount' })).toBe('sum(amount)');
+    expect(elementStatusName({ kind: 'line' })).toBe('line');
+    expect(elementStatusName({ id: 'el-1', kind: 'box' } as { kind: string })).toBe('box');
   });
 
   it('formats the page indicator as n / m', () => {

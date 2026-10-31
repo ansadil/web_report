@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ParameterDef } from '@reports-web/shared';
+import { canonicalizeLocaleTag, directionForLocale, type LocaleTag } from '@reports-web/shared';
 
 export const PageSizeName = z.enum(['A4', 'A5', 'Letter']);
 export type PageSizeName = z.infer<typeof PageSizeName>;
@@ -8,7 +9,14 @@ export const FieldType = z.enum(['string', 'number', 'date', 'bool', 'image']);
 export type FieldType = z.infer<typeof FieldType>;
 
 export const Direction = z.enum(['rtl', 'ltr']);
-export const Locale = z.enum(['ar', 'en']);
+/**
+ * Report locale: any valid BCP 47 tag ('ar', 'en', 'ar-SA', 'ar-SA-u-nu-latn', 'en-GB', ...),
+ * checked with Intl.getCanonicalLocales and stored in canonical form ('AR-sa' -> 'ar-SA').
+ */
+export const Locale = z
+  .string()
+  .refine((s) => canonicalizeLocaleTag(s) !== null, { message: 'Invalid BCP 47 locale tag' })
+  .transform((s): LocaleTag => canonicalizeLocaleTag(s)!);
 
 export const PositionSchema = z.object({
   x: z.number().min(0),
@@ -259,11 +267,16 @@ const ReportMetaSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   locale: Locale.default('en'),
-  /** When omitted, inferred from locale: 'ar' means 'rtl'. */
+  /** When omitted, inferred from locale: RTL languages (ar, fa, he, ur, ... incl. ar-*) mean 'rtl'. */
   dir: Direction.optional(),
+  /**
+   * Digits for {page}/{pages} tokens: 'locale' (default) follows the report locale
+   * (Arabic-Indic for Arabic), 'latn' forces Western digits.
+   */
+  pageNumberDigits: z.enum(['locale', 'latn']).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-}).transform((m) => ({ ...m, dir: m.dir ?? (m.locale === 'ar' ? 'rtl' : 'ltr') }));
+}).transform((m) => ({ ...m, dir: m.dir ?? directionForLocale(m.locale) }));
 
 const BandsBlockSchema = z.object({
   reportHeader: BandSchema.optional(),

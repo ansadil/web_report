@@ -234,7 +234,39 @@ describe('PDF page tokens', () => {
     });
     const lines = await readDrawnLines(await pdfBytes(s));
     const footers = lines.filter((l) => l.visual.includes('صفحة') || l.visual.includes('ةحفص'));
+    expect(footers.map((l) => l.visual)).toEqual([expectedVisual('صفحة ١ من ٢', 'rtl'), expectedVisual('صفحة ٢ من ٢', 'rtl')]);
+  });
+
+  const twoPages = (meta: AnyObj, footer: string): ReportSchemaV1 =>
+    schema([text('a', 'أ', 0)], meta, {
+      reportHeader: { height: 10, elements: [text('a', 'أ', 0)], pageBreakAfter: true },
+      pageFooter: { height: 8, elements: [text('pf', footer, 0)] },
+    });
+
+  it('page numbers follow the report locale: Arabic-Indic in ar (also via the Arabic aliases)', async () => {
+    const lines = await readDrawnLines(await pdfBytes(twoPages({ name: 'T', locale: 'ar', dir: 'rtl' }, 'صفحة {صفحة} من {صفحات}')));
+    const footers = lines.filter((l) => l.visual.includes('ةحفص') || l.visual.includes('صفحة'));
+    expect(footers.map((l) => l.visual)).toEqual([expectedVisual('صفحة ١ من ٢', 'rtl'), expectedVisual('صفحة ٢ من ٢', 'rtl')]);
+  });
+
+  it('meta.pageNumberDigits = "latn" forces Western page numbers in an Arabic report', async () => {
+    const lines = await readDrawnLines(await pdfBytes(twoPages({ name: 'T', locale: 'ar', dir: 'rtl', pageNumberDigits: 'latn' }, 'صفحة {page} من {pages}')));
+    const footers = lines.filter((l) => l.visual.includes('ةحفص') || l.visual.includes('صفحة'));
     expect(footers.map((l) => l.visual)).toEqual([expectedVisual('صفحة 1 من 2', 'rtl'), expectedVisual('صفحة 2 من 2', 'rtl')]);
+  });
+
+  it('page numbers are Western in an en report', async () => {
+    const lines = await readDrawnLines(await pdfBytes(twoPages({ name: 'T', locale: 'en', dir: 'ltr' }, 'Page {page} of {pages}')));
+    const all = lines.map((l) => l.visual).join('\n');
+    expect(all).toContain('Page 1 of 2');
+    expect(all).toContain('Page 2 of 2');
+    expect(all).not.toMatch(/[\u0660-\u0669]/);
+  });
+
+  it('rejects an invalid pageNumberDigits value; old templates without it still validate', () => {
+    const base = { version: '1', id: 'x', dataset: { adapter: 'static', source: 't' }, fields: [], bands: { detail: { height: 0, elements: [] } } };
+    expect(validateReport({ ...base, meta: { name: 'T', locale: 'ar', pageNumberDigits: 'hindi' } }).ok).toBe(false);
+    expect(validateReport({ ...base, meta: { name: 'T', locale: 'ar' } }).ok).toBe(true);
   });
 
   it('never replaces tokens inside data values', async () => {
@@ -278,5 +310,34 @@ describe('PDF non-text elements', () => {
     expect((await loadImageBytes(PNG_1PX))?.[1]).toBe(0x50);
     expect(encodeBarcode('12345678')?.bars).toMatch(/^[01]+$/);
     expect(encodeBarcode('abc', 'EAN13')).toBeNull();
+  });
+});
+
+describe('PDF with a BCP 47 Arabic locale (ar-SA)', () => {
+  // No meta.dir: it is inferred from the locale (ar-SA -> rtl).
+  const arSa = (): ReportSchemaV1 =>
+    schema([text('mix', 'ABC تقرير', 0)], { name: 'T', locale: 'ar-SA' }, {
+      detail: { height: 9, elements: [{ id: 'n', kind: 'field', field: 'n', format: 'decimal2', pos: { x: 0, y: 0, w: 100, h: 8 } }] },
+    });
+
+  it('infers rtl and draws Arabic-Indic digits in RTL visual order', async () => {
+    const s = arSa();
+    expect(s.meta.locale).toBe('ar-SA');
+    expect(s.meta.dir).toBe('rtl');
+    const lines = (await readDrawnLines(await pdfBytes(s, [{ n: 1234.5 }]))).map((l) => l.visual);
+    expect(lines).toContain(expectedVisual('١٬٢٣٤٫٥٠', 'rtl'));
+    expect(expectedVisual('ABC تقرير', 'rtl')).not.toBe(expectedVisual('ABC تقرير', 'ltr'));
+    expect(lines).toContain(expectedVisual('ABC تقرير', 'rtl'));
+    expect(lines.join('\n')).not.toContain('1,234.50');
+  });
+
+  it('ar-SA-u-nu-latn keeps Western digits but stays rtl', async () => {
+    const s = schema([text('mix', 'ABC تقرير', 0)], { name: 'T', locale: 'ar-SA-u-nu-latn' }, {
+      detail: { height: 9, elements: [{ id: 'n', kind: 'field', field: 'n', format: 'decimal2', pos: { x: 0, y: 0, w: 100, h: 8 } }] },
+    });
+    expect(s.meta.dir).toBe('rtl');
+    const all = (await readDrawnLines(await pdfBytes(s, [{ n: 1234.5 }]))).map((l) => l.visual).join('\n');
+    expect(all).not.toMatch(/[\u0660-\u0669]/);
+    expect(all).toMatch(/1.234.50|1,234.50/);
   });
 });

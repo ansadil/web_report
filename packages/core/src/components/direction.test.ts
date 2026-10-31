@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveDir, resolveLocale } from './direction.js';
 import { validateReport } from '../schema/report-schema.js';
+import { t } from '../i18n/strings.js';
 import './reports-viewer.js';
 import './reports-builder.js';
 import type { ReportsViewerElement } from './reports-viewer.js';
@@ -114,5 +115,76 @@ describe('host dir attribute follows the template without becoming an override',
     expect(v.dir).toBe('ltr');
     expect(v.shadowRoot!.querySelector('.surface')!.getAttribute('dir')).toBe('ltr');
     v.remove();
+  });
+});
+
+describe('resolveDir infers rtl for every RTL locale tag (isRtlLocale)', () => {
+  it.each(['ar', 'ar-SA', 'ar-EG', 'fa', 'fa-IR', 'he', 'ur', 'ps', 'sd', 'ckb', 'yi', 'dv'])('%s -> rtl', (locale) => {
+    expect(resolveDir(undefined, { locale })).toBe('rtl');
+    expect(resolveDir('', null, locale)).toBe('rtl');
+  });
+  it.each(['en', 'en-US', 'en-GB', 'fr', 'arn', 'xx_yy!!'])('%s -> ltr', (locale) => {
+    expect(resolveDir(undefined, { locale })).toBe('ltr');
+    expect(resolveDir('', null, locale)).toBe('ltr');
+  });
+  it('explicit meta.dir always wins over the locale', () => {
+    expect(resolveDir(undefined, { locale: 'ar-SA', dir: 'ltr' })).toBe('ltr');
+    expect(resolveDir(undefined, { locale: 'he', dir: 'ltr' })).toBe('ltr');
+    expect(resolveDir(undefined, { locale: 'en-US', dir: 'rtl' })).toBe('rtl');
+    expect(resolveDir(undefined, { locale: 'fr', dir: 'rtl' })).toBe('rtl');
+  });
+  it('host dir wins over meta.dir and the locale', () => {
+    expect(resolveDir('ltr', { locale: 'ar-EG' })).toBe('ltr');
+    expect(resolveDir('rtl', { locale: 'en-US', dir: 'ltr' })).toBe('rtl');
+  });
+  it('resolveLocale keeps full BCP 47 tags', () => {
+    expect(resolveLocale(undefined, { locale: 'ar-SA' })).toBe('ar-SA');
+    expect(resolveLocale('fa-IR', { locale: 'ar' })).toBe('fa-IR');
+  });
+});
+
+describe('schema meta.dir default for BCP 47 tags', () => {
+  it.each(['ar-SA', 'ar-EG', 'fa', 'he', 'ur'])('%s without dir -> rtl', (locale) => {
+    expect(schema({ locale }).meta.dir).toBe('rtl');
+  });
+  it.each(['en-US', 'fr'])('%s without dir -> ltr', (locale) => {
+    expect(schema({ locale }).meta.dir).toBe('ltr');
+  });
+  it('explicit dir wins', () => {
+    expect(schema({ locale: 'ar-SA', dir: 'ltr' }).meta.dir).toBe('ltr');
+    expect(schema({ locale: 'en-US', dir: 'rtl' }).meta.dir).toBe('rtl');
+  });
+});
+
+describe('reports-viewer with an ar-SA template and no host props', () => {
+  it('renders rtl with Arabic-Indic digits and Arabic UI strings', async () => {
+    document.documentElement.dir = 'ltr';
+    const v = document.createElement('reports-viewer') as ReportsViewerElement;
+    document.body.appendChild(v);
+    const s = schema({ locale: 'ar-SA' });
+    const detail = s.bands.detail;
+    v.schema = { ...s, bands: { ...s.bands, detail: { ...detail, elements: detail.elements.map((e) => ({ ...e, format: 'decimal2' })) } } };
+    v.rows = [{ x: 1234.5 }];
+    await rendered(v);
+    expect(v.shadowRoot!.querySelector('.surface')!.getAttribute('dir')).toBe('rtl');
+    expect(v.getAttribute('dir')).toBe('rtl');
+    const text = v.shadowRoot!.textContent ?? '';
+    expect(text).toMatch(/[\u0660-\u0669]/);
+    expect(text).toContain('١٬٢٣٤٫٥٠');
+    expect(text).not.toContain('1,234.50');
+    expect(text).toContain(t('ar', 'print'));
+    expect(t('ar', 'print')).not.toBe(t('en', 'print'));
+    v.remove();
+  });
+  it('fa-IR template is rtl too; en-GB is ltr', async () => {
+    for (const [locale, want] of [['fa-IR', 'rtl'], ['en-GB', 'ltr']] as const) {
+      const v = document.createElement('reports-viewer') as ReportsViewerElement;
+      document.body.appendChild(v);
+      v.schema = schema({ locale });
+      v.rows = [{ x: 1 }];
+      await rendered(v);
+      expect(v.shadowRoot!.querySelector('.surface')!.getAttribute('dir')).toBe(want);
+      v.remove();
+    }
   });
 });

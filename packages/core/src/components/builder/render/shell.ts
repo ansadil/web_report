@@ -1,6 +1,6 @@
 import { html, nothing } from 'lit';
 import { icon, resolveLabel, t } from '../api.js';
-import { elementStatusName } from '../status-bar.js';
+import { elementStatusName, formatLocalizedNumber } from '../status-bar.js';
 import { renderBands } from './canvas.js';
 import { renderContextMenu } from './context-menu.js';
 import type { BuilderViewCallbacks, BuilderViewState } from './model.js';
@@ -47,7 +47,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
         <span class="saved">${t(state.uiLocale, 'savedState')}</span>
       </div>
       <div class="tb-end">
-        <span>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</span>
+        <button type="button" class="locale-toggle" data-testid="title-locale" @click=${cb.onToggleLocale}>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</button>
         <span class="avatar" aria-hidden="true">${icon('user')}</span>
       </div>
     </header>
@@ -75,7 +75,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
             <button type="button" class=${state.sideTab === 'reportTree' ? 'on' : ''} @click=${() => cb.onSideTab('reportTree')}>${icon('layers')}<span>${t(state.uiLocale, 'reportTree')}</span></button>
           </div>
           <div class="side-body">
-            <div ?hidden=${sideHidden('dictionary')}>
+            <div class="side-fill" ?hidden=${sideHidden('dictionary')}>
               ${renderSideSection(
                 {
                   key: 'dictionary',
@@ -86,7 +86,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
                 { onToggle: () => cb.onToggleSection('dictionary') },
                 renderDictionary(state),
               )}
-              <p class="dict-hint">${t(state.uiLocale, 'dictionaryHint')}</p>
+              <p class="dict-hint" data-testid="dictionary-hint">${t(state.uiLocale, 'dictionaryHint')}</p>
             </div>
             <div ?hidden=${sideHidden('tools')}>
               ${renderSideSection(
@@ -138,8 +138,8 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       ${renderContextMenu(state.contextMenu, cb.contextMenu)}
     </main>
     <div class="page-tabs" data-testid="page-tabs">
-      <button type="button" class="page-tab on"><span>${t(state.uiLocale, 'pageOne')}</span></button>
-      <button type="button" class="page-tab add" aria-label=${t(state.uiLocale, 'pageOne')}>${icon('plus')}</button>
+      <button type="button" class="page-tab on"><span>${pageTabLabel(state)}</span></button>
+      <button type="button" class="page-tab add" aria-label=${pageTabLabel(state)}>${icon('plus')}</button>
     </div>
     <aside class="props" data-testid="properties-dock">
       ${renderSideSection(
@@ -159,6 +159,11 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
   `;
 }
 
+function pageTabLabel(state: BuilderViewState): string {
+  const n = formatLocalizedNumber(1, { locale: state.uiLocale, digits: state.status.digits });
+  return `${t(state.uiLocale, 'page')} ${n}`;
+}
+
 const PAPER_CM: Record<string, readonly [string, string]> = {
   A4: ['21', '29.7'],
   A5: ['14.8', '21'],
@@ -176,7 +181,7 @@ function renderCrumb(state: BuilderViewState) {
   const paper = page.orientation === 'landscape' ? `${dims[1]} × ${dims[0]}` : `${dims[0]} × ${dims[1]}`;
   return html`<div class="crumb-bar" data-testid="crumb-bar">
     <span class="crumb">
-      <b>${t(state.uiLocale, 'pageOne')}</b>
+      <b>${pageTabLabel(state)}</b>
       <span class="sep">›</span>
       <span>${state.name}</span>
       <span class="sep">›</span>

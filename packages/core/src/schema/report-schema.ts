@@ -37,6 +37,7 @@ export const StyleSchema = z
     color: z.string().optional(),
     background: z.string().optional(),
     align: z.enum(['start', 'center', 'end', 'justify']).optional(),
+    valign: z.enum(['start', 'center', 'end']).optional(),
     border: z
       .object({
         top: z.number().min(0).optional(),

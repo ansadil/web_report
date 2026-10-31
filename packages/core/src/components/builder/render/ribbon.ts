@@ -21,6 +21,7 @@ export interface RibbonFontState {
   color: string;
   highlight?: string;
   align: Style['align'] | '';
+  valign: 'start' | 'center' | 'end' | '';
 }
 
 export interface RibbonState {
@@ -190,14 +191,15 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             state.locale,
             'ribbonGroupAlign',
             html`
-              <div class="ribbon-fontcol">
-                <div class="row">
-                  ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
-                  ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
-                  ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
-                  ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
-                </div>
+              <div class="align-grid" data-testid="ribbon-align-grid">
+                ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
+                ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
+                ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
+                ${valignBtn(state, 'start', font.valign === 'start', cb)}
+                ${valignBtn(state, 'center', font.valign === 'center', cb)}
+                ${valignBtn(state, 'end', font.valign === 'end', cb)}
               </div>
+              ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
             `,
           )}
           ${cluster(
@@ -326,6 +328,12 @@ function onTabsKey(ev: KeyboardEvent, state: RibbonState, cb: RibbonCallbacks): 
 
 function cluster(locale: LocaleTag, caption: Parameters<typeof t>[1], body: TemplateResult) {
   return html`<div class="ribbon-cluster"><div class="ribbon-group">${body}</div><span class="ribbon-caption">${t(locale, caption)}</span></div>`;
+}
+
+function valignBtn(state: RibbonState, value: 'start' | 'center' | 'end', pressed: boolean, cb: RibbonCallbacks) {
+  const label = t(state.locale, value === 'start' ? 'alignTop' : value === 'center' ? 'alignMiddle' : 'alignBottom');
+  const iconName = value === 'start' ? 'valignStart' : value === 'center' ? 'valignCenter' : 'valignEnd';
+  return html`<button type="button" class="ribbon-cmd icon-only" data-testid=${`ribbon-valign-${value}`} aria-label=${label} title=${label} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ valign: value })}>${icon(iconName)}</button>`;
 }
 
 function alignBtn(

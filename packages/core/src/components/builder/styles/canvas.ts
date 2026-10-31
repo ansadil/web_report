@@ -82,7 +82,8 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 0;
       flex-direction: column;
       justify-content: flex-start;
     }
-    .element .kind { display: none; }
+    .element.valign-center .el-body { justify-content: center; }
+    .element.valign-end .el-body { justify-content: flex-end; }
     .element.field { color: #1d5a9e; }
     .element.image .el-body, .element.qr .el-body {
       align-items: center; justify-content: center; gap: 2px; text-align: center;
@@ -131,7 +132,7 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 0;
       flex: none;
       pointer-events: none;
     }
-    .element .kind { color: #64748b; font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .element .kind { display: none !important; }
     .resize-handles {
       position: absolute;
       inset: 0;

@@ -54,14 +54,37 @@ export const sideStyles = css`    aside.left {
     }
     .side-body {
       flex: 1 1 auto;
-      overflow-x: hidden;
-      overflow-y: auto;
+      overflow: hidden;
       padding: 8px;
       min-height: 0;
       min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 8px;
+    }
+    .side-fill {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 8px;
+    }
+    .side-fill[hidden] { display: none !important; }
+    .side-body > div:not(.side-fill) {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+    }
+    .side-fill > .side-section {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .side-fill > .side-section .section-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
     }
     .side-section {
       border: 1px solid var(--rb-border);

@@ -149,12 +149,6 @@ function qrMark() {
   return html`<svg class="qr-mark" viewBox="0 0 7 7" aria-hidden="true"><rect width="7" height="7" fill="#fff"/><path fill="#15233a" d="M0 0h3v3H0zm4 0h3v3H4zM0 4h3v3H0zM1 1h1v1H1zm4 0h1v1H5zM1 5h1v1H1zm3-1h1v1H4zm2 1h1v1H6zM5 6h1v1H5z"/></svg>`;
 }
 
-function kindLabel(el: ReportElement): 'text' | 'field' | 'image' | 'chart' | 'expression' | 'aggregate' | 'line' | 'box' | 'qr' | 'barcode' | 'html' | 'markdown' {
-  if (el.kind === 'expr') return 'expression';
-  if (el.kind === 'richtext') return el.mode === 'markdown' ? 'markdown' : 'html';
-  return el.kind;
-}
-
 function elementLabel(state: CanvasState, cb: CanvasCallbacks, el: Exclude<ReportElement, { kind: 'line' }>): string {
   switch (el.kind) {
     case 'text':
@@ -220,7 +214,6 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
         @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}
         @pointerdown=${onPointerDown}
       >
-        <span class="kind">${t(state.locale, 'line')}</span>
         ${showHandles ? html`<span class="el-name" data-testid="element-name">${t(state.locale, 'line')}</span>` : nothing}
         <div class="line-stroke" style=${strokeStyle}></div>
         ${showHandles
@@ -259,7 +252,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
   const body = el.kind === 'qr' ? qrMark() : el.kind === 'image' ? html`${icon('image')}<span>${label}</span>` : label;
   return html`
     <div
-      class="element ${isSel ? 'selected' : ''} ${el.kind}"
+      class="element ${isSel ? 'selected' : ''} ${el.kind} ${el.style?.valign ? `valign-${el.style.valign}` : ''}"
       data-testid=${`element-${el.id}`}
       data-kind=${el.kind}
       style="${style}"
@@ -267,7 +260,6 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
       @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}
       @pointerdown=${onPointerDown}
     >
-      <span class="kind">${t(state.locale, kindLabel(el))}</span>
       ${showHandles ? html`<span class="el-name" data-testid="element-name">${label}</span>` : nothing}
       <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''}">${body}</div>
       ${showHandles

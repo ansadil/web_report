@@ -128,6 +128,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
         color: selectedOnly?.style?.color ?? '#111111',
         highlight: selectedOnly?.style?.background ?? '#f6c344',
         align: selectedOnly?.style?.align ?? '',
+        valign: selectedOnly && selectedOnly.kind !== 'line' ? (selectedOnly.style?.valign ?? '') : '',
       },
     },
     status: {
@@ -185,6 +186,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
 
   const cb: BuilderViewCallbacks = {
     onToggleLeft: () => toggleLeft(session),
+    onToggleLocale: () => undefined,
     onSideTab: (tab) => setSideTab(session, tab),
     onToggleSection: (key) => toggleSection(session, key),
     onHostContextMenu: ports.pointer.onHostContextMenu,

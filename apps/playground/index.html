@@ -15,10 +15,17 @@
       }
       #app {
         display: grid;
-        grid-template-columns: 1fr;
-        grid-template-rows: 40px 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 40px minmax(0, 1fr);
+        grid-template-areas: 'bar' 'stage';
         height: 100vh;
       }
+      #app.drawer-open {
+        grid-template-columns: 280px minmax(0, 1fr);
+        grid-template-areas: 'bar bar' 'drawer stage';
+      }
+      header.playground-bar { grid-area: bar; }
+      main.main { grid-area: stage; }
       header.playground-bar {
         position: relative;
         z-index: 30;
@@ -84,19 +91,20 @@
       }
       aside.sidebar {
         display: none;
-        position: absolute;
-        z-index: 20;
-        top: 40px;
-        left: 8px;
-        width: 280px;
-        max-height: calc(100vh - 56px);
+        grid-area: drawer;
+        position: static;
+        z-index: 1;
+        width: auto;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
         background: #fff;
-        border: 1px solid #e5e7eb;
+        border-inline-end: 1px solid #e5e7eb;
         overflow: auto;
         padding: 16px;
-        box-shadow: 0 10px 30px rgba(15,25,45,.12);
+        box-shadow: none;
       }
-      aside.sidebar.open { display: block; }
+      #app.drawer-open aside.sidebar { display: block; }
       aside.sidebar h3 {
         font-size: 11px;
         text-transform: uppercase;
@@ -173,6 +181,7 @@
       main.main {
         overflow: hidden;
         background: #eef1f5;
+        min-width: 0;
         min-height: 0;
       }
       #view-viewer reports-viewer { display: block; height: calc(100vh - 40px); }

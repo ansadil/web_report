@@ -168,7 +168,7 @@ describe('playground designer stays on the local origin', () => {
     await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#tab-builder');
-    await page.click('#btn-samples');
+    await page.keyboard.press('Escape');
     const root = page.locator('reports-builder');
     await root.locator('[data-testid="ribbon"]').waitFor();
     const shown = (id: string) =>

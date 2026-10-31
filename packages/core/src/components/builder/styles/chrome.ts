@@ -60,6 +60,9 @@ export const chromeStyles = css`
   .ribbon-big:disabled { opacity: 0.45; cursor: not-allowed; }
   .ribbon-smallcol { display: flex; flex-direction: column; gap: 2px; }
   .ribbon-fontcol { display: flex; flex-direction: column; gap: 4px; }
+  .align-grid { display: grid; grid-template-columns: repeat(3, 28px); grid-template-rows: repeat(2, 26px); gap: 3px; }
+  .align-grid .ribbon-cmd { width: 28px; height: 26px; padding: 0; justify-content: center; }
+  [data-testid='ribbon-btn-format-painter'] svg { width: 16px; height: 16px; flex: none; }
   .ribbon .row { display: flex; gap: 3px; align-items: center; }
   .titlebar {
     height: 34px; max-height: 34px; overflow: hidden; background: #fff; color: #1b2433;
@@ -80,12 +83,15 @@ export const chromeStyles = css`
   }
   .titlebar .saved { color: #7a8699; font-size: 12px; white-space: nowrap; }
   .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #4a5568; font-size: 11.5px; white-space: nowrap; flex: none; }
+  .titlebar .locale-toggle { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
+  .titlebar .locale-toggle:hover { background: #e7f0fb; color: #1f5fa8; }
   .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #e7f0fb; color: #1f5fa8; display: grid; place-items: center; }
   .status-spacer { flex: 1; }
   .status-bar .toolbar { background: transparent; padding: 0; gap: 4px; flex: none; }
   .status-bar .zoom input[type='range'] { width: 110px; accent-color: #1f5fa8; }
   .page-tabs {
     display: flex; align-items: flex-end; gap: 2px; padding: 0 10px; background: #f3f5f8; border-top: 1px solid #dfe4ec;
+    position: relative; z-index: 2;
   }
   .page-tab {
     border: 1px solid #dfe4ec; border-bottom: 0; background: #e9edf3; border-radius: 6px 6px 0 0;

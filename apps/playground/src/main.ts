@@ -203,7 +203,37 @@ builder.addEventListener('export-json', (e) => {
   toast(state.locale === 'ar' ? 'تم تصدير JSON' : 'JSON exported');
 });
 
-$('btn-samples').addEventListener('click', () => $('sample-drawer').classList.toggle('open'));
+const sampleDrawer = $('sample-drawer');
+const appShell = $('app');
+function setSamplesOpen(open: boolean): void {
+  sampleDrawer.classList.toggle('open', open);
+  appShell.classList.toggle('drawer-open', open);
+}
+$('btn-samples').addEventListener('click', (event) => {
+  event.stopPropagation();
+  setSamplesOpen(!sampleDrawer.classList.contains('open'));
+});
+document.addEventListener('click', (event) => {
+  if (!sampleDrawer.classList.contains('open')) return;
+  const target = event.target;
+  if (!(target instanceof Node)) return;
+  if (sampleDrawer.contains(target) || $('btn-samples').contains(target)) return;
+  setSamplesOpen(false);
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setSamplesOpen(false);
+});
+builder.addEventListener('locale-change', (event) => {
+  const detail = (event as CustomEvent<{ locale: Locale; dir: 'rtl' | 'ltr' }>).detail;
+  state.locale = detail.locale;
+  document.documentElement.setAttribute('dir', detail.dir);
+  document.documentElement.setAttribute('lang', detail.locale);
+  $('btn-en').classList.toggle('active', detail.locale === 'en');
+  $('btn-ar').classList.toggle('active', detail.locale === 'ar');
+  renderReportsList();
+  void renderSavedList();
+  renderDatasets();
+});
 $('tab-viewer').addEventListener('click', () => switchView('viewer'));
 $('tab-builder').addEventListener('click', () => switchView('builder'));
 $('btn-en').addEventListener('click', () => switchLocale('en'));

@@ -1,8 +1,10 @@
 import type { LocaleTag } from '@reports-web/shared';
-import { html, type TemplateResult } from 'lit';
+import { html, nothing, type TemplateResult } from 'lit';
 import { icon, t, toolIconForKind } from '../api.js';
 import type { Style } from '../api.js';
 import type { ArrangeMode } from '../ops/arrange.js';
+import { ribbonTabFromKey } from '../ribbon-keys.js';
+import { formatLocalizedNumber, parseLocalizedNumber } from '../status-bar.js';
 import { TOOL_KINDS, type RibbonTab, type ToolKind } from '../types.js';
 import { renderActions, type ActionsCallbacks, type ActionsState } from './toolbar.js';
 
@@ -21,6 +23,9 @@ export interface RibbonFontState {
 
 export interface RibbonState {
   locale: LocaleTag;
+  dir: 'ltr' | 'rtl';
+  /** `latn` keeps Western digits. Otherwise digits follow the UI locale. */
+  digits: 'locale' | 'latn';
   tab: RibbonTab;
   actions: ActionsState;
   canCut: boolean;
@@ -76,33 +81,38 @@ function colorInputValue(value: string): string {
 
 export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
   const font = state.font;
+  const digits = { locale: state.locale, digits: state.digits };
+  const fontSizeLabel = formatLocalizedNumber(font.size, digits);
   const canAlign = state.selectionCount >= 2;
   const canDistribute = state.selectionCount >= 3;
   return html`
     <div class="ribbon" data-testid="ribbon">
-      <div class="ribbon-tabs" role="tablist">
+      <div class="ribbon-tabs" role="tablist" aria-orientation="horizontal" @keydown=${(ev: KeyboardEvent) => onTabsKey(ev, state, cb)}>
         ${TABS.map(
           (tab) => html`
             <button
               type="button"
               class="ribbon-tab ${state.tab === tab.id ? 'active' : ''}"
               role="tab"
+              id=${`ribbon-tab-${tab.id}`}
+              aria-controls=${`ribbon-panel-${tab.id}`}
               data-testid=${`ribbon-tab-${tab.id}`}
               aria-selected=${state.tab === tab.id ? 'true' : 'false'}
+              tabindex=${state.tab === tab.id ? '0' : '-1'}
               @click=${() => cb.onTab(tab.id)}
             >${t(state.locale, tab.label)}</button>
           `,
         )}
       </div>
       <div class="ribbon-body">
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'file'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-file" aria-labelledby="ribbon-tab-file" tabindex=${state.tab === 'file' ? '0' : '-1'} ?hidden=${state.tab !== 'file'}>
           ${cluster(
             state.locale,
             'ribbonGroupFile',
             html`
               <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-new" @click=${cb.onNew}>${icon('plus')}<span>${t(state.locale, 'newReport')}</span></button>
               <label class="ribbon-cmd">
-                ${icon('download')}<span>${t(state.locale, 'open')}</span>
+                ${icon('folderOpen')}<span>${t(state.locale, 'open')}</span>
                 <input
                   class="ribbon-file"
                   type="file"
@@ -117,16 +127,16 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             `,
           )}
         </div>
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'home'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-home" aria-labelledby="ribbon-tab-home" tabindex=${state.tab === 'home' ? '0' : '-1'} ?hidden=${state.tab !== 'home'}>
           ${renderActions(state.actions, cb.actions)}
           ${cluster(
             state.locale,
             'ribbonGroupClipboard',
             html`
-              ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
-              ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
-              ${cmd(state.locale, 'paste', 'paste', 'paste', !state.canPaste, cb.onPaste)}
-              ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete)}
+              ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut, true)}
+              ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy, true)}
+              ${cmd(state.locale, 'paste', 'paste', 'paste', !state.canPaste, cb.onPaste, true)}
+              ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete, true)}
             `,
           )}
           ${cluster(
@@ -143,16 +153,18 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               </select>
               <input
                 data-testid="ribbon-font-size"
-                type="number"
-                min="4"
-                max="96"
+                type="text"
+                inputmode="numeric"
                 ?disabled=${!font.enabled}
-                .value=${String(font.size)}
-                @change=${(ev: Event) => cb.onStyle({ fontSize: Number((ev.target as HTMLInputElement).value) })}
+                .value=${fontSizeLabel}
+                @change=${(ev: Event) => {
+                  const size = parseLocalizedNumber((ev.target as HTMLInputElement).value);
+                  if (Number.isFinite(size)) cb.onStyle({ fontSize: size });
+                }}
               />
-              <button type="button" class="ribbon-cmd" data-testid="ribbon-font-bold" aria-pressed=${font.bold ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ bold: !font.bold })}><span>${t(state.locale, 'bold')}</span></button>
-              <button type="button" class="ribbon-cmd" data-testid="ribbon-font-italic" aria-pressed=${font.italic ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ italic: !font.italic })}><span>${t(state.locale, 'italic')}</span></button>
-              <button type="button" class="ribbon-cmd" data-testid="ribbon-font-underline" aria-pressed=${font.underline ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ underline: !font.underline })}><span>${t(state.locale, 'underline')}</span></button>
+              <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-bold" aria-label=${t(state.locale, 'bold')} title=${t(state.locale, 'bold')} aria-pressed=${font.bold ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ bold: !font.bold })}>${icon('bold')}</button>
+              <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-italic" aria-label=${t(state.locale, 'italic')} title=${t(state.locale, 'italic')} aria-pressed=${font.italic ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ italic: !font.italic })}>${icon('italic')}</button>
+              <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-underline" aria-label=${t(state.locale, 'underline')} title=${t(state.locale, 'underline')} aria-pressed=${font.underline ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ underline: !font.underline })}>${icon('underline')}</button>
               <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
             `,
           )}
@@ -167,7 +179,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             `,
           )}
         </div>
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'insert'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-insert" aria-labelledby="ribbon-tab-insert" tabindex=${state.tab === 'insert' ? '0' : '-1'} ?hidden=${state.tab !== 'insert'}>
           ${cluster(
             state.locale,
             'ribbonGroupInsert',
@@ -189,7 +201,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             </div>`,
           )}
         </div>
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'layout'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-layout" aria-labelledby="ribbon-tab-layout" tabindex=${state.tab === 'layout' ? '0' : '-1'} ?hidden=${state.tab !== 'layout'}>
           ${cluster(
             state.locale,
             'ribbonGroupArrange',
@@ -230,7 +242,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             `,
           )}
         </div>
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'page'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-page" aria-labelledby="ribbon-tab-page" tabindex=${state.tab === 'page' ? '0' : '-1'} ?hidden=${state.tab !== 'page'}>
           ${cluster(
             state.locale,
             'ribbonGroupPage',
@@ -240,7 +252,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             `,
           )}
         </div>
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'view'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-view" aria-labelledby="ribbon-tab-view" tabindex=${state.tab === 'view' ? '0' : '-1'} ?hidden=${state.tab !== 'view'}>
           ${cluster(
             state.locale,
             'ribbonGroupZoom',
@@ -251,12 +263,22 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             `,
           )}
         </div>
-        <div class="ribbon-pane" ?hidden=${state.tab !== 'preview'}>
+        <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-preview" aria-labelledby="ribbon-tab-preview" tabindex=${state.tab === 'preview' ? '0' : '-1'} ?hidden=${state.tab !== 'preview'}>
           <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-tab" @click=${cb.actions.onPreview}>${icon('eye')}<span>${t(state.locale, 'preview')}</span></button>
         </div>
       </div>
     </div>
   `;
+}
+
+function onTabsKey(ev: KeyboardEvent, state: RibbonState, cb: RibbonCallbacks): void {
+  const next = ribbonTabFromKey(state.tab, ev.key, state.dir);
+  if (!next || next === state.tab) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  cb.onTab(next);
+  const list = ev.currentTarget as HTMLElement;
+  queueMicrotask(() => list.querySelector<HTMLButtonElement>(`#ribbon-tab-${next}`)?.focus());
 }
 
 function cluster(locale: LocaleTag, caption: Parameters<typeof t>[1], body: TemplateResult) {
@@ -270,7 +292,8 @@ function alignBtn(
   pressed: boolean,
   cb: RibbonCallbacks,
 ) {
-  return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-align-${value}`} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ align: value })}><span>${t(state.locale, label)}</span></button>`;
+  const name = t(state.locale, label);
+  return html`<button type="button" class="ribbon-cmd icon-only" data-testid=${`ribbon-align-${value}`} aria-label=${name} title=${name} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ align: value })}>${icon(value === 'start' ? 'alignStart' : value === 'center' ? 'alignCenter' : value === 'end' ? 'alignEnd' : 'alignJustify')}</button>`;
 }
 
 function arrange(locale: LocaleTag, id: string, label: Parameters<typeof t>[1], disabled: boolean, action: () => void) {
@@ -284,8 +307,10 @@ function cmd(
   labelKey: 'cut' | 'copy' | 'paste' | 'delete' | 'bringToFront' | 'bringForward' | 'sendToBack' | 'sendBackward',
   disabled: boolean,
   action: () => void,
+  iconOnly = false,
 ) {
-  return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-btn-${id}`} ?disabled=${disabled} @click=${action}>${icon(iconName)}<span>${t(locale, labelKey)}</span></button>`;
+  const label = t(locale, labelKey);
+  return html`<button type="button" class="ribbon-cmd ${iconOnly ? 'icon-only' : ''}" data-testid=${`ribbon-btn-${id}`} aria-label=${label} title=${label} ?disabled=${disabled} @click=${action}>${icon(iconName)}${iconOnly ? nothing : html`<span>${label}</span>`}</button>`;
 }
 
 async function readOpenFile(ev: Event, onOpenText: (text: string) => void): Promise<void> {

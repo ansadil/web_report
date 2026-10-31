@@ -9,7 +9,7 @@ if (typeof customElements !== 'undefined' && !customElements.get('reports-builde
 
 export function ReportBuilder(props: ReportBuilderProps) {
   const ref = useRef<ReportsBuilderElement | null>(null);
-  const { schema, dataAdapter, storageAdapter, sampleRows, locale, dir, onSave, onSaveError, onExportJson, className, style } = props;
+  const { schema, dataAdapter, storageAdapter, sampleRows, locale, dir, fontsBaseUrl, onSave, onSaveError, onExportJson, className, style } = props;
 
   useEffect(() => {
     const el = ref.current;
@@ -20,7 +20,8 @@ export function ReportBuilder(props: ReportBuilderProps) {
     el.sampleRows = (sampleRows ?? null) as readonly import('@reports-web/shared').Row[] | null;
     el.locale = locale;
     el.dir = dir ?? '';
-  }, [schema, dataAdapter, storageAdapter, sampleRows, locale, dir]);
+    if (fontsBaseUrl !== undefined) el.fontsBaseUrl = fontsBaseUrl;
+  }, [schema, dataAdapter, storageAdapter, sampleRows, locale, dir, fontsBaseUrl]);
 
   useEffect(() => {
     const el = ref.current;

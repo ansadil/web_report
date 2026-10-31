@@ -20,6 +20,7 @@ export const ReportViewer = defineComponent({
     hideViewControls: { type: Boolean, default: false },
     hidePageBoundaries: { type: Boolean, default: false },
     params: { type: Object as PropType<ReportViewerProps['params']>, default: undefined },
+    fontsBaseUrl: { type: String, default: undefined },
   },
   emits: ['rendered', 'export', 'export-error', 'parameters-error'],
   setup(props, { emit }) {
@@ -38,6 +39,7 @@ export const ReportViewer = defineComponent({
       el.hideViewControls = props.hideViewControls;
       el.hidePageBoundaries = props.hidePageBoundaries;
       el.params = props.params ?? null;
+      if (props.fontsBaseUrl !== undefined) el.fontsBaseUrl = props.fontsBaseUrl;
     };
 
     const onRendered = (e: Event) => emit('rendered', (e as CustomEvent).detail);
@@ -62,7 +64,7 @@ export const ReportViewer = defineComponent({
     });
 
     watch(
-      () => [props.schema, props.rows, props.dataAdapter, props.chartAdapter, props.locale, props.dir, props.noToolbar, props.hideViewControls, props.hidePageBoundaries, props.params],
+      () => [props.schema, props.rows, props.dataAdapter, props.chartAdapter, props.locale, props.dir, props.noToolbar, props.hideViewControls, props.hidePageBoundaries, props.params, props.fontsBaseUrl],
       () => apply(),
       { deep: true },
     );

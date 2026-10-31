@@ -24,10 +24,10 @@ export interface KindEditorCallbacks {
 export function renderKindSpecific(state: KindEditorState, cb: KindEditorCallbacks) {
   const { el, fields, locale } = state;
   const update = cb.update;
-  if (el.kind === 'text') return renderTextKind(el, update);
+  if (el.kind === 'text') return renderTextKind(el, locale, update);
   if (el.kind === 'field') return renderFieldKind(el, fields, update);
   if (el.kind === 'aggregate') return renderAggregateKind(el, fields, update);
-  if (el.kind === 'chart') return renderChartKind(el, fields, update);
+  if (el.kind === 'chart') return renderChartKind(el, fields, locale, update);
   if (el.kind === 'expr') return renderExpressionKind(el, update);
   if (el.kind === 'image') return renderImageKind(el, locale, update);
   if (el.kind === 'richtext') return renderRichTextKind(el, fields, locale, update);

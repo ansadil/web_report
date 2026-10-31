@@ -159,4 +159,46 @@ describe('playground designer stays on the local origin', () => {
     for (const row of selected) expect(row.overflow, row.text).toBe(0);
     await page.close();
   });
+
+  it('renders the File and Layout tabs and the Font and Alignment groups', async () => {
+    const page = await browser.newPage();
+    await page.goto(ORIGIN);
+    await page.waitForSelector('#reports-list .report-card');
+    await page.click('#tab-builder');
+    const root = page.locator('reports-builder');
+    await root.locator('[data-testid="ribbon"]').waitFor();
+    const shown = (id: string) =>
+      page.evaluate((testId) => {
+        const el = document.querySelector('reports-builder')?.shadowRoot?.querySelector(`[data-testid="${testId}"]`);
+        if (!(el instanceof HTMLElement)) return false;
+        const box = el.getBoundingClientRect();
+        return box.width > 0 && box.height > 0;
+      }, id);
+    await root.locator('[data-testid="ribbon-tab-file"]').click();
+    expect(await shown('ribbon-btn-new')).toBe(true);
+    expect(await page.evaluate(() => !!document.querySelector('reports-builder')?.shadowRoot?.querySelector('[data-testid="ribbon-open-file"]'))).toBe(true);
+    await root.locator('[data-testid="ribbon-tab-layout"]').click();
+    expect(await shown('ribbon-btn-align-start')).toBe(true);
+    await root.locator('[data-testid="ribbon-tab-home"]').click();
+    for (const id of [
+      'ribbon-font-family',
+      'ribbon-font-size',
+      'ribbon-font-bold',
+      'ribbon-font-italic',
+      'ribbon-font-underline',
+      'ribbon-align-start',
+      'ribbon-align-center',
+      'ribbon-align-end',
+      'ribbon-align-justify',
+    ]) {
+      expect(await shown(id), id).toBe(true);
+    }
+    expect(await shown('ribbon-font-bold')).toBe(true);
+    const icons = await page.evaluate(() => {
+      const q = (id: string) => document.querySelector('reports-builder')?.shadowRoot?.querySelector(`[data-testid="${id}"] svg`);
+      return { bold: !!q('ribbon-font-bold'), align: !!q('ribbon-align-start') };
+    });
+    expect(icons).toEqual({ bold: true, align: true });
+    await page.close();
+  });
 });

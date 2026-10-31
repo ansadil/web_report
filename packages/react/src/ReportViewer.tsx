@@ -9,7 +9,7 @@ if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer
 
 export function ReportViewer(props: ReportViewerProps) {
   const ref = useRef<ReportsViewerElement | null>(null);
-  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, onRendered, onExport, onExportError, onParametersError, className, style } = props;
+  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, fontsBaseUrl, onRendered, onExport, onExportError, onParametersError, className, style } = props;
 
   useEffect(() => {
     const el = ref.current;
@@ -24,7 +24,8 @@ export function ReportViewer(props: ReportViewerProps) {
     el.hideViewControls = !!hideViewControls;
     el.hidePageBoundaries = !!hidePageBoundaries;
     el.params = params ?? null;
-  }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params]);
+    if (fontsBaseUrl !== undefined) el.fontsBaseUrl = fontsBaseUrl;
+  }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, fontsBaseUrl]);
 
   useEffect(() => {
     const el = ref.current;

@@ -40,6 +40,16 @@ describe('React ReportViewer params prop', () => {
     expect(el.params).toEqual({ year: 2027 });
     el.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: 'x', issues: [] } }));
     expect(errors).toEqual([{ error: 'x', issues: [] }]);
+    await act(async () => {
+      root.render(createElement(ReportViewer, { schema: null, fontsBaseUrl: 'https://fonts.example/faces/' }));
+    });
+    const viewer = host.querySelector('reports-viewer') as HTMLElement & { fontsBaseUrl?: string };
+    expect(viewer.fontsBaseUrl).toBe('https://fonts.example/faces/');
+    await act(async () => {
+      root.render(createElement(ReportBuilder, { fontsBaseUrl: 'https://fonts.example/builder/' }));
+    });
+    const builder = host.querySelector('reports-builder') as HTMLElement & { fontsBaseUrl?: string };
+    expect(builder.fontsBaseUrl).toBe('https://fonts.example/builder/');
     await act(async () => root.unmount());
     host.remove();
   });

@@ -16,6 +16,7 @@ export const ReportBuilder = defineComponent({
     sampleRows: { type: Array as PropType<ReportBuilderProps['sampleRows']>, default: undefined },
     locale: { type: String as PropType<LocaleTag>, default: undefined },
     dir: { type: String as PropType<'rtl' | 'ltr'>, default: undefined },
+    fontsBaseUrl: { type: String, default: undefined },
   },
   emits: ['save', 'save-error', 'export-json'],
   setup(props, { emit }) {
@@ -30,6 +31,7 @@ export const ReportBuilder = defineComponent({
       el.sampleRows = (props.sampleRows ?? null) as readonly import('@reports-web/shared').Row[] | null;
       el.locale = props.locale;
       el.dir = props.dir ?? '';
+      if (props.fontsBaseUrl !== undefined) el.fontsBaseUrl = props.fontsBaseUrl;
     };
 
     const onSave = (e: Event) => emit('save', (e as CustomEvent).detail.schema);
@@ -51,7 +53,7 @@ export const ReportBuilder = defineComponent({
     });
 
     watch(
-      () => [props.schema, props.dataAdapter, props.storageAdapter, props.sampleRows, props.locale, props.dir],
+      () => [props.schema, props.dataAdapter, props.storageAdapter, props.sampleRows, props.locale, props.dir, props.fontsBaseUrl],
       () => apply(),
       { deep: true },
     );

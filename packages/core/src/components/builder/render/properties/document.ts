@@ -20,7 +20,7 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
   const meta = state.schema.meta;
   const page = state.schema.page;
   return html`
-    <form class="props" @submit=${(e: Event) => e.preventDefault()}>
+    <div class="props">
       <div class="group">
         <h4>${t(state.locale, 'document')}</h4>
         <label>${t(state.locale, 'description')}<input data-testid="prop-description" .value=${meta.description ?? ''} @input=${(e: Event) => cb.updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></label>
@@ -71,6 +71,6 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
       ${renderReportBandsEditor(state, cb)}
       ${renderGroupsBandsEditor(state, cb)}
       ${renderWatermarkEditor({ locale: state.locale, watermark: state.schema.watermark }, cb)}
-    </form>
+    </div>
   `;
 }

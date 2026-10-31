@@ -23,7 +23,7 @@ export function emptySchema(): ReportSchemaV1 {
 }
 
 export function defaultStyle(): Style {
-  return { fontSize: 10, color: '#111' };
+  return { fontSize: 10, color: '#111111' };
 }
 
 export function createElement(kind: ToolKind, x: number, y: number, w: number, h: number, field?: string): ReportElement {

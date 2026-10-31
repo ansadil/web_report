@@ -10,6 +10,7 @@ export interface ToolboxState {
 
 export interface ToolboxCallbacks {
   onToolDragStart: (ev: DragEvent, kind: ToolKind) => void;
+  onToolInsert: (kind: ToolKind) => void;
   onFieldDragStart: (ev: DragEvent, field: FieldMeta) => void;
 }
 
@@ -27,16 +28,24 @@ export function renderToolbox(state: ToolboxState, cb: ToolboxCallbacks) {
       ${TOOL_KINDS.map((tool) => {
         const label = t(state.locale, tool.labelKey);
         return html`
-          <div
+          <button
+            type="button"
             class="tool"
             draggable="true"
             data-testid=${`tool-${tool.kind}`}
+            tabindex="0"
             title=${label}
             aria-label=${label}
             @dragstart=${(e: DragEvent) => cb.onToolDragStart(e, tool.kind)}
+            @click=${() => cb.onToolInsert(tool.kind)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault();
+              cb.onToolInsert(tool.kind);
+            }}
           >
             ${toolIconForKind(tool.kind)}
-          </div>
+          </button>
         `;
       })}
     </div>

@@ -53,6 +53,14 @@ const map = {
   toolBarcode: 'barcode',
   portrait: 'rectangle-vertical',
   landscape: 'rectangle-horizontal',
+  folderOpen: 'folder-open',
+  bold: 'bold',
+  italic: 'italic',
+  underline: 'underline',
+  alignStart: 'text-align-start',
+  alignCenter: 'text-align-center',
+  alignEnd: 'text-align-end',
+  alignJustify: 'text-align-justify',
 };
 
 const entries = [];

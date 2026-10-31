@@ -151,7 +151,13 @@ type StringKey =
   | 'typeDate'
   | 'typeBool'
   | 'typeImage'
-  | 'unitMm';
+  | 'unitMm'
+  | 'inherit'
+  | 'valueField'
+  | 'labelsField'
+  | 'chartType'
+  | 'title'
+  | 'elementMissing';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -306,6 +312,12 @@ const en: Record<StringKey, string> = {
   typeBool: 'bool',
   typeImage: 'image',
   unitMm: 'mm',
+  inherit: 'inherit',
+  valueField: 'Value field',
+  labelsField: 'Labels field',
+  chartType: 'Type',
+  title: 'Title',
+  elementMissing: 'Element not found',
 };
 
 const ar: Record<StringKey, string> = {
@@ -461,6 +473,12 @@ const ar: Record<StringKey, string> = {
   typeBool: 'منطقي',
   typeImage: 'صورة',
   unitMm: 'مم',
+  inherit: 'موروث',
+  valueField: 'حقل القيمة',
+  labelsField: 'حقل التسميات',
+  chartType: 'النوع',
+  title: 'العنوان',
+  elementMissing: 'العنصر غير موجود',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

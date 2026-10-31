@@ -1,7 +1,8 @@
 import { html } from 'lit';
-import type { FieldMeta } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag } from '@reports-web/shared';
 import { lineThicknessMm, t } from '../../api.js';
 import type { ConditionalFormatRule, ReportElement, Style } from '../../api.js';
+import { elementStatusName } from '../../status-bar.js';
 import type { BandKey } from '../../types.js';
 import { renderDocumentProperties, type DocumentCallbacks, type DocumentState } from './document.js';
 import { renderKindSpecific } from './kinds/index.js';
@@ -10,6 +11,24 @@ export interface PropertiesState extends DocumentState {
   fields: readonly FieldMeta[];
   selectedBand: BandKey | null;
   selectedIds: ReadonlySet<string>;
+}
+
+function kindHeading(el: ReportElement, locale: LocaleTag): string {
+  const key =
+    el.kind === 'expr' ? 'expression' : el.kind === 'richtext' ? (el.mode === 'markdown' ? 'markdown' : 'html') : el.kind;
+  const kind = t(locale, key);
+  const name = elementStatusName(el, locale);
+  return name === kind ? kind : `${kind} — ${name}`;
+}
+
+function colorInputValue(value: string | undefined): string {
+  const raw = (value ?? '#111111').trim();
+  const short = /^#([0-9a-fA-F]{3})$/.exec(raw);
+  if (short?.[1]) {
+    const [r, g, b] = short[1];
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : '#111111';
 }
 
 export interface PropertiesCallbacks extends DocumentCallbacks {
@@ -25,28 +44,28 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
   if (state.selectedIds.size > 1) {
     const n = state.selectedIds.size;
     return html`
-      <form class="props" @submit=${(e: Event) => e.preventDefault()}>
+      <div class="props">
         <div class="group">
           <h4>${String(n)}</h4>
           <p style="margin:0;font-size:12px;color:#64748b;line-height:1.45">${t(state.locale, 'multiSelectionHint')}</p>
         </div>
         <button class="danger" type="button" @click=${cb.deleteSelected}>${t(state.locale, 'delete')}</button>
-      </form>
+      </div>
     `;
   }
 
   const onlyId = [...state.selectedIds][0]!;
   const el = band?.elements.find((e) => e.id === onlyId);
-  if (!el) return html`<div class="empty-hint">Element not found</div>`;
+  if (!el) return html`<div class="empty-hint">${t(state.locale, 'elementMissing')}</div>`;
   const selectedBand = state.selectedBand;
   const update = (patch: Partial<ReportElement>) => cb.updateElement(selectedBand, el.id, patch);
   const updateStyle = (patch: Partial<Style>) => update({ style: { ...(el.style ?? {}), ...patch } });
   const border = el.style?.border ?? {};
 
   return html`
-    <form class="props" @submit=${(e: Event) => e.preventDefault()}>
+    <div class="props">
       <div class="group">
-        <h4>${el.kind.toUpperCase()} — id: ${el.id}</h4>
+        <h4>${kindHeading(el, state.locale)}</h4>
         <div class="grid4">
           <label>x<input data-testid="prop-x" type="number" .value=${String(el.pos.x)} @input=${(e: Event) => update({ pos: { ...el.pos, x: Number((e.target as HTMLInputElement).value) } })} /></label>
           <label>y<input data-testid="prop-y" type="number" .value=${String(el.pos.y)} @input=${(e: Event) => update({ pos: { ...el.pos, y: Number((e.target as HTMLInputElement).value) } })} /></label>
@@ -70,21 +89,21 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
 
       <div class="group">
         <h4>${t(state.locale, 'style')}</h4>
-        <label>${t(state.locale, 'fontFamily')}<input data-testid="prop-font-family" .value=${el.style?.font ?? ''} placeholder="inherit" @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} /></label>
+        <label>${t(state.locale, 'fontFamily')}<input data-testid="prop-font-family" .value=${el.style?.font ?? ''} placeholder=${t(state.locale, 'inherit')} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} /></label>
         <div class="grid2">
           <label>${t(state.locale, 'fontSize')}<input data-testid="prop-font-size" type="number" min="4" max="96" .value=${String(el.style?.fontSize ?? 10)} @input=${(e: Event) => updateStyle({ fontSize: Number((e.target as HTMLInputElement).value) })} /></label>
           <label>${t(state.locale, 'align')}
             <select data-testid="prop-align" @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
               <option value="">-</option>
-              <option value="start" ?selected=${el.style?.align === 'start'}>start</option>
-              <option value="center" ?selected=${el.style?.align === 'center'}>center</option>
-              <option value="end" ?selected=${el.style?.align === 'end'}>end</option>
-              <option value="justify" ?selected=${el.style?.align === 'justify'}>justify</option>
+              <option value="start" ?selected=${el.style?.align === 'start'}>${t(state.locale, 'alignStart')}</option>
+              <option value="center" ?selected=${el.style?.align === 'center'}>${t(state.locale, 'alignCenter')}</option>
+              <option value="end" ?selected=${el.style?.align === 'end'}>${t(state.locale, 'alignEnd')}</option>
+              <option value="justify" ?selected=${el.style?.align === 'justify'}>${t(state.locale, 'alignJustify')}</option>
             </select>
           </label>
         </div>
         <div class="grid2">
-          <label>${t(state.locale, 'color')}<input data-testid="prop-color" type="color" .value=${el.style?.color ?? '#111111'} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></label>
+          <label>${t(state.locale, 'color')}<input data-testid="prop-color" type="color" .value=${colorInputValue(el.style?.color)} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></label>
           <label>${t(state.locale, 'background')}<input data-testid="prop-background" type="color" .value=${el.style?.background ?? '#ffffff'} @input=${(e: Event) => updateStyle({ background: (e.target as HTMLInputElement).value })} /></label>
         </div>
         <div class="grid4">
@@ -115,7 +134,7 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
       ${renderKindSpecific({ el, fields: state.fields, locale: state.locale }, { update })}
 
       <button class="danger" type="button" @click=${cb.deleteSelected}>${t(state.locale, 'delete')}</button>
-    </form>
+    </div>
   `;
 }
 
@@ -142,7 +161,7 @@ function renderCondRule(
         <button class="danger" type="button" @click=${removeRule} title=${t(state.locale, 'delete')}>×</button>
       </div>
       <div class="row">
-        <label style="flex:1">${t(state.locale, 'color')}<input data-testid=${`prop-cond-${idx}-color`} type="color" .value=${rule.style.color ?? '#111111'} @input=${(e: Event) => updateRule({ style: { color: (e.target as HTMLInputElement).value } })} /></label>
+        <label style="flex:1">${t(state.locale, 'color')}<input data-testid=${`prop-cond-${idx}-color`} type="color" .value=${colorInputValue(rule.style.color)} @input=${(e: Event) => updateRule({ style: { color: (e.target as HTMLInputElement).value } })} /></label>
         <label style="flex:1">${t(state.locale, 'background')}<input data-testid=${`prop-cond-${idx}-background`} type="color" .value=${rule.style.background ?? '#ffffff'} @input=${(e: Event) => updateRule({ style: { background: (e.target as HTMLInputElement).value } })} /></label>
       </div>
       <div class="row">

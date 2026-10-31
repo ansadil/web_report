@@ -15,6 +15,8 @@ export interface ReportViewerProps {
   hidePageBoundaries?: boolean;
   /** Report parameter values (by `ParameterDef.name`), merged into `DataQuery.params`; changes trigger a refetch. */
   params?: ParameterValues;
+  /** Base URL for the woff2 faces. Omitted leaves the element's default. */
+  fontsBaseUrl?: string;
 }
 
 export interface ReportBuilderProps {
@@ -25,4 +27,6 @@ export interface ReportBuilderProps {
   /** BCP 47 tag ('ar', 'ar-SA', 'en-GB', ...). UI strings: ar / ar-* -> Arabic, else English. */
   locale?: LocaleTag;
   dir?: 'rtl' | 'ltr';
+  /** Base URL for the woff2 faces. Omitted leaves the element's default. */
+  fontsBaseUrl?: string;
 }

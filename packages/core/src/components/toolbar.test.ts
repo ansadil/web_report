@@ -140,7 +140,7 @@ describe('reports-builder toolbar + collapsible panels', () => {
     await flush(b);
     expect(b.shadowRoot!.querySelector('aside.left')?.classList.contains('collapsed')).toBe(false);
     expect(b.shadowRoot!.querySelector('aside.right')).toBeNull();
-    expect(b.shadowRoot!.querySelector('[data-section="actions"]')).toBeTruthy();
+    expect(b.shadowRoot!.querySelector('[data-section="actions"]')).toBeNull();
     expect(b.shadowRoot!.querySelector('[data-section="tools"]')).toBeTruthy();
     expect(b.shadowRoot!.querySelector('[data-section="properties"]')).toBeTruthy();
   });

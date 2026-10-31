@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveIntlLocale } from '@reports-web/shared';
-import { elementStatusName, formatCursorMm, formatLocalizedNumber, formatPageIndicator, formatSelectionSummary, formatZoomPercent } from './status-bar.js';
+import { elementStatusName, formatCursorMm, formatLocalizedNumber, formatPageIndicator, formatSelectionSummary, formatZoomPercent, parseLocalizedNumber } from './status-bar.js';
 
 describe('designer status bar', () => {
   it('formats zoom as a whole percent', () => {
@@ -46,5 +46,12 @@ describe('designer status bar', () => {
     expect(formatZoomPercent(1, ar)).toBe(new Intl.NumberFormat(resolveIntlLocale('ar'), { style: 'percent', maximumFractionDigits: 0, useGrouping: false }).format(1));
     expect(formatPageIndicator(2, 4, latn)).toBe('2 / 4');
     expect(formatSelectionSummary({ name: 'عنوان', w: 10, h: 5 }, latn)).toBe('عنوان · 10.0 × 5.0 مم');
+  });
+
+  it('parses Western and Arabic-Indic digits', () => {
+    expect(parseLocalizedNumber('16')).toBe(16);
+    expect(parseLocalizedNumber('١٦')).toBe(16);
+    expect(parseLocalizedNumber('۴')).toBe(4);
+    expect(parseLocalizedNumber('')).toBeNaN();
   });
 });

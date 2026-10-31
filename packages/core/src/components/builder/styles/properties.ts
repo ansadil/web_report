@@ -1,14 +1,14 @@
 import { css } from 'lit';
 
-export const propertiesStyles = css`    form.props {
+export const propertiesStyles = css`    .props {
       display: grid;
       gap: 8px;
       min-width: 0;
       width: 100%;
       box-sizing: border-box;
     }
-    form.props label { display: grid; gap: 4px; font-size: 11px; color: #475569; min-width: 0; }
-    form.props input, form.props select, form.props textarea {
+    .props label { display: grid; gap: 4px; font-size: 11px; color: #475569; min-width: 0; }
+    .props input, .props select, .props textarea {
       padding: 4px 6px;
       border: 1px solid #d1d5db;
       border-radius: 4px;
@@ -19,23 +19,23 @@ export const propertiesStyles = css`    form.props {
       min-width: 0;
       box-sizing: border-box;
     }
-    form.props textarea {
+    .props textarea {
       min-height: 120px;
       resize: vertical;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
-    form.props .hint {
+    .props .hint {
       margin: 0;
       font-size: 11px;
       color: #64748b;
       line-height: 1.35;
     }
-    form.props .field-chips {
+    .props .field-chips {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
     }
-    form.props .field-chips .chip {
+    .props .field-chips .chip {
       padding: 2px 8px;
       border: 1px solid #cbd5e1;
       border-radius: 999px;
@@ -43,38 +43,38 @@ export const propertiesStyles = css`    form.props {
       font-size: 11px;
       cursor: pointer;
     }
-    form.props .field-chips .chip:hover {
+    .props .field-chips .chip:hover {
       background: #e2e8f0;
     }
-    form.props input[type='checkbox'],
-    form.props input[type='color'] {
+    .props input[type='checkbox'],
+    .props input[type='color'] {
       width: auto;
       max-width: none;
       justify-self: start;
     }
-    form.props label:has(input[type='checkbox']) {
+    .props label:has(input[type='checkbox']) {
       display: flex;
       flex-direction: row;
       align-items: flex-start;
       gap: 8px;
       flex-wrap: wrap;
     }
-    form.props label:has(input[type='checkbox']) input[type='checkbox'] {
+    .props label:has(input[type='checkbox']) input[type='checkbox'] {
       margin-top: 2px;
       flex: none;
     }
-    form.props .grid2,
-    form.props .grid4 {
+    .props .grid2,
+    .props .grid4 {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 8px;
       min-width: 0;
     }
-    form.props button.danger {
+    .props button.danger {
       background: #fee2e2; border: 1px solid #fecaca; color: #b91c1c; padding: 6px;
       border-radius: 4px; cursor: pointer;
     }
-    form.props button.secondary {
+    .props button.secondary {
       background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 4px 8px;
       border-radius: 4px; cursor: pointer; font-size: 11px;
     }
@@ -141,6 +141,6 @@ export const propertiesStyles = css`    form.props {
       text-transform: uppercase;
       letter-spacing: 0.4px;
     }
-    form.props .band-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .props .band-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   
 `;

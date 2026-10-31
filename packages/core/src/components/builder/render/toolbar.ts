@@ -1,6 +1,7 @@
 import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { icon, t } from '../api.js';
+import { formatZoomPercent } from '../status-bar.js';
 import {
   BUILDER_DEFAULT_ACTIONS,
   MAX_BUILDER_ZOOM,
@@ -14,6 +15,8 @@ export interface ActionsState {
   canUndo: boolean;
   canRedo: boolean;
   zoom: number;
+  /** `latn` keeps Western digits. Otherwise digits follow the UI locale. */
+  digits: 'locale' | 'latn';
   actions: readonly BuilderAction[];
   menuOpen: boolean;
 }
@@ -34,7 +37,7 @@ export interface ActionsCallbacks {
 
 export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
   const items = (state.actions ?? BUILDER_DEFAULT_ACTIONS).filter((a) => a === 'save' || a === 'json' || a === 'preview');
-  const zoomLabel = `${Math.round(state.zoom * 100)}%`;
+  const zoomLabel = formatZoomPercent(state.zoom, { locale: state.locale, digits: state.digits });
   return html`
     <div class="doc-name">
       <label for="report-name">${t(state.locale, 'document')}</label>

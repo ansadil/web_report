@@ -27,6 +27,7 @@ import {
   toggleLeft,
   toggleMenu,
   toggleSection,
+  insertToolKind,
   patchSelectedStyle,
   updateElement,
   zoomIn,
@@ -51,6 +52,7 @@ export interface InteractionPorts {
 
 export function buildViewModel(session: BuilderSession, ports: InteractionPorts): { state: BuilderViewState; cb: BuilderViewCallbacks } {
   const locale = session.uiLocale;
+  const digits = session.schema.meta.pageNumberDigits ?? 'locale';
   const widthMm = pageContentWidthMm(session.schema.page);
   const widthPx = widthMm * MM_TO_PX;
   const bandHeightsMm = BAND_KEYS.flatMap((key) => {
@@ -86,6 +88,8 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     collapsed: session.collapsedSections,
     ribbon: {
       locale,
+      dir: session.uiDir,
+      digits,
       tab: session.ribbonTab,
       actions: {
         locale,
@@ -93,6 +97,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
         canUndo: session.history.canUndo,
         canRedo: session.history.canRedo,
         zoom: session.zoom,
+        digits,
         actions: session.actions,
         menuOpen: session.menuOpen,
       },
@@ -116,7 +121,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     },
     status: {
       locale,
-      digits: session.schema.meta.pageNumberDigits ?? 'locale',
+      digits,
       zoom: session.zoom,
       cursor: session.cursorMm,
       selection: selectedOnly ? { name: elementStatusName(selectedOnly, locale), w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
@@ -129,6 +134,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       canUndo: session.history.canUndo,
       canRedo: session.history.canRedo,
       zoom: session.zoom,
+      digits,
       actions: session.actions,
       menuOpen: session.menuOpen,
     },
@@ -190,6 +196,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     },
     toolbox: {
       onToolDragStart: (ev, kind) => ports.dnd.onToolDragStart(ev, kind),
+      onToolInsert: (kind) => insertToolKind(session, kind),
       onFieldDragStart: (ev, field) => ports.dnd.onFieldDragStart(ev, field),
     },
     canvas: {
@@ -251,7 +258,14 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       onOpenText: (text) => openReportText(session, text),
       onSaveAs: () => saveAsCopy(session),
       onArrange: (mode) => arrangeSelected(session, mode),
-      onStyle: (patch) => patchSelectedStyle(session, patch),
+      onStyle: (patch) => {
+        const next = { ...patch };
+        if (next.fontSize !== undefined) {
+          if (!Number.isFinite(next.fontSize)) return;
+          next.fontSize = Math.min(96, Math.max(4, next.fontSize));
+        }
+        patchSelectedStyle(session, next);
+      },
     },
     properties: {
       updateMeta: (patch) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, ...patch } }),

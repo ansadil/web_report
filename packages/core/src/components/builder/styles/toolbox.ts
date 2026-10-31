@@ -30,6 +30,7 @@ export const toolboxStyles = css`    .panel-title { font-size: 11px; text-transf
       border-color: #cbd5e1;
     }
     .tool:active { cursor: grabbing; }
+    .tool:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: 2px; }
     .field-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 6px 8px; border-radius: 6px; cursor: grab;

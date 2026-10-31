@@ -45,16 +45,6 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
         : html`<div class="side-body">
             ${renderSideSection(
               {
-                key: 'actions',
-                title: t(state.uiLocale, 'actions'),
-                collapsed: state.collapsed.actions,
-                testId: 'panel-actions',
-              },
-              { onToggle: () => cb.onToggleSection('actions') },
-              html`<p class="empty-hint">${state.name}</p>`,
-            )}
-            ${renderSideSection(
-              {
                 key: 'dictionary',
                 title: t(state.uiLocale, 'dictionary'),
                 collapsed: state.collapsed.dictionary,

@@ -14,6 +14,15 @@ function numberLocale(fmt: DigitFormat): string {
   return fmt.digits === 'latn' ? 'en' : resolveIntlLocale(fmt.locale as LocaleTag);
 }
 
+/** Parse Western or Arabic-Indic digits. Non-numeric text becomes NaN. */
+export function parseLocalizedNumber(raw: string): number {
+  const western = raw
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[^\d.-]/g, '');
+  return western === '' || western === '-' || western === '.' ? Number.NaN : Number(western);
+}
+
 /** Decimal text via `Intl.NumberFormat`. `latn` keeps Western digits. */
 export function formatLocalizedNumber(value: number, fmt: DigitFormat = WESTERN, fractionDigits = 0): string {
   return new Intl.NumberFormat(numberLocale(fmt), {

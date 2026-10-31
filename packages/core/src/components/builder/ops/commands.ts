@@ -1,7 +1,8 @@
 import type { Band, Group, ReportElement, ReportSchemaV1, Style, Watermark } from '../api.js';
 import { logger } from '../api.js';
 import { newId } from '../ids.js';
-import { bandBounds, clampElementPos, clampZoom } from '../geometry.js';
+import { createElement } from '../factory.js';
+import { bandBounds, clampElementPos, clampLinePos, clampZoom } from '../geometry.js';
 import { clipboardFrom, pastedCopies, pasteTargetBand } from './clipboard.js';
 import {
   applyElementPatch,
@@ -19,10 +20,11 @@ import {
   sendToBack as sendToBackOrder,
 } from './zorder.js';
 import type { BuilderSession } from '../session.js';
-import { emptySelection, type SelectionState } from '../state/selection.js';
+import { emptySelection, selectOnly, type SelectionState } from '../state/selection.js';
 import {
   BUILDER_ZOOM_STEP,
   type BandKey,
+  type ToolKind,
   type BuilderAction,
   type SideSectionKey,
 } from '../types.js';
@@ -56,6 +58,17 @@ export function updateBand(
   const next = mapBand(session.schema, band, updater);
   if (!next) return;
   commitSchema(session, next, opts);
+}
+
+export function insertToolKind(session: BuilderSession, kind: ToolKind): void {
+  const band: BandKey = session.selectedBand && session.schema.bands[session.selectedBand] ? session.selectedBand : 'detail';
+  const count = session.schema.bands[band]?.elements.length ?? 0;
+  const created = createElement(kind, 4 + (count % 5) * 6, 2, 30, 6);
+  const bounds = bandBounds(session.schema, band);
+  const pos = created.kind === 'line' ? clampLinePos(created, created.pos, bounds) : clampElementPos(created.pos, bounds);
+  const placed = { ...created, pos };
+  updateBand(session, band, (current) => ({ ...current, elements: [...current.elements, placed] }));
+  queueMicrotask(() => applySelection(session, selectOnly(band, placed.id)));
 }
 
 export function patchSelectedStyle(session: BuilderSession, patch: Partial<Style>): void {

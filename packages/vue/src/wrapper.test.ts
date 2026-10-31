@@ -40,6 +40,28 @@ describe('Vue ReportViewer params prop', () => {
     await nextTick();
     await nextTick();
     expect(el.params).toEqual({ year: 2027 });
+    const fontHost = document.createElement('div');
+    document.body.appendChild(fontHost);
+    const fontApp = createApp({
+      render: () => h(ReportViewer, { schema: null, fontsBaseUrl: 'https://fonts.example/faces/' }),
+    });
+    fontApp.mount(fontHost);
+    await nextTick();
+    const viewer = fontHost.querySelector('reports-viewer') as HTMLElement & { fontsBaseUrl?: string };
+    expect(viewer.fontsBaseUrl).toBe('https://fonts.example/faces/');
+    const builderHost = document.createElement('div');
+    document.body.appendChild(builderHost);
+    const builderApp = createApp({
+      render: () => h(ReportBuilder, { fontsBaseUrl: 'https://fonts.example/builder/' }),
+    });
+    builderApp.mount(builderHost);
+    await nextTick();
+    const builder = builderHost.querySelector('reports-builder') as HTMLElement & { fontsBaseUrl?: string };
+    expect(builder.fontsBaseUrl).toBe('https://fonts.example/builder/');
+    fontApp.unmount();
+    builderApp.unmount();
+    fontHost.remove();
+    builderHost.remove();
     el.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: 'x', issues: [] } }));
     expect(errors).toEqual([{ error: 'x', issues: [] }]);
     app.unmount();

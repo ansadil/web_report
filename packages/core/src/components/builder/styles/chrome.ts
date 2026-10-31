@@ -10,17 +10,26 @@ export const chromeStyles = css`
     font: inherit; font-weight: 600; border-bottom: 2px solid transparent;
   }
   .ribbon-tab.active { color: var(--rb-accent); border-bottom-color: var(--rb-accent); background: #fff; }
+  .ribbon-tab:focus-visible { outline: 2px solid var(--rb-accent); outline-offset: -2px; }
   .ribbon-body { display: flex; align-items: center; gap: 8px; padding: 6px 8px; min-height: 52px; overflow: auto; }
   .ribbon-pane { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #ribbon-panel-home { flex-wrap: nowrap; }
+  #ribbon-panel-home .toolbar { flex-wrap: nowrap; }
+  #ribbon-panel-home .doc-name { width: 120px; margin: 0; }
   .ribbon-pane[hidden] { display: none; }
   .ribbon-group, .ribbon-insert { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  #ribbon-panel-home .ribbon-group { flex-wrap: nowrap; }
   .ribbon-cluster { display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .ribbon-caption { font-size: 10px; color: var(--rb-muted); line-height: 1.2; }
   .ribbon-file { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
-  .ribbon-group select, .ribbon-group input[type='number'] {
+  .ribbon-group select, .ribbon-group input[data-testid='ribbon-font-size'] {
     font: inherit; font-size: 12px; border: 1px solid var(--rb-border); border-radius: 6px; padding: 4px 6px; background: var(--rb-panel);
   }
-  .ribbon-group input[type='number'] { width: 56px; }
+  .ribbon-group select { max-width: 108px; }
+  .ribbon-group input[data-testid='ribbon-font-size'] { width: 44px; }
+  .ribbon-cmd.icon-only { padding: 4px; }
+  :host([dir='rtl']) [data-testid='ribbon-align-start'] svg,
+  :host([dir='rtl']) [data-testid='ribbon-align-end'] svg { transform: scaleX(-1); }
   .ribbon-group input[type='color'] { width: 28px; height: 28px; padding: 0; border: 1px solid var(--rb-border); background: transparent; }
   .ribbon-cmd, .ribbon-insert-btn {
     display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--rb-border);

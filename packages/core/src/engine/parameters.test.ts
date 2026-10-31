@@ -89,24 +89,58 @@ describe('resolveParameterValues: coercion', () => {
     expect(issues(d, { b: 'yes' })[0]!.message).toBe('expected a boolean');
   });
 
-  it('date -> ISO string', () => {
+  it('date -> local calendar date YYYY-MM-DD (TZ-independent: built from local components)', () => {
     const d: ParameterDef[] = [{ name: 'd', type: 'date' }];
     expect(ok(d, { d: '2026-10-01' })).toEqual({ d: '2026-10-01' });
-    expect(ok(d, { d: new Date(Date.UTC(2026, 9, 1)) })).toEqual({ d: '2026-10-01T00:00:00.000Z' });
-    expect(ok(d, { d: Date.UTC(2026, 0, 2) })).toEqual({ d: '2026-01-02T00:00:00.000Z' });
+    expect(ok(d, { d: ' 2026-10-01 ' })).toEqual({ d: '2026-10-01' });
+    expect(ok(d, { d: new Date(2026, 9, 1) })).toEqual({ d: '2026-10-01' }); // local midnight, any TZ
+    expect(ok(d, { d: new Date(2026, 9, 1, 23, 59, 59, 999) })).toEqual({ d: '2026-10-01' });
+    expect(ok(d, { d: new Date(2026, 0, 2).getTime() })).toEqual({ d: '2026-01-02' }); // epoch ms
+    expect(ok(d, { d: new Date(999, 0, 5) })).toEqual({ d: '0999-01-05' }); // zero-padded year
+    // other parseable strings are kept as-is (host owns their zone)
+    expect(ok(d, { d: '2026-10-01T00:00:00+03:00' })).toEqual({ d: '2026-10-01T00:00:00+03:00' });
     expect(issues(d, { d: 'not a date' })[0]!.code).toBe('invalid');
+    expect(issues(d, { d: '2026-13-01' })[0]!.code).toBe('invalid');
     expect(issues(d, { d: new Date('x') })[0]!.code).toBe('invalid');
   });
 
-  it('dateRange -> { from, to }', () => {
+  it('datetime -> full ISO instant via toISOString()', () => {
+    const d: ParameterDef[] = [{ name: 't', type: 'datetime' }];
+    const local = new Date(2026, 9, 1, 0, 0, 0);
+    expect(ok(d, { t: local })).toEqual({ t: local.toISOString() });
+    expect(ok(d, { t: new Date(Date.UTC(2026, 9, 1, 12, 30)) })).toEqual({ t: '2026-10-01T12:30:00.000Z' });
+    expect(ok(d, { t: Date.UTC(2026, 0, 2) })).toEqual({ t: '2026-01-02T00:00:00.000Z' });
+    expect(ok(d, { t: '2026-10-01T08:00:00+03:00' })).toEqual({ t: '2026-10-01T08:00:00+03:00' });
+    expect(issues(d, { t: 'nope' })[0]!.code).toBe('invalid');
+    expect(issues(d, { t: new Date('x') })[0]!.code).toBe('invalid');
+  });
+
+  it('dateRange -> { from, to } as local calendar dates, boundaries included', () => {
     const d: ParameterDef[] = [{ name: 'p', type: 'dateRange' }];
-    expect(ok(d, { p: { from: '2026-01-01', to: new Date(Date.UTC(2026, 0, 31)) } })).toEqual({
-      p: { from: '2026-01-01', to: '2026-01-31T00:00:00.000Z' },
+    expect(ok(d, { p: { from: new Date(2026, 9, 1), to: new Date(2026, 9, 31, 23, 59, 59, 999) } })).toEqual({
+      p: { from: '2026-10-01', to: '2026-10-31' },
     });
-    expect(ok(d, { p: ['2026-01-01', '2026-02-01'] })).toEqual({ p: { from: '2026-01-01', to: '2026-02-01' } });
-    expect(issues(d, { p: { from: '2026-01-01' } })[0]!.message).toBe('dateRange requires both from and to');
+    expect(ok(d, { p: { from: '2026-01-01', to: new Date(2026, 0, 31) } })).toEqual({ p: { from: '2026-01-01', to: '2026-01-31' } });
+    expect(ok(d, { p: [new Date(2026, 0, 1).getTime(), '2026-02-01'] })).toEqual({ p: { from: '2026-01-01', to: '2026-02-01' } });
+    expect(ok(d, { p: { from: new Date(2026, 4, 5), to: new Date(2026, 4, 5, 18) } })).toEqual({ p: { from: '2026-05-05', to: '2026-05-05' } });
     expect(issues(d, { p: { from: '2026-02-01', to: '2026-01-01' } })[0]!.message).toBe('from must not be after to');
     expect(issues(d, { p: '2026-01-01' })[0]!.code).toBe('invalid');
+  });
+
+  it('dateRange: required rejects a missing end; optional accepts an open-ended range', () => {
+    const req: ParameterDef[] = [{ name: 'p', type: 'dateRange', required: true }];
+    expect(issues(req, { p: { from: '2026-01-01' } })[0]!.message).toBe('dateRange requires both from and to');
+    expect(issues(req, { p: { to: new Date(2026, 0, 1) } })[0]!.message).toBe('dateRange requires both from and to');
+    expect(issues(req, { p: { from: '', to: null } })[0]!.message).toBe('dateRange requires both from and to');
+    expect(issues(req, {})[0]!.code).toBe('required');
+
+    const opt: ParameterDef[] = [{ name: 'p', type: 'dateRange' }];
+    expect(ok(opt, { p: { from: new Date(2026, 9, 1) } })).toEqual({ p: { from: '2026-10-01' } });
+    expect(ok(opt, { p: { to: new Date(2026, 9, 31) } })).toEqual({ p: { to: '2026-10-31' } });
+    expect(ok(opt, { p: [null, '2026-10-31'] })).toEqual({ p: { to: '2026-10-31' } });
+    expect(Object.keys((ok(opt, { p: { from: '2026-10-01', to: '' } }) as { p: object }).p)).toEqual(['from']);
+    expect(ok(opt, { p: { from: null, to: null } })).toEqual({});
+    expect(ok(opt, {})).toEqual({});
   });
 
   it('select with static options returns the option value', () => {

@@ -5,10 +5,14 @@ import type { ReportSchemaV1 } from '../schema/report-schema.js';
 /** Parameter values supplied by the host, keyed by `ParameterDef.name`. */
 export type ParameterValues = Readonly<Record<string, unknown>>;
 
-/** Normalized value of a `dateRange` parameter (ISO strings). */
+/**
+ * Normalized value of a `dateRange` parameter. Each end is a local `YYYY-MM-DD` for Date/epoch inputs (other date
+ * strings as given). Both ends are present for required parameters; an OPTIONAL dateRange may be open-ended, in which
+ * case only the provided end is set (`{ from }` or `{ to }`).
+ */
 export interface DateRangeValue {
-  readonly from: string;
-  readonly to: string;
+  from?: string;
+  to?: string;
 }
 
 export interface ParameterIssue {
@@ -44,28 +48,69 @@ function isBlank(v: unknown): boolean {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
 }
 
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Local calendar date of `d` as `YYYY-MM-DD` (no time, no zone), e.g. local 2026-10-01 00:00 -> `2026-10-01` in any TZ. */
+function toLocalDateString(d: Date): string {
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Serializes a `date` parameter (and each end of a `dateRange`):
+ * - `Date` object or epoch milliseconds -> the LOCAL calendar date `YYYY-MM-DD` (never `toISOString()`, which would
+ *   shift e.g. local 2026-10-01 00:00 in UTC+3 to 2026-09-30T21:00Z).
+ * - `YYYY-MM-DD` string -> unchanged.
+ * - Any other string `Date.parse` accepts (e.g. a full ISO timestamp) -> kept as-is (trimmed); the host owns its zone.
+ */
 function coerceDate(v: unknown): string {
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) throw new InvalidValue('expected a valid date');
-    return v.toISOString();
+    return toLocalDateString(v);
   }
-  if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) throw new InvalidValue('expected a valid date');
+    return toLocalDateString(d);
+  }
   if (typeof v === 'string') {
     const s = v.trim();
-    if (!Number.isNaN(Date.parse(s))) return s; // keep host-provided ISO string as-is (no timezone shift)
+    if (ISO_DATE_ONLY.test(s)) {
+      if (Number.isNaN(Date.parse(s))) throw new InvalidValue('expected a valid date');
+      return s;
+    }
+    if (!Number.isNaN(Date.parse(s))) return s;
   }
-  throw new InvalidValue('expected an ISO date string, Date or epoch milliseconds');
+  throw new InvalidValue('expected a YYYY-MM-DD string, Date or epoch milliseconds');
 }
 
-function coerceDateRange(v: unknown): DateRangeValue {
+/** `datetime`: Date / epoch ms -> full ISO via `toISOString()` (UTC instant); other parseable strings kept as-is. */
+function coerceDateTime(v: unknown): string {
+  if (v instanceof Date || (typeof v === 'number' && Number.isFinite(v))) {
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) throw new InvalidValue('expected a valid date-time');
+    return d.toISOString();
+  }
+  if (typeof v === 'string' && !Number.isNaN(Date.parse(v.trim()))) return v.trim();
+  throw new InvalidValue('expected an ISO date-time string, Date or epoch milliseconds');
+}
+
+function coerceDateRange(def: ParameterDef, v: unknown): DateRangeValue | typeof MISSING {
   let from: unknown;
   let to: unknown;
   if (Array.isArray(v) && v.length === 2) [from, to] = v;
   else if (v && typeof v === 'object' && !(v instanceof Date)) ({ from, to } = v as { from?: unknown; to?: unknown });
   else throw new InvalidValue('expected { from, to }');
-  if (isBlank(from) || isBlank(to)) throw new InvalidValue('dateRange requires both from and to');
-  const r = { from: coerceDate(from), to: coerceDate(to) };
-  if (Date.parse(r.from) > Date.parse(r.to)) throw new InvalidValue('from must not be after to');
+  const hasFrom = !isBlank(from);
+  const hasTo = !isBlank(to);
+  if ((!hasFrom || !hasTo) && def.required) throw new InvalidValue('dateRange requires both from and to');
+  if (!hasFrom && !hasTo) return MISSING; // optional range with neither end: omitted like any absent optional value
+  const r: DateRangeValue = {};
+  if (hasFrom) r.from = coerceDate(from);
+  if (hasTo) r.to = coerceDate(to);
+  if (r.from !== undefined && r.to !== undefined && Date.parse(r.from) > Date.parse(r.to)) {
+    throw new InvalidValue('from must not be after to');
+  }
   return r;
 }
 
@@ -99,8 +144,10 @@ function coerce(def: ParameterDef, v: unknown): Coerced {
       throw new InvalidValue('expected a boolean');
     case 'date':
       return coerceDate(v);
+    case 'datetime':
+      return coerceDateTime(v);
     case 'dateRange':
-      return coerceDateRange(v);
+      return coerceDateRange(def, v);
     case 'select':
       return coerceSelect(def, v);
     default:
@@ -110,7 +157,7 @@ function coerce(def: ParameterDef, v: unknown): Coerced {
 
 /**
  * Resolves effective parameter values: explicit value (blank = absent) ?? `ParameterDef.default`, coerced to the declared type
- * (number, bool, date -> ISO string, dateRange -> `{ from, to }` ISO strings, select -> matching option value).
+ * (number, bool, date -> local `YYYY-MM-DD` for Date/epoch ms, datetime -> ISO via toISOString(), dateRange -> `{ from, to }` local dates (optional ranges may be open-ended), select -> matching option value).
  * Required parameters without a value produce a `required` issue. Optional parameters without a value are omitted.
  * Values for names that are not declared are passed through unchanged.
  */

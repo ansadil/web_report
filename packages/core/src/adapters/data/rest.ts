@@ -26,7 +26,9 @@ function defaultExtract(json: unknown): readonly Row[] {
 }
 
 /**
- * Serializes one query-string value. Dates become ISO strings; plain objects (e.g. a dateRange
+ * Serializes one query-string value. Raw `Date` values (only reachable for undeclared params, or hosts calling the
+ * adapter directly) become full ISO/UTC strings via `toISOString()`; declared `date`/`dateRange` parameters are already
+ * local `YYYY-MM-DD` strings by the time they get here (see engine/parameters.ts). Plain objects (e.g. a dateRange
  * `{ from, to }`) use bracket notation (`period[from]=...&period[to]=...`), which Laravel/PHP,
  * Rails and `qs` parse back into objects. Other values keep the previous `String(v)` behavior.
  */

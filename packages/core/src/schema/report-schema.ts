@@ -175,7 +175,7 @@ export type FieldDeclaration = z.infer<typeof FieldDeclaration>;
 /** `string` or a per-locale map such as `{ ar: '...', en: '...' }`. */
 export const LocalizedTextSchema = z.union([z.string(), z.record(z.string())]);
 
-export const ParameterType = z.enum(['string', 'number', 'date', 'dateRange', 'bool', 'select']);
+export const ParameterType = z.enum(['string', 'number', 'date', 'datetime', 'dateRange', 'bool', 'select']);
 
 const ParameterOptionSchema = z.object({
   value: z.unknown(),

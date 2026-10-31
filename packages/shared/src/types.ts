@@ -54,7 +54,7 @@ export interface DictRelation {
   readonly name?: string;
 }
 
-export type ParameterType = 'string' | 'number' | 'date' | 'dateRange' | 'bool' | 'select';
+export type ParameterType = 'string' | 'number' | 'date' | 'datetime' | 'dateRange' | 'bool' | 'select';
 
 export interface ParameterOption {
   readonly value: unknown;

@@ -120,6 +120,28 @@ describe('reports-viewer parameters', () => {
     expect(counts).toEqual([2]);
   });
 
+  it('accepts datetime parameters in the schema and sends date/dateRange Dates as local calendar dates', async () => {
+    const r = validateReport({
+      version: '1', id: 'dates', meta: { name: 'D' },
+      dataset: { adapter: 'custom', source: 't' },
+      fields: [],
+      parameters: [
+        { name: 'day', type: 'date', required: true },
+        { name: 'period', type: 'dateRange' },
+        { name: 'at', type: 'datetime' },
+      ],
+      bands: { detail: { height: 5 } },
+    });
+    if (!r.ok) throw new Error(r.error);
+    const at = new Date(2026, 9, 1, 8, 15);
+    const rendered = nextEvent(v, 'report-rendered');
+    v.dataAdapter = adapter;
+    v.params = { day: new Date(2026, 9, 1), period: { from: new Date(2026, 9, 1) }, at };
+    v.schema = r.value;
+    await rendered;
+    expect(calls.at(-1)!.params).toEqual({ day: '2026-10-01', period: { from: '2026-10-01' }, at: at.toISOString() });
+  });
+
   it('old templates without parameters still fetch with static params', async () => {
     const r = validateReport({
       version: '1', id: 'old', meta: { name: 'O' },

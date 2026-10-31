@@ -21,11 +21,13 @@ describe('designer status bar', () => {
 
   it('uses a label when the element has one, otherwise the kind', () => {
     expect(elementStatusName({ kind: 'text', value: 'Hello' })).toBe('Hello');
-    expect(elementStatusName({ kind: 'text', value: '  ' })).toBe('text');
+    expect(elementStatusName({ kind: 'text', value: '  ' })).toBe('Text');
     expect(elementStatusName({ kind: 'field', field: 'amount' })).toBe('amount');
     expect(elementStatusName({ kind: 'aggregate', fn: 'sum', field: 'amount' })).toBe('sum(amount)');
-    expect(elementStatusName({ kind: 'line' })).toBe('line');
-    expect(elementStatusName({ id: 'el-1', kind: 'box' } as { kind: string })).toBe('box');
+    expect(elementStatusName({ kind: 'line' })).toBe('Line');
+    expect(elementStatusName({ kind: 'box' })).toBe('Box');
+    expect(elementStatusName({ kind: 'text', value: '  ' }, 'ar')).toBe('نص');
+    expect(elementStatusName({ kind: 'line' }, 'ar')).toBe('خط');
   });
 
   it('formats the page indicator as n / m', () => {
@@ -33,7 +35,7 @@ describe('designer status bar', () => {
     expect(formatPageIndicator(2, 4)).toBe('2 / 4');
   });
 
-  it('uses Intl digits for the report locale and مم in Arabic', () => {
+  it('uses Intl digits for the UI locale and مم in Arabic', () => {
     const ar = { locale: 'ar', digits: 'locale' as const };
     const latn = { locale: 'ar-SA', digits: 'latn' as const };
     expect(formatLocalizedNumber(12, ar, 1)).toMatch(/[٠-٩]/);

@@ -1,4 +1,5 @@
 import { resolveIntlLocale, type LocaleTag } from '@reports-web/shared';
+import { t } from '../../i18n/strings.js';
 
 export interface DigitFormat {
   /** BCP 47 tag used when `digits` is `locale`. */
@@ -23,7 +24,7 @@ export function formatLocalizedNumber(value: number, fmt: DigitFormat = WESTERN,
 }
 
 export function lengthUnit(locale: string): string {
-  return locale.toLowerCase().startsWith('ar') ? 'مم' : 'mm';
+  return t(locale as LocaleTag, 'unitMm');
 }
 
 export function formatZoomPercent(zoom: number, fmt: DigitFormat = WESTERN): string {
@@ -51,34 +52,71 @@ export function formatSelectionSummary(
   return `${input.name} · ${w} × ${h} ${lengthUnit(fmt.locale)}`;
 }
 
+type KindLabel =
+  | 'text'
+  | 'field'
+  | 'image'
+  | 'chart'
+  | 'expression'
+  | 'aggregate'
+  | 'line'
+  | 'box'
+  | 'qr'
+  | 'barcode'
+  | 'html'
+  | 'markdown';
+
+function kindLabel(kind: string, mode?: string): KindLabel {
+  if (kind === 'expr') return 'expression';
+  if (kind === 'richtext') return mode === 'markdown' ? 'markdown' : 'html';
+  if (
+    kind === 'text' ||
+    kind === 'field' ||
+    kind === 'image' ||
+    kind === 'chart' ||
+    kind === 'aggregate' ||
+    kind === 'line' ||
+    kind === 'box' ||
+    kind === 'qr' ||
+    kind === 'barcode'
+  ) {
+    return kind;
+  }
+  return 'text';
+}
+
 /** Status-bar name: a human label when the element has one, otherwise its kind. */
-export function elementStatusName(el: {
-  kind: string;
-  value?: string;
-  field?: string;
-  fn?: string;
-  expression?: string;
-  type?: string;
-  symbology?: string;
-  mode?: string;
-}): string {
+export function elementStatusName(
+  el: {
+    kind: string;
+    value?: string;
+    field?: string;
+    fn?: string;
+    expression?: string;
+    type?: string;
+    symbology?: string;
+    mode?: string;
+  },
+  locale: LocaleTag = 'en',
+): string {
+  const fallback = t(locale, kindLabel(el.kind, el.mode));
   switch (el.kind) {
     case 'text':
-      return el.value?.trim() || 'text';
+      return el.value?.trim() || fallback;
     case 'field':
-      return el.field?.trim() || 'field';
+      return el.field?.trim() || fallback;
     case 'aggregate':
-      return el.fn && el.field ? `${el.fn}(${el.field})` : 'aggregate';
+      return el.fn && el.field ? `${el.fn}(${el.field})` : fallback;
     case 'expr':
-      return el.expression?.trim() || 'expr';
+      return el.expression?.trim() || fallback;
     case 'chart':
-      return el.type?.trim() || 'chart';
+      return el.type?.trim() || fallback;
     case 'barcode':
-      return el.symbology?.trim() || 'barcode';
+      return el.symbology?.trim() || fallback;
     case 'richtext':
-      return el.mode?.trim() || 'richtext';
+      return fallback;
     default:
-      return el.kind;
+      return fallback;
   }
 }
 

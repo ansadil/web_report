@@ -1,4 +1,4 @@
-import { createStaticAdapter, logger, resolveLabel, validateReport } from '../api.js';
+import { createStaticAdapter, logger, resolveLabel, t, validateReport } from '../api.js';
 import type { ReportSchemaV1 } from '../api.js';
 import { emptySchema } from '../factory.js';
 import { newId } from '../ids.js';
@@ -90,7 +90,7 @@ export function saveAsCopy(session: BuilderSession): void {
   const next: ReportSchemaV1 = {
     ...session.schema,
     id: newId('report'),
-    meta: { ...session.schema.meta, name: `${session.schema.meta.name} (2)` },
+    meta: { ...session.schema.meta, name: `${session.schema.meta.name}${t(session.uiLocale, 'copySuffix')}` },
   };
   replaceSchema(session, next);
   void saveReport(session);

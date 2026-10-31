@@ -71,8 +71,6 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
       flex-direction: column;
       justify-content: flex-start;
     }
-    .element .el-body.valign-center { justify-content: center; }
-    .element .el-body.valign-end { justify-content: flex-end; }
     .element .kind {
       position: absolute;
       top: 0;

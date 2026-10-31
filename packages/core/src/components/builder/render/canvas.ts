@@ -151,7 +151,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
         @pointerdown=${onPointerDown}
       >
         <span class="kind">${t(state.locale, 'line')}</span>
-        ${showHandles ? html`<span class="el-name" data-testid="element-name">${el.kind}</span>` : nothing}
+        ${showHandles ? html`<span class="el-name" data-testid="element-name">${t(state.locale, 'line')}</span>` : nothing}
         <div class="line-stroke" style=${strokeStyle}></div>
         ${showHandles
           ? html`<div class="resize-handles" aria-hidden="true">
@@ -182,7 +182,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     ${el.style?.bold ? 'font-weight:700;' : ''}
     ${el.style?.italic ? 'font-style:italic;' : ''}
     ${el.style?.underline ? 'text-decoration:underline;' : ''}
-    ${el.style?.align ? `text-align:${el.style.align === 'end' ? 'right' : el.style.align === 'center' ? 'center' : el.style.align === 'start' ? 'left' : 'justify'};` : ''}
+    ${el.style?.align ? `text-align:${el.style.align};` : ''}
     ${canvasDecor ? `;${canvasDecor}` : ''}
   `;
   const label = elementLabel(state, cb, el);
@@ -198,7 +198,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     >
       <span class="kind">${t(state.locale, kindLabel(el))}</span>
       ${showHandles ? html`<span class="el-name" data-testid="element-name">${label}</span>` : nothing}
-      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''} ${el.style?.valign ? `valign-${el.style.valign}` : ''}">${label}</div>
+      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''}">${label}</div>
       ${showHandles
         ? html`<div class="resize-handles" aria-hidden="true">
             ${RESIZE_HANDLE_KINDS.map(

@@ -1,5 +1,6 @@
 export { exportPdf } from './pdf.js';
-export type { PdfExportInput } from './pdf.js';
+export type { PdfExportInput, PdfWarning } from './pdf.js';
+export { PdfWarningCode } from './pdf.js';
 export {
   DEFAULT_FONTS_BASE_URL,
   FALLBACK_ARABIC_FAMILY,

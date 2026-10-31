@@ -47,7 +47,33 @@ const url = await resolveFontUrl({ family: '"Cairo", sans-serif', weight: 700 },
   `import()` on the Node path only, so browser bundles are unaffected.
 - PDF: a text element's `style.font` picks the family (first match of the stack), `style.bold`
   the 700 face; unknown families use Noto Sans Arabic + Noto Sans. Fonts are read on the first
-  PDF export only — `fonts.json` plus the TTFs the report uses, nothing outside `fontsBaseUrl`.
+  PDF export only — `fonts.json` plus the TTFs the report uses, nothing outside `fontsBaseUrl`
+  (except the bundled fallback below).
+
+### Fallback to the bundled fonts (`onWarning`)
+
+With a custom `fontsBaseUrl`, two problems no longer fail the PDF export; the bundled faces
+(`DEFAULT_FONTS_BASE_URL`, read from disk in Node) are embedded instead and `onWarning` is called
+**once per face (family + weight) per export**:
+
+| `code` (`PdfWarningCode`) | when | `family` | `url` |
+| --- | --- | --- | --- |
+| `FONT_FILE_UNAVAILABLE` | `fonts.json` lists the face but its TTF is missing (ENOENT / HTTP 404 …) or not a TrueType/OpenType font. The bundled face of the same family/weight is used; if the bundled folder has no such family, the bundled Noto Sans Arabic / Noto Sans. | the family | the TTF that failed |
+| `FONT_FALLBACK_MISSING` | `fonts.json` has no Noto Sans Arabic or Noto Sans face (the PDF fallback fonts). The bundled one is used. | `Noto Sans Arabic` / `Noto Sans` | the custom `fonts.json` |
+
+```ts
+import { exportPdf, PdfWarningCode, type PdfWarning } from '@reports-web/core';
+
+await exportPdf({ schema, rows, fontsBaseUrl: '/fonts/', onWarning: (w: PdfWarning) => {
+  if (w.code === PdfWarningCode.FONT_FILE_UNAVAILABLE) report(`font ${w.family} fell back (${w.url})`);
+} });
+```
+
+- Default `onWarning`: `console.warn`.
+- The export still rejects when the bundled fonts cannot be loaded either, when the bundled
+  folder itself is the one that is broken (no fallback from the bundled folder), and when the
+  custom folder's `fonts.json` cannot be read or parsed (a folder-level error, not a face).
+- Unknown families are not a problem: they use Noto Sans Arabic + Noto Sans without a warning.
 
 ## Regenerating
 

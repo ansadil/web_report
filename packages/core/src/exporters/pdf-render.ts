@@ -29,7 +29,8 @@ import { logger } from '../logging/logger.js';
 import { hasPageTokens, replacePageTokens } from '../engine/page-tokens.js';
 import { stripHtmlToPlainText } from '../engine/template-fields.js';
 import { TextLayouter, wrapText, type FaceChain, type LaidOutLine } from './pdf-text-layout.js';
-import { fontLibrary, type FontLibrary, type LoadedFace } from './pdf-fonts.js';
+import { FontSession, fontLibrary, type LoadedFace } from './pdf-fonts.js';
+import { defaultPdfWarning } from './pdf-warnings.js';
 import { FALLBACK_ARABIC_FAMILY, FALLBACK_LATIN_FAMILY, resolveFontFamily, type FontManifestEntry } from './fonts-manifest.js';
 import { CidFontWriter, cidHex } from './pdf-cid-font.js';
 import type { PdfExportInput } from './pdf.js';
@@ -233,12 +234,12 @@ class HarfBuzzEngine implements TextEngine {
 
   private constructor(
     private readonly pdf: PDFDocument,
-    private readonly fonts: FontLibrary,
+    private readonly fonts: FontSession,
     private readonly manifest: readonly FontManifestEntry[],
     private readonly rtl: boolean,
   ) {}
 
-  static async create(pdf: PDFDocument, rtl: boolean, fonts: FontLibrary): Promise<HarfBuzzEngine> {
+  static async create(pdf: PDFDocument, rtl: boolean, fonts: FontSession): Promise<HarfBuzzEngine> {
     return new HarfBuzzEngine(pdf, fonts, await fonts.manifest(), rtl);
   }
 
@@ -261,15 +262,10 @@ class HarfBuzzEngine implements TextEngine {
   }
 
   private async buildChain(family: string | null, bold: boolean): Promise<ChainSet> {
-    const need = async (f: string): Promise<LoadedFace> => {
-      const face = await this.fonts.loadFamily(f, bold);
-      if (!face) throw new Error(`fonts.json has no "${f}" face (PDF fallback font)`);
-      return face;
-    };
     const [primary, arabic, latin] = await Promise.all([
       family ? this.fonts.loadFamily(family, bold) : Promise.resolve(null),
-      need(FALLBACK_ARABIC_FAMILY),
-      need(FALLBACK_LATIN_FAMILY),
+      this.fonts.loadFallback(FALLBACK_ARABIC_FAMILY, bold),
+      this.fonts.loadFallback(FALLBACK_LATIN_FAMILY, bold),
     ]);
     const faces: LoadedFace[] = primary ? [primary, arabic, latin] : [arabic, latin];
     // First face = metrics + hinting of the merged font; the Latin fallback always keeps Basic
@@ -613,7 +609,7 @@ function requestedFamilies(tree: RenderTree): string[] {
  * Helvetica). The manifest is only read when some element sets `style.font`; if it cannot be
  * read the report keeps Helvetica.
  */
-async function usesBundledFamily(tree: RenderTree, fonts: FontLibrary): Promise<boolean> {
+async function usesBundledFamily(tree: RenderTree, fonts: FontSession): Promise<boolean> {
   const families = requestedFamilies(tree);
   if (families.length === 0) return false;
   try {
@@ -625,10 +621,10 @@ async function usesBundledFamily(tree: RenderTree, fonts: FontLibrary): Promise<
   }
 }
 
-export async function renderPdf({ schema, rows, fontsBaseUrl }: PdfExportInput): Promise<Blob> {
+export async function renderPdf({ schema, rows, fontsBaseUrl, onWarning }: PdfExportInput): Promise<Blob> {
   const pdf = await PDFDocument.create();
   const tree = interpret({ schema, rows });
-  const fonts = fontLibrary(fontsBaseUrl);
+  const fonts = new FontSession(fontLibrary(fontsBaseUrl), onWarning ?? defaultPdfWarning);
   const useUnicode = needsUnicodePdfFont(tree, schema) || (await usesBundledFamily(tree, fonts));
   /**
    * Paragraph base direction for bidi and layout. An explicit template/host `dir` always wins (BUG-21: Arabic +

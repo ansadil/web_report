@@ -6,7 +6,9 @@
  * decided by the public helpers in `fonts-manifest.ts` (same as the UI).
  */
 import type { ShapedGlyph, ShapingFace } from './pdf-text-layout.js';
-import { loadFontManifest, readFontAsset, resolveFontUrl, type FontManifestEntry } from './fonts-manifest.js';
+import fontkit from '@pdf-lib/fontkit';
+import { loadFontManifest, readFontAsset, resolveFontUrl, resolveFontsBaseUrl, type FontManifestEntry } from './fonts-manifest.js';
+import { PdfWarningCode, type PdfWarning } from './pdf-warnings.js';
 
 type HarfBuzz = typeof import('harfbuzzjs');
 
@@ -90,12 +92,13 @@ export class FontLibrary {
     return loadFontManifest(this.fontsBaseUrl);
   }
 
-  /** HarfBuzz face for an absolute font URL. */
-  private loadFace(url: string): Promise<LoadedFace> {
+  /** HarfBuzz face for an absolute font URL; rejects if the file is missing or not a font. */
+  loadFace(url: string): Promise<LoadedFace> {
     let p = this.faces.get(url);
     if (!p) {
       p = (async () => {
         const [hb, bytes] = await Promise.all([loadHarfBuzz(), readFontAsset(url)]);
+        assertFont(bytes, url);
         return new HarfBuzzFace(hb, url.slice(url.lastIndexOf('/') + 1), bytes, url);
       })();
       p.catch(() => this.faces.delete(url));
@@ -104,10 +107,131 @@ export class FontLibrary {
     return p;
   }
 
+  /** TTF URL of `family` (name or CSS stack) at 400/700, or `null` if the manifest lacks it. */
+  faceUrl(family: string, bold: boolean): Promise<string | null> {
+    return resolveFontUrl({ family, weight: bold ? 700 : 400 }, { format: 'ttf', fontsBaseUrl: this.fontsBaseUrl });
+  }
+
   /** Face of `family` (name or CSS stack) at 400/700, or `null` if the manifest lacks it. */
   async loadFamily(family: string, bold: boolean): Promise<LoadedFace | null> {
-    const url = await resolveFontUrl({ family, weight: bold ? 700 : 400 }, { format: 'ttf', fontsBaseUrl: this.fontsBaseUrl });
+    const url = await this.faceUrl(family, bold);
     return url ? this.loadFace(url) : null;
+  }
+}
+
+/** sfnt magic (TrueType 1.0 / 'true' / 'OTTO') and a parseable table directory. */
+function assertFont(bytes: Uint8Array, url: string): void {
+  const magic = bytes.length >= 12 ? ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0 : 0;
+  let ok = magic === 0x00010000 || magic === 0x74727565 || magic === 0x4f54544f;
+  if (ok) {
+    try {
+      ok = fontkit.create(bytes).numGlyphs > 0;
+    } catch {
+      ok = false;
+    }
+  }
+  if (!ok) throw new Error(`PDF font asset ${url} is not a TrueType/OpenType font`);
+}
+
+const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * The faces one PDF export uses: its {@link FontLibrary} plus the fallback to the bundled
+ * fonts folder when a custom `fontsBaseUrl` cannot provide a face. Each fallback is reported
+ * once per face (family + weight) through `onWarning`.
+ */
+export class FontSession {
+  private readonly warned = new Set<string>();
+  private customPromise: Promise<boolean> | null = null;
+
+  constructor(
+    readonly library: FontLibrary,
+    private readonly onWarning: (w: PdfWarning) => void,
+    private readonly bundled: FontLibrary = fontLibrary(),
+  ) {}
+
+  manifest(): Promise<FontManifestEntry[]> {
+    return this.library.manifest();
+  }
+
+  /** Whether the library is a folder other than the bundled one (only those fall back). */
+  private isCustom(): Promise<boolean> {
+    if (!this.customPromise) {
+      const base = this.library.fontsBaseUrl;
+      this.customPromise = base
+        ? Promise.all([resolveFontsBaseUrl(base), resolveFontsBaseUrl(this.bundled.fontsBaseUrl)]).then(([a, b]) => a.href !== b.href)
+        : Promise.resolve(false);
+    }
+    return this.customPromise;
+  }
+
+  private warn(w: PdfWarning, bold: boolean): void {
+    const key = `${w.code}|${(w.family ?? '').toLowerCase()}|${bold ? 700 : 400}`;
+    if (this.warned.has(key)) return;
+    this.warned.add(key);
+    this.onWarning(w);
+  }
+
+  /**
+   * Face of `family` at 400/700, `null` if the manifest lacks the family. If the folder lists
+   * it but its TTF is missing/unloadable, a custom folder falls back to the bundled face of
+   * the family (or `null`, i.e. the Noto fallbacks, if the bundled folder lacks it) with a
+   * {@link PdfWarningCode.FONT_FILE_UNAVAILABLE} warning; the bundled folder itself rejects.
+   */
+  async loadFamily(family: string, bold: boolean): Promise<LoadedFace | null> {
+    const url = await this.library.faceUrl(family, bold);
+    if (!url) return null;
+    try {
+      return await this.library.loadFace(url);
+    } catch (err) {
+      if (!(await this.isCustom())) throw err;
+      const face = await this.loadBundled(family, bold, err);
+      this.warn(
+        {
+          code: PdfWarningCode.FONT_FILE_UNAVAILABLE,
+          message:
+            `Font file for "${family}" ${bold ? 700 : 400} could not be loaded (${errorText(err)}); ` +
+            (face ? `using the bundled ${face.file} instead.` : 'the bundled fonts have no such family, using Noto Sans Arabic / Noto Sans.'),
+          family,
+          url,
+        },
+        bold,
+      );
+      return face;
+    }
+  }
+
+  /**
+   * One of the PDF fallback families (Noto Sans Arabic / Noto Sans). A custom folder without
+   * it uses the bundled face, with a {@link PdfWarningCode.FONT_FALLBACK_MISSING} warning.
+   */
+  async loadFallback(family: string, bold: boolean): Promise<LoadedFace> {
+    const face = await this.loadFamily(family, bold);
+    if (face) return face;
+    if (!(await this.isCustom())) throw new Error(`fonts.json has no "${family}" face (PDF fallback font)`);
+    const bundled = await this.loadBundled(family, bold, null);
+    if (!bundled) throw new Error(`bundled fonts.json has no "${family}" face (PDF fallback font)`);
+    const manifestUrl = `${(await resolveFontsBaseUrl(this.library.fontsBaseUrl)).href}fonts.json`;
+    this.warn(
+      {
+        code: PdfWarningCode.FONT_FALLBACK_MISSING,
+        message: `${manifestUrl} has no "${family}" ${bold ? 700 : 400} face (PDF fallback font); using the bundled ${bundled.file}.`,
+        family,
+        url: manifestUrl,
+      },
+      bold,
+    );
+    return bundled;
+  }
+
+  /** Bundled face of `family`, `null` if the bundled folder lacks it; rejects if it fails to load. */
+  private async loadBundled(family: string, bold: boolean, cause: unknown): Promise<LoadedFace | null> {
+    try {
+      return await this.bundled.loadFamily(family, bold);
+    } catch (e) {
+      const why = cause ? `${errorText(cause)}; ` : '';
+      throw new Error(`PDF font "${family}" ${bold ? 700 : 400} unavailable: ${why}bundled fallback failed too: ${errorText(e)}`);
+    }
   }
 }
 

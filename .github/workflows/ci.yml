@@ -46,6 +46,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Install poppler-utils (pdftotext for BUG-23 QA checks)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          pdftotext -v
+
       - name: QA tests
         continue-on-error: true
+        env:
+          QA_REQUIRE_PDFTOTEXT: '1'
         run: node .github/scripts/qa-tests.mjs

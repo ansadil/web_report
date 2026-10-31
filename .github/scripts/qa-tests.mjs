@@ -126,7 +126,12 @@ function main() {
   child.on('error', (error) => {
     rmSync(reportDir, { recursive: true, force: true });
     printSummary({ passed: 0, failed: 0 }, `pnpm test:qa could not be started: ${error.message}`);
-    process.exit(required && !pdftotext ? 1 : 0);
+    if (required && !pdftotext) {
+      console.error(`QA FAILED: ${PDFTOTEXT_MISSING} QA_REQUIRE_PDFTOTEXT=1 requires them to run; install poppler-utils.`);
+      console.log(`::error title=QA: pdftotext missing::${PDFTOTEXT_MISSING} (QA_REQUIRE_PDFTOTEXT=1)`);
+    }
+    console.error('QA FAILED: pnpm test:qa could not be started.');
+    process.exit(1);
   });
 
   child.on('close', (code) => {
@@ -147,15 +152,30 @@ function main() {
       note,
     );
 
+    let exitCode = 0;
     if (!pdftotext) {
       if (required) {
         console.error(`QA FAILED: ${PDFTOTEXT_MISSING} QA_REQUIRE_PDFTOTEXT=1 requires them to run; install poppler-utils.`);
         console.log(`::error title=QA: pdftotext missing::${PDFTOTEXT_MISSING} (QA_REQUIRE_PDFTOTEXT=1)`);
-        process.exit(1);
+        exitCode = 1;
+      } else {
+        console.warn(`warning: ${PDFTOTEXT_MISSING} Not failing (set QA_REQUIRE_PDFTOTEXT=1 to make this an error).`);
       }
-      console.warn(`warning: ${PDFTOTEXT_MISSING} Not failing (set QA_REQUIRE_PDFTOTEXT=1 to make this an error).`);
     }
-    process.exit(0);
+
+    // A green summary is not enough: fail the process when tests failed, vitest
+    // itself exited non-zero (or was signalled), or the totals could not be parsed.
+    const vitestFailed = code !== 0;
+    if (!counts.parsed || counts.failed > 0 || vitestFailed) {
+      const reasons = [];
+      if (!counts.parsed) reasons.push('could not parse test totals');
+      if (counts.parsed && counts.failed > 0) reasons.push(`${counts.failed} test(s) failed`);
+      if (vitestFailed) reasons.push(`pnpm test:qa exited ${code ?? 'unknown'}`);
+      console.error(`QA FAILED: ${reasons.join('; ')}.`);
+      exitCode = 1;
+    }
+
+    process.exit(exitCode);
   });
 }
 

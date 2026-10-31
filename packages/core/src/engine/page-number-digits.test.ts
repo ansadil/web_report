@@ -45,3 +45,24 @@ describe('HTML viewer page numbers follow the report number locale', () => {
     });
   }
 });
+
+describe('HTML viewer with a BCP 47 Arabic locale (ar-SA, dir inferred)', () => {
+  it('renders rtl and Arabic-Indic digits (body and page numbers)', () => {
+    const s = schema({ locale: 'ar-SA' }, 'صفحة {page} من {pages}');
+    expect(s.meta.dir).toBe('rtl');
+    for (const visualPages of [false, true]) {
+      const out = html(s, visualPages);
+      expect(out).toContain('data-dir="rtl"');
+      expect(out).toContain('data-locale="ar-SA"');
+      expect(out).toContain('١٬٢٣٤٫٥٠');
+      expect(out).toContain('صفحة ٢ من ٢');
+      expect(out).not.toContain('1,234.50');
+    }
+  });
+  it('en-GB stays ltr with Western digits', () => {
+    const out = html(schema({ locale: 'en-GB' }, 'Page {page} of {pages}'), false);
+    expect(out).toContain('data-dir="ltr"');
+    expect(out).toContain('1,234.50');
+    expect(out).not.toMatch(/[\u0660-\u0669]/);
+  });
+});

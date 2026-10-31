@@ -1,5 +1,5 @@
 import type { Row } from '@reports-web/shared';
-import { applyPattern } from '@reports-web/shared';
+import { applyPattern, type LocaleTag } from '@reports-web/shared';
 import type {
   Band,
   Element as ReportElement,
@@ -67,7 +67,7 @@ export interface RenderTree {
   readonly height: number;
   readonly margins: { top: number; right: number; bottom: number; left: number };
   readonly dir: 'rtl' | 'ltr';
-  readonly locale: 'ar' | 'en';
+  readonly locale: LocaleTag;
   /** Digits for page-number tokens (schema `meta.pageNumberDigits`, default 'locale'). */
   readonly pageNumberDigits?: 'locale' | 'latn';
   readonly sections: RenderSection[];
@@ -142,7 +142,7 @@ function applyConditional(el: ReportElement, ctx: { row?: Row; aggregates?: Reco
 
 function renderElement(
   el: ReportElement,
-  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: 'ar' | 'en'; groupRows?: readonly Row[] },
+  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag; groupRows?: readonly Row[] },
 ): RenderElement | null {
   if (!evalCondition(el.visibleWhen, ctx)) return null;
   const style = applyConditional(el, ctx);
@@ -229,7 +229,7 @@ function renderElement(
 function renderBand(
   band: Band | undefined,
   kind: BandKind,
-  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: 'ar' | 'en'; groupRows?: readonly Row[] },
+  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag; groupRows?: readonly Row[] },
   groupInfo?: { key: string; value: unknown },
 ): RenderSection | null {
   if (!band) return null;

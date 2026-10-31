@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
-import type { FieldMeta, Row } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag, Row } from '@reports-web/shared';
 import { MM_TO_PX } from '@reports-web/shared';
 import { resolveLabel } from '../engine/dictionary.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
@@ -776,8 +776,8 @@ export class ReportsBuilderElement extends LitElement {
   @property({ attribute: false }) dataAdapter: DataAdapter | null = null;
   @property({ attribute: false }) storageAdapter: StorageAdapter | null = null;
   @property({ attribute: false }) sampleRows: readonly Row[] | null = null;
-  /** UI language override. When unset, follows the template's meta.locale. */
-  @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
+  /** UI language override (BCP 47 tag). When unset, follows the template's meta.locale. */
+  @property({ type: String }) locale: LocaleTag | undefined = undefined;
   /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
   @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
   private _syncingDir = false;
@@ -797,7 +797,7 @@ export class ReportsBuilderElement extends LitElement {
     }
   }
 
-  private get _uiLocale(): 'ar' | 'en' {
+  private get _uiLocale(): LocaleTag {
     return resolveLocale(this.locale, this._schema.meta);
   }
 
@@ -2202,9 +2202,12 @@ export class ReportsBuilderElement extends LitElement {
           <label>${t(this._uiLocale, 'description')}<input .value=${meta.description ?? ''} @input=${(e: Event) => updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></label>
           <div class="grid2">
             <label>${t(this._uiLocale, 'locale')}
-              <select @change=${(e: Event) => updateMeta({ locale: (e.target as HTMLSelectElement).value as 'ar' | 'en' })}>
+              <select @change=${(e: Event) => updateMeta({ locale: (e.target as HTMLSelectElement).value })}>
                 <option value="en" ?selected=${meta.locale === 'en'}>en</option>
                 <option value="ar" ?selected=${meta.locale === 'ar'}>ar</option>
+                ${meta.locale !== 'en' && meta.locale !== 'ar'
+                  ? html`<option value=${meta.locale} selected>${meta.locale}</option>`
+                  : nothing}
               </select>
             </label>
             <label>${t(this._uiLocale, 'direction')}

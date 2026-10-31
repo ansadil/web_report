@@ -1,4 +1,4 @@
-import type { Row } from '@reports-web/shared';
+import type { LocaleTag, Row } from '@reports-web/shared';
 import type { ReportSchemaV1, DataAdapter, StorageAdapter, ChartAdapter } from '@reports-web/core';
 
 export type ExportKind = 'pdf' | 'excel' | 'csv' | 'png' | 'print';
@@ -14,7 +14,8 @@ export interface ReportViewerProps {
   rows?: readonly Row[];
   dataAdapter?: DataAdapter;
   chartAdapter?: ChartAdapter;
-  locale?: 'ar' | 'en';
+  /** BCP 47 tag ('ar', 'ar-SA', 'en-GB', ...). UI strings: ar / ar-* -> Arabic, else English. */
+  locale?: LocaleTag;
   dir?: 'rtl' | 'ltr';
   noToolbar?: boolean;
   /** Hide zoom / section navigation (export toolbar stays visible unless `noToolbar`). */
@@ -33,7 +34,8 @@ export interface ReportBuilderProps {
   dataAdapter?: DataAdapter;
   storageAdapter?: StorageAdapter;
   sampleRows?: readonly Row[];
-  locale?: 'ar' | 'en';
+  /** BCP 47 tag ('ar', 'ar-SA', 'en-GB', ...). UI strings: ar / ar-* -> Arabic, else English. */
+  locale?: LocaleTag;
   dir?: 'rtl' | 'ltr';
   className?: string;
   style?: React.CSSProperties;

@@ -264,3 +264,32 @@ describe('PDF non-text elements', () => {
     expect(encodeBarcode('abc', 'EAN13')).toBeNull();
   });
 });
+
+describe('PDF with a BCP 47 Arabic locale (ar-SA)', () => {
+  // No meta.dir: it is inferred from the locale (ar-SA -> rtl).
+  const arSa = (): ReportSchemaV1 =>
+    schema([text('mix', 'ABC تقرير', 0)], { name: 'T', locale: 'ar-SA' }, {
+      detail: { height: 9, elements: [{ id: 'n', kind: 'field', field: 'n', format: 'decimal2', pos: { x: 0, y: 0, w: 100, h: 8 } }] },
+    });
+
+  it('infers rtl and draws Arabic-Indic digits in RTL visual order', async () => {
+    const s = arSa();
+    expect(s.meta.locale).toBe('ar-SA');
+    expect(s.meta.dir).toBe('rtl');
+    const lines = (await readDrawnLines(await pdfBytes(s, [{ n: 1234.5 }]))).map((l) => l.visual);
+    expect(lines).toContain(expectedVisual('١٬٢٣٤٫٥٠', 'rtl'));
+    expect(expectedVisual('ABC تقرير', 'rtl')).not.toBe(expectedVisual('ABC تقرير', 'ltr'));
+    expect(lines).toContain(expectedVisual('ABC تقرير', 'rtl'));
+    expect(lines.join('\n')).not.toContain('1,234.50');
+  });
+
+  it('ar-SA-u-nu-latn keeps Western digits but stays rtl', async () => {
+    const s = schema([text('mix', 'ABC تقرير', 0)], { name: 'T', locale: 'ar-SA-u-nu-latn' }, {
+      detail: { height: 9, elements: [{ id: 'n', kind: 'field', field: 'n', format: 'decimal2', pos: { x: 0, y: 0, w: 100, h: 8 } }] },
+    });
+    expect(s.meta.dir).toBe('rtl');
+    const all = (await readDrawnLines(await pdfBytes(s, [{ n: 1234.5 }]))).map((l) => l.visual).join('\n');
+    expect(all).not.toMatch(/[\u0660-\u0669]/);
+    expect(all).toMatch(/1.234.50|1,234.50/);
+  });
+});

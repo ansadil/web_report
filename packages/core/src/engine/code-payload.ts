@@ -1,5 +1,5 @@
 import type { Row } from '@reports-web/shared';
-import { applyPattern } from '@reports-web/shared';
+import { applyPattern, type LocaleTag } from '@reports-web/shared';
 import { tryEvaluate } from './expression.js';
 import { logger } from '../logging/logger.js';
 
@@ -12,7 +12,7 @@ export interface PayloadSource {
 
 export function resolveCodePayload(
   src: PayloadSource,
-  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: 'ar' | 'en' },
+  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag },
 ): string {
   if (src.expression?.trim()) {
     const r = tryEvaluate(src.expression, ctx);

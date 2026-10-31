@@ -1,5 +1,6 @@
 import type { Row } from '@reports-web/shared';
 import type { DataAdapter, DataQuery } from './types.js';
+import { toDescribeFn, type DescribeOption } from './describe.js';
 import { logger } from '../../logging/logger.js';
 
 export interface RestDataAdapterOptions {
@@ -8,6 +9,8 @@ export interface RestDataAdapterOptions {
   readonly extractRows?: (json: unknown) => readonly Row[];
   readonly method?: 'GET' | 'POST';
   readonly timeoutMs?: number;
+  /** Optional data dictionary description (static object or async function, e.g. fetching a metadata endpoint). */
+  readonly describe?: DescribeOption;
 }
 
 function defaultExtract(json: unknown): readonly Row[] {
@@ -68,5 +71,6 @@ export function createRestAdapter(opts: RestDataAdapterOptions): DataAdapter {
         if (signal) signal.removeEventListener('abort', onAbort);
       }
     },
+    ...(opts.describe ? { describe: toDescribeFn(opts.describe) } : {}),
   };
 }

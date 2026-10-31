@@ -124,3 +124,25 @@ describe('DataAdapterRegistry', () => {
     expect(() => r.get('rest')).toThrow(/Available/);
   });
 });
+
+describe('Adapter describe() pass-through', () => {
+  const desc = { sources: [{ name: 's', fields: [{ name: 'a', type: 'string' as const }] }] };
+  it('static adapter exposes describe from an object', async () => {
+    const a = createStaticAdapter({ tables: {}, describe: desc });
+    expect(await a.describe!()).toEqual(desc);
+  });
+  it('static adapter has no describe by default', () => {
+    expect(createStaticAdapter({ tables: {} }).describe).toBeUndefined();
+  });
+  it('REST adapter exposes describe from a function', async () => {
+    const a = createRestAdapter({ baseUrl: 'http://api/', describe: async () => desc });
+    expect(await a.describe!()).toEqual(desc);
+    expect(createRestAdapter({ baseUrl: 'http://api/' }).describe).toBeUndefined();
+  });
+  it('custom adapter passes describe through', async () => {
+    const describeFn = async () => desc;
+    const a = createCustomAdapter({ fetch: async () => [], describe: describeFn });
+    expect(a.describe).toBe(describeFn);
+    expect(createCustomAdapter({ fetch: async () => [] }).describe).toBeUndefined();
+  });
+});

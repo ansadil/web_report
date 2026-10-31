@@ -2,6 +2,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
 import type { FieldMeta, Row } from '@reports-web/shared';
 import { MM_TO_PX } from '@reports-web/shared';
+import { resolveLabel } from '../engine/dictionary.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 import type {
   Element as ReportElement,
@@ -1012,7 +1013,10 @@ export class ReportsBuilderElement extends LitElement {
     try {
       const fields = await adapter.introspect({ source: this._schema.dataset.source });
       this._fields = fields;
-      this._replaceSchema({ ...this._schema, fields: fields.map((f) => ({ name: f.name, type: f.type, label: f.label })) });
+      this._replaceSchema({
+        ...this._schema,
+        fields: fields.map((f) => ({ name: f.name, type: f.type, label: f.label === undefined ? undefined : resolveLabel(f.label, this._uiLocale) })),
+      });
     } catch (e) {
       logger.warn('reports-builder', 'introspect failed', { error: e instanceof Error ? e.message : String(e) });
     }
@@ -1702,7 +1706,7 @@ export class ReportsBuilderElement extends LitElement {
               (f) => html`
                 <div class="field-row" draggable="true"
                      @dragstart=${(e: DragEvent) => this._onFieldDragStart(e, f)}>
-                  <span>${f.label ?? f.name}</span>
+                  <span>${resolveLabel(f.label, this._uiLocale, f.name)}</span>
                   <span class="type">${f.type}</span>
                 </div>
               `,

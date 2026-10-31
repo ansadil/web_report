@@ -1,4 +1,4 @@
-export type { DataAdapter, DataQuery } from './types.js';
+export type { DataAdapter, DataQuery, DataDictionaryDescription } from './types.js';
 export { createStaticAdapter } from './static.js';
 export { createRestAdapter } from './rest.js';
 export { createGraphQLAdapter } from './graphql.js';

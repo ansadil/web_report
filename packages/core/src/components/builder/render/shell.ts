@@ -8,7 +8,6 @@ import { renderRibbon } from './ribbon.js';
 import { renderHorizontalRuler, renderVerticalRuler } from './rulers.js';
 import { renderSideSection } from './side.js';
 import { renderStatusBar } from './status-bar.js';
-import { renderActions } from './toolbar.js';
 import { renderToolbox } from './toolbox.js';
 
 /** Top-level layout. Pure: it only reads `state` and calls `cb`. */
@@ -31,7 +30,9 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       <div class="qa">
         <button type="button" class="qa-btn" data-control="undo" data-testid="ribbon-btn-undo" aria-label=${t(state.uiLocale, 'undo')} title=${t(state.uiLocale, 'undo')} ?disabled=${!state.actions.canUndo} @click=${cb.actions.onUndo}>${icon('undo')}</button>
         <button type="button" class="qa-btn" data-control="redo" data-testid="ribbon-btn-redo" aria-label=${t(state.uiLocale, 'redo')} title=${t(state.uiLocale, 'redo')} ?disabled=${!state.actions.canRedo} @click=${cb.actions.onRedo}>${icon('redo')}</button>
-        <button type="button" class="qa-btn" data-testid="title-save" aria-label=${t(state.uiLocale, 'save')} title=${t(state.uiLocale, 'save')} @click=${cb.actions.onSave}>${icon('save')}</button>
+        ${state.actions.actions.includes('save')
+          ? html`<button type="button" class="qa-btn" data-testid="title-save" data-action="save" aria-label=${t(state.uiLocale, 'save')} title=${t(state.uiLocale, 'save')} @click=${cb.actions.onSave}>${icon('save')}</button>`
+          : html`<button type="button" class="qa-btn" data-testid="title-save" aria-label=${t(state.uiLocale, 'save')} title=${t(state.uiLocale, 'save')} @click=${cb.actions.onSave}>${icon('save')}</button>`}
       </div>
       <div class="doc-center">
         <input
@@ -149,7 +150,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       )}
     </aside>
     <div class="status-host">
-      ${renderStatusBar(state.status, renderActions(state.actions, cb.actions), cb.onSetZoom)}
+      ${renderStatusBar(state.status, { onIn: cb.actions.onZoomIn, onOut: cb.actions.onZoomOut, onReset: cb.actions.onZoomReset, onSet: cb.onSetZoom })}
     </div>
   `;
 }
@@ -162,31 +163,56 @@ function fieldBadge(type: string): string {
   return 'Aa';
 }
 
+function typeLabel(state: BuilderViewState, type: string): string {
+  if (type === 'number') return t(state.uiLocale, 'typeNumber');
+  if (type === 'date') return t(state.uiLocale, 'typeDate');
+  if (type === 'bool') return t(state.uiLocale, 'typeBool');
+  if (type === 'image') return t(state.uiLocale, 'typeImage');
+  if (type === 'static') return t(state.uiLocale, 'typeStatic');
+  return t(state.uiLocale, 'typeString');
+}
+
+function adapterTag(state: BuilderViewState, adapter: string): string {
+  if (adapter === 'static') return t(state.uiLocale, 'typeStatic');
+  if (/rest|json/i.test(adapter)) return 'REST · JSON';
+  return adapter;
+}
+
 function renderDictionary(state: BuilderViewState) {
   const source = state.properties.schema.dataset.source;
   const adapter = state.properties.schema.dataset.adapter;
   const fields = state.toolbox.fields;
   const parameters = state.properties.schema.parameters ?? [];
   return html`
-    <div class="dict-tools">
-      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'dataSources')}>${icon('plus')}</button>
-      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'editItem')}>${icon('pencil')}</button>
-      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'delete')}>${icon('trash')}</button>
-      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'refresh')}>${icon('refresh')}</button>
+    <div class="dict-head"><b>${t(state.uiLocale, 'reportData')}</b>
+      <div class="dict-tools">
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'dataSources')}>${icon('plus')}</button>
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'editItem')}>${icon('pencil')}</button>
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'delete')}>${icon('trash')}</button>
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'refresh')}>${icon('refresh')}</button>
+      </div>
     </div>
     <div class="dict" data-testid="dictionary-tree">
-      <div class="dict-node root">${t(state.uiLocale, 'dataSources')}</div>
-      <div class="dict-node source">${source}<span class="tmeta">${adapter}</span></div>
-      ${fields.map(
-        (field, index) => html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.type}">${fieldBadge(field.type)}</span><span>${field.name}</span><span class="tmeta">${field.type}</span></div>`,
-      )}
-      <div class="dict-node root">${t(state.uiLocale, 'reportParameters')}</div>
-      ${parameters.map((parameter) => html`<div class="dict-node field"><span class="tic">${fieldBadge(parameter.type ?? 'string')}</span><span>${parameter.name}</span><span class="tmeta">${parameter.type ?? ''}</span></div>`)}
-      <div class="dict-node root">${t(state.uiLocale, 'systemVariables')}</div>
-      <div class="dict-node field"><span class="tic">#</span><span>{page}</span><span class="tmeta">${t(state.uiLocale, 'statusPage')}</span></div>
-      <div class="dict-node field"><span class="tic">#</span><span>{pages}</span></div>
-      <div class="dict-node field"><span class="tic tic-date">D</span><span>${t(state.uiLocale, 'typeDate')}</span></div>
-      <div class="dict-node field"><span class="tic">Aa</span><span>${t(state.uiLocale, 'document')}</span></div>
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}${icon('folder')}<span>${t(state.uiLocale, 'dataSources')}</span></summary>
+        <details open>
+          <summary class="dict-node source">${icon('sectionDown')}${icon('table')}<span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
+          ${fields.map(
+            (field, index) => html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.type}">${fieldBadge(field.type)}</span><span>${field.name}</span><span class="tmeta">${typeLabel(state, field.type)}</span></div>`,
+          )}
+        </details>
+      </details>
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}<span>${t(state.uiLocale, 'reportParameters')}</span></summary>
+        ${parameters.map((parameter) => html`<div class="dict-node field"><span class="tic">${fieldBadge(parameter.type)}</span><span>${parameter.name}</span><span class="tmeta">${typeLabel(state, parameter.type)}</span></div>`)}
+      </details>
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}<span>${t(state.uiLocale, 'systemVariables')}</span></summary>
+        <div class="dict-node field"><span class="tic">#</span><span>{page}</span><span class="tmeta">${t(state.uiLocale, 'statusPage')}</span></div>
+        <div class="dict-node field"><span class="tic">#</span><span>{pages}</span></div>
+        <div class="dict-node field"><span class="tic tic-date">D</span><span>${t(state.uiLocale, 'typeDate')}</span></div>
+        <div class="dict-node field"><span class="tic">Aa</span><span>${t(state.uiLocale, 'document')}</span></div>
+      </details>
     </div>
   `;
 }
@@ -195,8 +221,10 @@ function renderReportTree(state: BuilderViewState) {
   const bands = state.canvas.bands;
   return html`<div class="dict" data-testid="report-tree-list">
     ${Object.entries(bands).map(([band, value]) => html`
-      <div class="dict-node root">${t(state.uiLocale, band as 'detail')}</div>
-      ${(value?.elements ?? []).map((el) => html`<div class="dict-node field"><span class="tic">${el.kind.slice(0, 1)}</span><span>${'value' in el && el.value ? el.value : el.id}</span></div>`)}
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}<span>${t(state.uiLocale, band as 'detail')}</span></summary>
+        ${(value?.elements ?? []).map((el) => html`<div class="dict-node field"><span class="tic">${t(state.uiLocale, el.kind === 'expr' ? 'expression' : el.kind === 'richtext' ? 'html' : el.kind === 'text' || el.kind === 'field' || el.kind === 'line' || el.kind === 'box' || el.kind === 'image' || el.kind === 'chart' || el.kind === 'aggregate' || el.kind === 'qr' || el.kind === 'barcode' ? el.kind : 'text').slice(0, 1)}</span><span>${'value' in el && typeof el.value === 'string' && el.value ? el.value : el.id}</span></div>`)}
+      </details>
     `)}
   </div>`;
 }

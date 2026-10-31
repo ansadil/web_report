@@ -1,5 +1,5 @@
 import { html } from 'lit';
-import type { FieldMeta, LocaleTag } from '@reports-web/shared';
+import type { FieldMeta } from '@reports-web/shared';
 import { lineThicknessMm, t } from '../../api.js';
 import type { ConditionalFormatRule, ReportElement, Style } from '../../api.js';
 import { elementStatusName } from '../../status-bar.js';
@@ -13,12 +13,11 @@ export interface PropertiesState extends DocumentState {
   selectedIds: ReadonlySet<string>;
 }
 
-function kindHeading(el: ReportElement, locale: LocaleTag): string {
-  const key =
-    el.kind === 'expr' ? 'expression' : el.kind === 'richtext' ? (el.mode === 'markdown' ? 'markdown' : 'html') : el.kind;
-  const kind = t(locale, key);
-  const name = elementStatusName(el, locale);
-  return name === kind ? kind : `${kind} — ${name}`;
+function kindKey(el: ReportElement): 'text' | 'field' | 'image' | 'chart' | 'expression' | 'aggregate' | 'line' | 'box' | 'qr' | 'barcode' | 'html' | 'markdown' {
+  if (el.kind === 'expr') return 'expression';
+  if (el.kind === 'richtext') return el.mode === 'markdown' ? 'markdown' : 'html';
+  if (el.kind === 'text' || el.kind === 'field' || el.kind === 'image' || el.kind === 'chart' || el.kind === 'aggregate' || el.kind === 'line' || el.kind === 'box' || el.kind === 'qr' || el.kind === 'barcode') return el.kind;
+  return 'text';
 }
 
 function colorInputValue(value: string | undefined): string {
@@ -70,7 +69,7 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
         <span class="prop-card-icon">${t(state.locale, 'text').slice(0, 1)}</span>
         <div>
           <b>${elementStatusName(el, state.locale)}</b>
-          <small>${kindHeading(el, state.locale)}</small>
+          <small>${t(state.locale, 'elementWord')} ${t(state.locale, kindKey(el))} · ${t(state.locale, selectedBand)}</small>
         </div>
       </div>
       <div class="ptoggle">

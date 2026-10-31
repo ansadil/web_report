@@ -123,7 +123,7 @@ describe('reports-builder toolbar + collapsible panels', () => {
 
   it('renders the default toolbar actions (save, json)', async () => {
     await flush(b);
-    const buttons = b.shadowRoot!.querySelectorAll('.toolbar button[data-action]');
+    const buttons = b.shadowRoot!.querySelectorAll('button[data-action]');
     const ids = Array.from(buttons).map((b) => b.getAttribute('data-action'));
     expect(ids).toEqual(expect.arrayContaining(['save', 'json']));
   });
@@ -131,7 +131,7 @@ describe('reports-builder toolbar + collapsible panels', () => {
   it('honors a custom actions list', async () => {
     b.actions = ['save'];
     await flush(b);
-    const buttons = b.shadowRoot!.querySelectorAll('.toolbar button[data-action]');
+    const buttons = b.shadowRoot!.querySelectorAll('button[data-action]');
     const ids = Array.from(buttons).map((bn) => bn.getAttribute('data-action'));
     expect(ids).toEqual(['save']);
   });

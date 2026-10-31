@@ -14,10 +14,23 @@ export const propertiesStyles = css`
     .cat { border-top: 1px solid var(--rb-border); }
     .cat-h { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f7f9fc; font-weight: 700; font-size: 12px; }
     .cat-h .cnt { margin-inline-start: auto; color: var(--rb-muted); font-weight: 500; font-size: 10.5px; }
-    .prow { display: grid; grid-template-columns: 44% 56%; border-top: 1px solid #eef1f6; min-height: 27px; }
-    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; }
-    .prow .v { padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; }
-    .prow .v input, .prow .v select { width: 100%; border: 1px solid transparent; background: transparent; height: 24px; min-width: 0; }
+    .prow { display: grid; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); border-top: 1px solid #eef1f6; min-height: 27px; }
+    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; overflow: hidden; }
+    .prow .v { position: relative; padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%; }
+    .prow .v input, .prow .v select {
+      width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; height: 24px;
+      font: inherit; font-size: 12px; color: inherit; text-overflow: ellipsis;
+    }
+    .prow .v select {
+      appearance: none; padding-inline: 2px 18px; cursor: pointer;
+      background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
+      background-position: calc(100% - 10px) 10px, calc(100% - 6px) 10px;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    :host([dir='rtl']) .prow .v select {
+      background-position: 10px 10px, 6px 10px;
+    }
     .prow .u { color: var(--rb-muted); font-size: 10.5px; }
     .prop-grid .events-body { display: none; padding: 12px; color: var(--rb-muted); }
     .prop-grid.show-events .props-body { display: none; }

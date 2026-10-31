@@ -187,7 +187,14 @@ type StringKey =
   | 'shrinkFont'
   | 'strike'
   | 'refresh'
-  | 'editItem';
+  | 'editItem'
+  | 'elementWord'
+  | 'localeEnglish'
+  | 'localeArabic'
+  | 'dirLtr'
+  | 'dirRtl'
+  | 'typeStatic'
+  | 'reportData';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -378,6 +385,13 @@ const en: Record<StringKey, string> = {
   strike: 'Strikethrough',
   refresh: 'Refresh',
   editItem: 'Edit',
+  elementWord: 'Element',
+  localeEnglish: 'English',
+  localeArabic: 'Arabic',
+  dirLtr: 'Left to right',
+  dirRtl: 'Right to left',
+  typeStatic: 'Static',
+  reportData: 'Report data',
 };
 
 const ar: Record<StringKey, string> = {
@@ -569,6 +583,13 @@ const ar: Record<StringKey, string> = {
   strike: 'يتوسطه خط',
   refresh: 'تحديث',
   editItem: 'تعديل',
+  elementWord: 'عنصر',
+  localeEnglish: 'الإنجليزية',
+  localeArabic: 'العربية',
+  dirLtr: 'من اليسار لليمين',
+  dirRtl: 'من اليمين لليسار',
+  typeStatic: 'ثابت',
+  reportData: 'بيانات التقرير',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

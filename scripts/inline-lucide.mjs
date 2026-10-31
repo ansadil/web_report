@@ -76,6 +76,8 @@ const map = {
   refresh: 'refresh-cw',
   pencil: 'pencil',
   user: 'user',
+  folder: 'folder',
+  table: 'table',
 };
 
 const entries = [];

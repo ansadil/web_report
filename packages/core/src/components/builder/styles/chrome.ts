@@ -47,8 +47,11 @@ export const chromeStyles = css`
     min-width: 52px; padding: 5px 5px 3px; border: 1px solid transparent; border-radius: 7px;
     background: none; cursor: pointer; line-height: 1.25; font-size: 11.5px; color: var(--rb-text);
   }
-  .ribbon-big .ic { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
-  .ribbon-big .ic svg { width: 20px; height: 20px; }
+  .ribbon-big .ic { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; }
+  .ribbon-big .ic svg { width: 28px; height: 28px; }
+  .color-swatch { position: relative; width: 26px; height: 26px; display: grid; place-items: end center; cursor: pointer; }
+  .color-swatch .bar { width: 16px; height: 4px; border-radius: 2px; }
+  .color-swatch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .ribbon-big.c-blue .ic { background: #e6f0fc; color: #1f5fa8; }
   .ribbon-big.c-teal .ic { background: #e0f5f1; color: #0e8173; }
   .ribbon-big.c-amber .ic { background: #fdf1dc; color: #b86b06; }
@@ -89,11 +92,16 @@ export const chromeStyles = css`
   }
   .page-tab.on { background: #fff; color: #1f5fa8; font-weight: 700; }
   .dict { padding: 4px 8px 8px; }
+  .dict-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 0; }
+  .dict details { margin: 0; }
+  .dict summary { list-style: none; cursor: pointer; }
+  .dict summary::-webkit-details-marker { display: none; }
   .dict-node { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 4px; border-radius: 5px; }
+  .dict-node svg { width: 14px; height: 14px; flex: none; }
   .dict-tools { display: flex; gap: 2px; justify-content: flex-end; padding: 4px 8px; }
   .dict-tools .qa-btn { width: 24px; height: 24px; border: 0; background: transparent; color: #1f5fa8; display: grid; place-items: center; cursor: pointer; }
   .dict-node.cur { background: #e7f0fb; color: #174a85; font-weight: 600; }
-  .tmeta { margin-inline-start: auto; color: var(--rb-muted); font-size: 10.5px; }
+  .tmeta { margin-inline-start: auto; color: #7a8699; font-size: 10.5px; background: #f4f6fa; border-radius: 8px; padding: 0 6px; font-weight: 500; }
   .dict-node.root { font-weight: 700; margin-top: 6px; }
   .dict-node.source, .dict-node.field { padding-inline-start: 18px; }
   .tic { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 800; background: #fdf1dc; color: #b86b06; }

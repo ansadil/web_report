@@ -27,6 +27,7 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
         <div><b>${meta.name}</b><small>${t(state.locale, 'page')}</small></div>
       </div>
       <div class="ptoggle"><button type="button" class="on">${t(state.locale, 'properties')}</button><button type="button">${t(state.locale, 'events')}</button></div>
+      <div class="prop-search"><input placeholder=${t(state.locale, 'properties')} @input=${filterPropRows} /></div>
       <section class="cat">
         <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">6</span></div>
         <div class="prow"><span class="k">${t(state.locale, 'paperSize')}</span><span class="v"><select data-testid="prop-paper-size" @change=${(e: Event) => cb.updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>
@@ -47,13 +48,13 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
         <div class="cat-h">${t(state.locale, 'document')}<span class="cnt">3</span></div>
         <div class="prow"><span class="k">${t(state.locale, 'description')}</span><span class="v"><input data-testid="prop-description" .value=${meta.description ?? ''} @input=${(e: Event) => cb.updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></span></div>
         <div class="prow"><span class="k">${t(state.locale, 'locale')}</span><span class="v"><select data-testid="prop-locale" @change=${(e: Event) => cb.updateMeta({ locale: (e.target as HTMLSelectElement).value })}>
-          <option value="en" ?selected=${meta.locale === 'en'}>en</option>
-          <option value="ar" ?selected=${meta.locale === 'ar'}>ar</option>
+          <option value="en" ?selected=${meta.locale === 'en'}>${t(state.locale, 'localeEnglish')}</option>
+          <option value="ar" ?selected=${meta.locale === 'ar'}>${t(state.locale, 'localeArabic')}</option>
           ${meta.locale !== 'en' && meta.locale !== 'ar' ? html`<option value=${meta.locale} selected>${meta.locale}</option>` : nothing}
         </select></span></div>
         <div class="prow"><span class="k">${t(state.locale, 'direction')}</span><span class="v"><select data-testid="prop-direction" @change=${(e: Event) => cb.updateMeta({ dir: (e.target as HTMLSelectElement).value as 'rtl' | 'ltr' })}>
-          <option value="ltr" ?selected=${meta.dir === 'ltr'}>ltr</option>
-          <option value="rtl" ?selected=${meta.dir === 'rtl'}>rtl</option>
+          <option value="ltr" ?selected=${meta.dir === 'ltr'}>${t(state.locale, 'dirLtr')}</option>
+          <option value="rtl" ?selected=${meta.dir === 'rtl'}>${t(state.locale, 'dirRtl')}</option>
         </select></span></div>
       </section>
       <details class="cat"><summary class="cat-h">${t(state.locale, 'page')}</summary>
@@ -64,4 +65,13 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
       </details>
     </div>
   `;
+}
+
+function filterPropRows(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const q = input.value.trim().toLowerCase();
+  input.closest('.prop-grid')?.querySelectorAll('.prow').forEach((row) => {
+    const name = row.querySelector('.k')?.textContent?.toLowerCase() ?? '';
+    (row as HTMLElement).hidden = q.length > 0 && !name.includes(q);
+  });
 }

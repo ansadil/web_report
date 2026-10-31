@@ -124,7 +124,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               </label>
               <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-save" @click=${cb.actions.onSave}>${icon('save')}<span>${t(state.locale, 'save')}</span></button>
               <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-save-as" @click=${cb.onSaveAs}>${icon('copy')}<span>${t(state.locale, 'saveAs')}</span></button>
-              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-export" @click=${cb.actions.onExportJson}>${icon('json')}<span>${t(state.locale, 'export')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-export" data-action=${state.actions.actions.includes('json') ? 'json' : nothing} @click=${cb.actions.onExportJson}>${icon('json')}<span>${t(state.locale, 'export')}</span></button>
             `,
           )}
         </div>
@@ -174,7 +174,10 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
                   <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-italic" aria-label=${t(state.locale, 'italic')} title=${t(state.locale, 'italic')} aria-pressed=${font.italic ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ italic: !font.italic })}>${icon('italic')}</button>
                   <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-underline" aria-label=${t(state.locale, 'underline')} title=${t(state.locale, 'underline')} aria-pressed=${font.underline ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ underline: !font.underline })}>${icon('underline')}</button>
                   <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-strike" aria-label=${t(state.locale, 'strike')} title=${t(state.locale, 'strike')} aria-pressed=${font.strike ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ strike: !font.strike })}>${icon('strike')}</button>
-                  <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
+                  <label class="color-swatch" title=${t(state.locale, 'color')}>
+                    <span class="bar" style=${`background:${colorInputValue(font.color)}`}></span>
+                    <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
+                  </label>
                 </div>
               </div>
             `,
@@ -204,9 +207,9 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             html`
               ${bigBtn(state.locale, 'borders', 'borderAll', 'allBorders', 'slate', !font.enabled, () => cb.onStyle({ border: { top: 0.3, right: 0.3, bottom: 0.3, left: 0.3 } }))}
               <div class="ribbon-smallcol">
-                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-none" ?disabled=${!font.enabled} @click=${() => cb.onStyle({ border: { top: 0, right: 0, bottom: 0, left: 0 } })}><span>${t(state.locale, 'noBorders')}</span></button>
-                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-bottom" ?disabled=${!font.enabled} @click=${() => cb.onStyle({ border: { top: 0, right: 0, bottom: 0.3, left: 0 } })}><span>${t(state.locale, 'bottomBorder')}</span></button>
-                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-weight" ?disabled=${!font.enabled}><span>${t(state.locale, 'borderWeight')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-none" ?disabled=${!font.enabled} @click=${() => cb.onStyle({ border: { top: 0, right: 0, bottom: 0, left: 0 } })}>${icon('toolBox')}<span>${t(state.locale, 'noBorders')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-bottom" ?disabled=${!font.enabled} @click=${() => cb.onStyle({ border: { top: 0, right: 0, bottom: 0.3, left: 0 } })}>${icon('toolLine')}<span>${t(state.locale, 'bottomBorder')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-weight" ?disabled=${!font.enabled}>${icon('cog')}<span>${t(state.locale, 'borderWeight')}</span></button>
               </div>
             `,
           )}

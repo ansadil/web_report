@@ -224,6 +224,27 @@ interface ChainSet {
 }
 
 /**
+ * /W width (1/1000 em) of a glyph extractors do not advance over (non-spacing mark, format
+ * character) drawn at `x`, followed by a glyph at `nextX` (BUG-26).
+ *
+ * pdf.js ignores this width: it never moves its pen over such a glyph (the caller follows it
+ * with a `Td`). Poppler (pdftotext) cuts a line into fragments wherever a glyph is not where
+ * the previous one ended, sorts the fragments by their left edge and re-joins neighbours that
+ * were drawn one after the other. A mark is usually drawn before its base and over it, i.e.
+ * to the right of the base's left edge (RTL), so a zero-width box sorted after its base and
+ * scrambled the word; a width reaching exactly the next glyph left the two left edges tied,
+ * resolved by floating-point noise. The box therefore ends at the glyph's own x and starts
+ * one unit before whichever is further left, its own x or the next glyph's: strictly between
+ * the previous fragment and the next one, so the fragments keep drawing order. Negative
+ * widths only reverse the box in poppler; nothing is drawn differently. When the next glyph
+ * starts exactly at `x` (a zero-width format character such as U+200F inside a run) the width
+ * stays 0: the run is gap-free for every extractor and needs no `Td`, so it stays one string.
+ */
+export function advancelessWidth(x: number, nextX: number): number {
+  return nextX === x ? 0 : Math.min(nextX - x, 0) - 1;
+}
+
+/**
  * HarfBuzz engine: bidi + shaping happen once in {@link TextLayouter}; this class only
  * writes the shaped glyphs through {@link CidFontWriter} (subset fonts, exact widths,
  * logical-text ToUnicode), so pdf-lib/fontkit never re-shape or re-order anything.
@@ -317,17 +338,18 @@ class HarfBuzzEngine implements TextEngine {
    * sources of the same merged PDF font, so a mixed line never switches fonts, and the PDF
    * viewer never re-orders or re-shapes anything.
    *
-   * Positions (BUG-25): a CID's /W width is 0 when its ToUnicode text is a format character
-   * (ZWSP for the extra glyphs of a decomposed cluster, ZWNJ...) or a non-spacing mark —
-   * glyphs text extractors such as pdf.js do not advance over. Every other glyph spans to the
-   * next spacing glyph of the line as HarfBuzz placed it (the last one: its advance), so
-   * an extractor sees a gap-free run and inserts no fake spaces; widths are never
-   * negative. Wherever the pen then differs from the next glyph's position, the string is
-   * ended and `Td` moves to the exact position: viewers draw every glyph exactly where
-   * HarfBuzz put it (same positions as before) and extractors track the same pen. Before,
-   * ZWSP-mapped dots carried non-zero (mostly negative) widths that pdf.js skips, so its pen
-   * drifted right and glyphs past the page edge — the first words of long RTL lines — were
-   * dropped.
+   * Positions (BUG-25, BUG-26): a glyph whose ToUnicode text is a format character (ZWSP for
+   * the extra glyphs of a decomposed cluster, ZWNJ...) or a non-spacing mark is one text
+   * extractors such as pdf.js do not advance over: unless the next glyph starts at the same
+   * x, it gets a small negative width that keeps poppler's reading order (see
+   * {@link advancelessWidth}) and the next glyph is positioned with `Td`. Every other glyph spans to the next spacing glyph of the
+   * line as HarfBuzz placed it (the last one: its advance), never negative, so an extractor
+   * sees a gap-free run and inserts no fake spaces. Wherever the pen then differs from the
+   * next glyph's position, the string is ended and `Td` moves to the exact position: viewers
+   * draw every glyph exactly where HarfBuzz put it (same positions as before) and extractors
+   * track the same pen. Before, ZWSP-mapped dots carried non-zero (mostly negative) widths
+   * that pdf.js skips, so its pen drifted right and glyphs past the page edge — the first
+   * words of long RTL lines — were dropped.
    * Marks with a vertical offset are raised/lowered with `Ts` (text rise) inside the same
    * text object. A line drawn mark-first is wrapped in a `/Span` marked-content sequence.
    */
@@ -389,17 +411,22 @@ class HarfBuzzEngine implements TextEngine {
         rise = wantRise;
       }
       // A spacing glyph spans to the next spacing glyph (as HarfBuzz placed it), so extractors
-      // see one gap-free run; glyphs extractors do not advance over get 0. Never negative:
-      // where the pen and the next glyph differ, `Td` repositions.
-      let width = 0;
-      if (!advancelessForExtractors(g.text)) {
+      // see one gap-free run; never negative: where the pen and the next glyph differ, `Td`
+      // repositions. For an advanceless glyph see `advancelessWidth`.
+      const advanceless = advancelessForExtractors(g.text);
+      let width: number;
+      if (advanceless) {
+        width = advancelessWidth(x, k + 1 < glyphs.length ? q(glyphs[k + 1]!.x) : x + q(g.advance));
+      } else {
         let j = k + 1;
         while (j < glyphs.length && advancelessForExtractors(glyphs[j]!.text)) j++;
         width = Math.max(0, j < glyphs.length ? q(glyphs[j]!.x) - x : q(g.advance));
       }
       const cid = writer.cid(src, g.gid, width, g.text);
       cids.push(cid);
-      pen = x + writer.widthOf(cid);
+      // pdf.js does not move its pen over an advanceless glyph whatever its width, so after a
+      // non-zero one the next glyph always starts with a `Td` (exact position) to resync it.
+      pen = advanceless && width !== 0 ? Number.NaN : x + writer.widthOf(cid);
     }
     flush();
     if (rise !== 0) ops.push(setTextRise(0));

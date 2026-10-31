@@ -1,35 +1,44 @@
-import { createReadStream, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
+import { join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
-const fontsDir = fileURLToPath(new URL('../../packages/core/assets/fonts/', import.meta.url));
+/** `@reports-web/core`'s fonts folder (fonts.json, TTF for PDF, WOFF2 for the UI). */
+const FONTS_DIR = fileURLToPath(new URL('../../packages/core/assets/fonts/', import.meta.url));
+const FONTS_ROUTE = '/assets/fonts/';
 
-/** Serve the shared woff2/ttf folder at /assets/fonts without changing the font resolver. */
-function serveReportFonts(): Plugin {
+/**
+ * Same-origin fonts (BUG-35): serve the core fonts folder at `/assets/fonts/` in dev, and copy
+ * it to `dist/assets/fonts/` in the build (so `vite preview` and any static host serve it). main.ts passes that URL as
+ * `fontsBaseUrl`, so nothing depends on where the bundler put the core module.
+ */
+function reportsFonts(): Plugin {
+  const serve = (req: { url?: string }, res: import('node:http').ServerResponse, next: () => void): void => {
+    const path = (req.url ?? '').split(/[?#]/)[0]!;
+    if (!path.startsWith(FONTS_ROUTE)) return next();
+    const file = normalize(join(FONTS_DIR, decodeURIComponent(path.slice(FONTS_ROUTE.length))));
+    if (!file.startsWith(FONTS_DIR) || !existsSync(file) || !statSync(file).isFile()) return next();
+    const type = file.endsWith('.json') ? 'application/json' : file.endsWith('.woff2') ? 'font/woff2' : file.endsWith('.ttf') ? 'font/ttf' : 'application/octet-stream';
+    res.setHeader('Content-Type', type);
+    createReadStream(file).pipe(res);
+  };
+  let outDir = 'dist';
   return {
-    name: 'serve-report-fonts',
+    name: 'reports-web-fonts',
+    configResolved(c) {
+      outDir = c.build.outDir.startsWith('/') ? c.build.outDir : join(c.root, c.build.outDir);
+    },
     configureServer(server) {
-      server.middlewares.use('/assets/fonts', (req, res, next) => {
-        const name = decodeURIComponent((req.url ?? '/').split('?')[0] ?? '').replace(/^\//, '');
-        if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.(woff2|ttf|json|txt)$/.test(name)) {
-          next();
-          return;
-        }
-        const file = join(fontsDir, name);
-        if (!existsSync(file)) {
-          next();
-          return;
-        }
-        res.setHeader('Content-Type', name.endsWith('.woff2') ? 'font/woff2' : 'application/octet-stream');
-        createReadStream(file).pipe(res);
-      });
+      server.middlewares.use(serve);
+    },
+    writeBundle() {
+      cpSync(FONTS_DIR, join(outDir, 'assets', 'fonts'), { recursive: true });
     },
   };
 }
 
 export default defineConfig({
-  plugins: [serveReportFonts()],
+  plugins: [reportsFonts()],
   server: {
     port: 5173,
     host: '127.0.0.1',

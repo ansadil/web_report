@@ -33,7 +33,32 @@ export function formatDate(value: Date | string | number, locale: Locale, opts: 
   return f.format(d);
 }
 
-export function applyPattern(value: unknown, pattern: string | undefined, locale: Locale): string {
+/** Per-element format options (schema `formatOptions`). */
+export interface PatternOptions {
+  readonly dateStyle?: 'full' | 'long' | 'medium' | 'short';
+}
+
+/**
+ * Umm al-Qura (Saudi official) Hijri date via Intl calendar `islamic-umalqura`.
+ * A date-only ISO string is read as that calendar day in local time (not UTC midnight),
+ * so the Hijri day never shifts by the runtime's UTC offset.
+ */
+export function formatHijri(value: Date | string, locale: Locale, dateStyle: PatternOptions['dateStyle'] = 'medium'): string {
+  let d: Date;
+  const m = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
+  if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
+  else d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const key = `hijri|${locale}|${dateStyle}`;
+  let f = dateFormatterCache.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA-u-ca-islamic-umalqura' : 'en-u-ca-islamic-umalqura', { dateStyle });
+    dateFormatterCache.set(key, f);
+  }
+  return f.format(d);
+}
+
+export function applyPattern(value: unknown, pattern: string | undefined, locale: Locale, options?: PatternOptions): string {
   if (value == null) return '';
   if (value instanceof Date) {
     if (!pattern) return formatDate(value, locale, { dateStyle: 'medium', timeStyle: 'short' });
@@ -50,7 +75,8 @@ export function applyPattern(value: unknown, pattern: string | undefined, locale
     return formatNumber(value, locale);
   }
   if (value instanceof Date || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
-    if (pattern === 'date') return formatDate(value as Date | string, locale, { dateStyle: 'medium' });
+    if (pattern === 'date:hijri') return formatHijri(value as Date | string, locale, options?.dateStyle ?? 'medium');
+    if (pattern === 'date') return formatDate(value as Date | string, locale, { dateStyle: options?.dateStyle ?? 'medium' });
     if (pattern === 'date:short') return formatDate(value as Date | string, locale, { dateStyle: 'short' });
     if (pattern === 'date:long') return formatDate(value as Date | string, locale, { dateStyle: 'long' });
     if (pattern === 'datetime') return formatDate(value as Date | string, locale, { dateStyle: 'medium', timeStyle: 'short' });

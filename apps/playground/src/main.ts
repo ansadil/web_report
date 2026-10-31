@@ -61,7 +61,6 @@ function applySchema(schema: ReportSchemaV1): void {
 
 function paintChrome(): void {
   const loc = state.locale;
-  $('btn-samples').textContent = t(loc, 'samples');
   $('samples-heading').textContent = t(loc, 'sampleReports');
   $('saved-heading').textContent = t(loc, 'savedReports');
   $('datasets-heading').textContent = t(loc, 'datasetsHeading');
@@ -150,8 +149,6 @@ function switchView(which: View): void {
   state.view = which;
   $('view-viewer').hidden = which !== 'viewer';
   $('view-builder').hidden = which !== 'builder';
-  $('tab-viewer').classList.toggle('active', which === 'viewer');
-  $('tab-builder').classList.toggle('active', which === 'builder');
 }
 
 function switchLocale(loc: Locale): void {
@@ -163,8 +160,6 @@ function switchLocale(loc: Locale): void {
   builder.dir = dir;
   document.documentElement.setAttribute('dir', dir);
   document.documentElement.setAttribute('lang', loc);
-  $('btn-en').classList.toggle('active', loc === 'en');
-  $('btn-ar').classList.toggle('active', loc === 'ar');
   paintChrome();
   renderReportsList();
   void renderSavedList();
@@ -190,6 +185,8 @@ viewer.addEventListener('export-error', (e) => {
 
 builder.addEventListener('request-preview', () => {
   viewer.fontsBaseUrl = builder.fontsBaseUrl;
+  viewer.schema = builder.getSchema();
+  switchView('viewer');
 });
 
 builder.addEventListener('save', (e) => {
@@ -217,7 +214,7 @@ function setSamplesOpen(open: boolean): void {
   sampleDrawer.classList.toggle('open', open);
   appShell.classList.toggle('drawer-open', open);
 }
-$('btn-samples').addEventListener('click', (event) => {
+builder.addEventListener('toggle-samples', (event) => {
   event.stopPropagation();
   setSamplesOpen(!sampleDrawer.classList.contains('open'));
 });
@@ -225,7 +222,7 @@ document.addEventListener('click', (event) => {
   if (!sampleDrawer.classList.contains('open')) return;
   const target = event.target;
   if (!(target instanceof Node)) return;
-  if (sampleDrawer.contains(target) || $('btn-samples').contains(target)) return;
+  if (sampleDrawer.contains(target)) return;
   setSamplesOpen(false);
 });
 document.addEventListener('keydown', (event) => {
@@ -238,16 +235,11 @@ builder.addEventListener('locale-change', (event) => {
   viewer.dir = '';
   document.documentElement.setAttribute('dir', detail.dir);
   document.documentElement.setAttribute('lang', detail.locale);
-  $('btn-en').classList.toggle('active', detail.locale === 'en');
-  $('btn-ar').classList.toggle('active', detail.locale === 'ar');
   paintChrome();
   renderReportsList();
   void renderSavedList();
   renderDatasets();
 });
-$('tab-viewer').addEventListener('click', () => switchView('viewer'));
 $('tab-builder').addEventListener('click', () => switchView('builder'));
-$('btn-en').addEventListener('click', () => switchLocale('en'));
-$('btn-ar').addEventListener('click', () => switchLocale('ar'));
 
 switchLocale('ar');

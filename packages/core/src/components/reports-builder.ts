@@ -170,15 +170,22 @@ export class ReportsBuilderElement extends LitElement {
   override render(): unknown {
     const view = buildViewModel(this.session, { pointer: this.pointer, dnd: this.dnd });
     view.cb.onToggleLocale = () => this.toggleUiLocale();
+    view.cb.onSetLocale = (locale) => this.setUiLocale(locale);
+    const openSamples = () => this.dispatchEvent(new CustomEvent('toggle-samples', { bubbles: true, composed: true }));
+    view.cb.onSamples = openSamples;
+    view.cb.ribbon.onSamples = openSamples;
     return renderBuilder(view.state, view.cb);
   }
 
   private toggleUiLocale(): void {
-    const next = this._uiLocale.toLowerCase().startsWith('ar') ? 'en' : 'ar';
-    const dir = next === 'ar' ? 'rtl' : 'ltr';
-    this.locale = next;
+    this.setUiLocale(this._uiLocale.toLowerCase().startsWith('ar') ? 'en' : 'ar');
+  }
+
+  private setUiLocale(locale: 'ar' | 'en'): void {
+    const dir = locale === 'ar' ? 'rtl' : 'ltr';
+    this.locale = locale;
     this.dir = dir;
-    this.dispatchEvent(new CustomEvent('locale-change', { bubbles: true, composed: true, detail: { locale: next, dir } }));
+    this.dispatchEvent(new CustomEvent('locale-change', { bubbles: true, composed: true, detail: { locale, dir } }));
   }
 
   getSchema(): ReportSchemaV1 {

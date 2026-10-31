@@ -47,6 +47,11 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
         <span class="saved">${t(state.uiLocale, 'savedState')}</span>
       </div>
       <div class="tb-end">
+        <button type="button" id="btn-samples" data-testid="btn-samples" class="title-chip" @click=${(e: Event) => { e.stopPropagation(); cb.onSamples(); }}>${t(state.uiLocale, 'samples')}</button>
+        <div class="lang-switch">
+          <button type="button" id="btn-en" data-testid="btn-en" class=${state.uiLocale.toLowerCase().startsWith('ar') ? '' : 'active'} @click=${() => cb.onSetLocale('en')}>EN</button>
+          <button type="button" id="btn-ar" data-testid="btn-ar" class=${state.uiLocale.toLowerCase().startsWith('ar') ? 'active' : ''} @click=${() => cb.onSetLocale('ar')}>AR</button>
+        </div>
         <button type="button" class="locale-toggle" data-testid="title-locale" @click=${cb.onToggleLocale}>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</button>
         <span class="avatar" aria-hidden="true">${icon('user')}</span>
       </div>

@@ -34,6 +34,8 @@ export interface BuilderViewState {
 export interface BuilderViewCallbacks {
   onToggleLeft: () => void;
   onToggleLocale: () => void;
+  onSetLocale: (locale: 'ar' | 'en') => void;
+  onSamples: () => void;
   onSideTab: (tab: SideTab) => void;
   onToggleSection: (key: SideSectionKey) => void;
   onHostContextMenu: (ev: Event) => void;

@@ -85,6 +85,12 @@ export const chromeStyles = css`
   .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #4a5568; font-size: 11.5px; white-space: nowrap; flex: none; }
   .titlebar .locale-toggle { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
   .titlebar .locale-toggle:hover { background: #e7f0fb; color: #1f5fa8; }
+  .titlebar .title-chip, .titlebar .lang-switch button {
+    border: 1px solid #dfe4ec; background: #fff; color: #1b2433; border-radius: 6px; height: 24px;
+    padding: 0 8px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700;
+  }
+  .titlebar .lang-switch { display: flex; gap: 2px; }
+  .titlebar .lang-switch button.active { background: #1f5fa8; color: #fff; border-color: #1f5fa8; }
   .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #e7f0fb; color: #1f5fa8; display: grid; place-items: center; }
   .status-spacer { flex: 1; }
   .status-bar .toolbar { background: transparent; padding: 0; gap: 4px; flex: none; }

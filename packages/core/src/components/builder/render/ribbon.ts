@@ -58,6 +58,7 @@ export interface RibbonCallbacks {
   onNew: () => void;
   onOpenText: (text: string) => void;
   onSaveAs: () => void;
+  onSamples: () => void;
   onArrange: (mode: ArrangeMode) => void;
   onStyle: (patch: Partial<Style>) => void;
 }
@@ -127,6 +128,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-save" @click=${cb.actions.onSave}>${icon('save')}<span>${t(state.locale, 'save')}</span></button>
               <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-save-as" @click=${cb.onSaveAs}>${icon('copy')}<span>${t(state.locale, 'saveAs')}</span></button>
               <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-export" data-action=${state.actions.actions.includes('json') ? 'json' : nothing} @click=${cb.actions.onExportJson}>${icon('json')}<span>${t(state.locale, 'export')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-samples" @click=${cb.onSamples}>${icon('folder')}<span>${t(state.locale, 'samples')}</span></button>
             `,
           )}
         </div>

@@ -92,7 +92,6 @@ describe.skipIf(!hasBrowser)('BUG-35: production build loads fonts from its own 
     expect(exported).toBe('pdf');
     expect([...fonts.keys()].some((u) => u.startsWith(`${ORIGIN}/assets/fonts/`) && u.endsWith('.ttf'))).toBe(true);
     // Designer canvas: Cairo woff2 via @font-face.
-    await page.click('#tab-builder');
     await page.waitForFunction(() => document.fonts.check('16px Cairo') && [...document.fonts].some((f) => f.family.replace(/"/g, '') === 'Cairo' && f.status === 'loaded'), undefined, { timeout: 15_000 });
 
     expect(foreign).toEqual([]);

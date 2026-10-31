@@ -76,7 +76,7 @@ describe('playground designer stays on the local origin', () => {
     await page.goto(ORIGIN);
     await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
-    await page.click('#tab-builder');
+    await page.keyboard.press('Escape');
     await page.waitForFunction(() => {
       const view = document.querySelector('#view-builder');
       const ribbon = document.querySelector('reports-builder')?.shadowRoot?.querySelector('[data-testid="ribbon"]');
@@ -103,7 +103,7 @@ describe('playground designer stays on the local origin', () => {
     await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.locator('#reports-list .report-card').filter({ hasText: 'تقرير المبيعات الشهري' }).click();
-    await page.click('#tab-builder');
+    await page.keyboard.press('Escape');
     await page.waitForFunction(cairoFacesLoaded, undefined, { timeout: 15_000 });
     for (const file of ['Cairo-Regular.woff2', 'Cairo-Bold.woff2']) {
       const res = await page.request.get(`${ORIGIN}/assets/fonts/${file}`);
@@ -167,7 +167,6 @@ describe('playground designer stays on the local origin', () => {
     await page.goto(ORIGIN);
     await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
-    await page.click('#tab-builder');
     await page.keyboard.press('Escape');
     const root = page.locator('reports-builder');
     await root.locator('[data-testid="ribbon"]').waitFor();

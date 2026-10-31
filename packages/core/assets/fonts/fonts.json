@@ -1,0 +1,72 @@
+[
+  {
+    "family": "Cairo",
+    "weight": 400,
+    "style": "normal",
+    "ttf": "Cairo-Regular.ttf",
+    "woff2": "Cairo-Regular.woff2"
+  },
+  {
+    "family": "Cairo",
+    "weight": 700,
+    "style": "normal",
+    "ttf": "Cairo-Bold.ttf",
+    "woff2": "Cairo-Bold.woff2"
+  },
+  {
+    "family": "Tajawal",
+    "weight": 400,
+    "style": "normal",
+    "ttf": "Tajawal-Regular.ttf",
+    "woff2": "Tajawal-Regular.woff2"
+  },
+  {
+    "family": "Tajawal",
+    "weight": 700,
+    "style": "normal",
+    "ttf": "Tajawal-Bold.ttf",
+    "woff2": "Tajawal-Bold.woff2"
+  },
+  {
+    "family": "Noto Naskh Arabic",
+    "weight": 400,
+    "style": "normal",
+    "ttf": "NotoNaskhArabic-Regular.ttf",
+    "woff2": "NotoNaskhArabic-Regular.woff2"
+  },
+  {
+    "family": "Noto Naskh Arabic",
+    "weight": 700,
+    "style": "normal",
+    "ttf": "NotoNaskhArabic-Bold.ttf",
+    "woff2": "NotoNaskhArabic-Bold.woff2"
+  },
+  {
+    "family": "Noto Sans Arabic",
+    "weight": 400,
+    "style": "normal",
+    "ttf": "NotoSansArabic-Regular.ttf",
+    "woff2": "NotoSansArabic-Regular.woff2"
+  },
+  {
+    "family": "Noto Sans Arabic",
+    "weight": 700,
+    "style": "normal",
+    "ttf": "NotoSansArabic-Bold.ttf",
+    "woff2": "NotoSansArabic-Bold.woff2"
+  },
+  {
+    "family": "Noto Sans",
+    "weight": 400,
+    "style": "normal",
+    "ttf": "NotoSans-Regular.ttf",
+    "woff2": "NotoSans-Regular.woff2"
+  },
+  {
+    "family": "Noto Sans",
+    "weight": 700,
+    "style": "normal",
+    "ttf": "NotoSans-Bold.ttf",
+    "woff2": "NotoSans-Bold.woff2"
+  }
+]

@@ -18,6 +18,7 @@ import {
   setTextRise,
   showText,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
   type RGB,
 } from 'pdf-lib';
@@ -33,6 +34,26 @@ import { TextLayouter, wrapText, type FaceChain, type LaidOutLine } from './pdf-
 import { loadFace, type LoadedFace } from './pdf-fonts.js';
 import { CidFontWriter, cidHex } from './pdf-cid-font.js';
 import type { PdfExportInput } from './pdf.js';
+import { drawBarcodeBars, drawImageContain, drawQr, embedRaster, encodeBarcode, loadImageBytes } from './pdf-graphics.js';
+
+function toRgb(hex: string): RGB {
+  const c = parseColor(hex);
+  return rgb(c.r, c.g, c.b);
+}
+
+const imageCache = new WeakMap<PDFDocument, Map<string, Promise<PDFImage | null>>>();
+
+/** Embed each distinct image source once per document. */
+function cachedImage(pdf: PDFDocument, src: string): Promise<PDFImage | null> {
+  let byDoc = imageCache.get(pdf);
+  if (!byDoc) imageCache.set(pdf, (byDoc = new Map()));
+  let hit = byDoc.get(src);
+  if (!hit) {
+    hit = loadImageBytes(src).then((b) => (b ? embedRaster(pdf, b) : null));
+    byDoc.set(src, hit);
+  }
+  return hit;
+}
 
 function parseColor(hex?: string): { r: number; g: number; b: number } {
   if (!hex) return { r: 0, g: 0, b: 0 };
@@ -430,14 +451,48 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
   }
 
   if (el.kind === 'image') {
-    ctx.page.drawRectangle({ x: ptX, y: ptYBottom, width: w, height: h, borderWidth: 0.25, borderColor: rgb(0.7, 0.7, 0.7) });
-    await drawLabel(ctx, '[image]', ptX, ptYBottom + h / 2 - 4, w, 8, false, rgb(0.5, 0.5, 0.5));
+    const img = el.src ? await cachedImage(ctx.page.doc, el.src) : null;
+    if (img) {
+      drawImageContain(ctx.page, img, { x: ptX, y: ptYBottom, w, h });
+    } else {
+      ctx.page.drawRectangle({ x: ptX, y: ptYBottom, width: w, height: h, borderWidth: 0.25, borderColor: rgb(0.7, 0.7, 0.7) });
+      if (el.src) logger.warn('pdf', 'image not embeddable (only PNG/JPEG data or URLs)', { id: el.id });
+    }
     return;
   }
 
-  if (el.kind === 'qr' || el.kind === 'barcode') {
-    ctx.page.drawRectangle({ x: ptX, y: ptYBottom, width: w, height: h, borderWidth: 0.25, borderColor: rgb(0.7, 0.7, 0.7) });
-    await drawLabel(ctx, el.kind === 'qr' ? '[QR]' : '[barcode]', ptX, ptYBottom + h / 2 - 4, w, 8, false, rgb(0.5, 0.5, 0.5));
+  if ((el.kind === 'qr' || el.kind === 'barcode') && el.code) {
+    const box = { x: ptX, y: ptYBottom, w, h };
+    const dark = el.style?.color ? toRgb(el.style.color) : undefined;
+    const light = el.style?.background ? toRgb(el.style.background) : undefined;
+    if (el.code.kind === 'qr') {
+      drawQr(ctx.page, el.code.payload, box, {
+        ...(el.code.errorCorrectionLevel ? { errorCorrectionLevel: el.code.errorCorrectionLevel } : {}),
+        ...(dark ? { dark } : {}),
+        ...(light ? { light } : {}),
+      });
+      return;
+    }
+    const enc = encodeBarcode(el.code.payload, el.code.symbology ?? 'CODE128');
+    if (!enc) {
+      logger.warn('pdf', 'barcode payload invalid for symbology', { id: el.id, symbology: el.code.symbology });
+      return;
+    }
+    const showText = el.code.displayValue !== false && h >= 14;
+    const textSize = Math.min(8, h * 0.25);
+    drawBarcodeBars(ctx.page, enc.bars, box, showText ? textSize + 2 : 0, dark, light);
+    if (showText) {
+      const [line] = await ctx.text.layout(enc.text, { bold: false, size: textSize, maxWidth: Math.max(1, w - 4), maxLines: 1 });
+      if (line) {
+        ctx.text.draw(ctx.page, line, {
+          x: alignedX('center', 'ltr', ptX, w, line.width),
+          y: ptYBottom + 1,
+          size: textSize,
+          bold: false,
+          color: dark ?? rgb(0, 0, 0),
+        });
+      }
+    }
     return;
   }
 
@@ -533,7 +588,22 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
         opacity: wm.opacity,
         rotateDeg: wm.rotation,
       });
+      return;
     }
+    const img = await cachedImage(pdf, wm.src);
+    if (!img) return;
+    const w = wm.width * MM_TO_PT;
+    const h = (img.height / img.width) * w;
+    // Rotate around the image centre (same convention as the text watermark).
+    const rad = (wm.rotation * Math.PI) / 180;
+    target.drawImage(img, {
+      x: space.width / 2 - (w / 2) * Math.cos(rad) + (h / 2) * Math.sin(rad),
+      y: space.height / 2 - (w / 2) * Math.sin(rad) - (h / 2) * Math.cos(rad),
+      width: w,
+      height: h,
+      opacity: wm.opacity,
+      rotate: degrees(wm.rotation),
+    });
   };
 
   let page = pdf.addPage([space.width, space.height]);

@@ -37,8 +37,14 @@ export interface ShapingFace {
   shape(text: string, start: number, end: number, rtl: boolean): readonly ShapedGlyph[];
 }
 
-/** Fallback chain: the first face is preferred for Arabic script, the rest for anything else. */
+/**
+ * Fallback chain. With a `primary` face (a family the report asked for) every code point it
+ * covers comes from it; the rest — and every code point when there is no primary — follows
+ * the Arabic/Latin rule below.
+ */
 export interface FaceChain {
+  /** Requested family; preferred for everything it has a glyph for. */
+  readonly primary?: ShapingFace;
   /** Face used for Arabic-script code points (letters, harakat, Arabic-Indic digits). */
   readonly arabic: ShapingFace;
   /** Face used for Latin letters, Western digits and general punctuation. */
@@ -87,6 +93,7 @@ interface Item {
 
 function pickFace(cp: number, ch: string, prev: ShapingFace | null, chain: FaceChain): ShapingFace {
   if (prev && MARK_OR_FORMAT_RE.test(ch)) return prev;
+  if (chain.primary?.hasCodePoint(cp)) return chain.primary;
   if (ARABIC_SCRIPT_RE.test(ch)) {
     return chain.arabic.hasCodePoint(cp) || !chain.latin.hasCodePoint(cp) ? chain.arabic : chain.latin;
   }

@@ -1,38 +1,12 @@
 /**
- * Lazily loaded PDF text assets: HarfBuzz (WASM) and the bundled OFL fonts.
+ * Lazily loaded PDF text assets: HarfBuzz (WASM) and the faces of the shared fonts folder.
  *
- * Only ever reached through a dynamic `import()` from {@link exportPdf}, so neither the
- * WASM shaper nor the font bytes are part of the main bundle. Works in Node (fs) and
- * browsers (fetch relative to `import.meta.url`).
- *
- * Fonts live in the shared package folder `packages/core/assets/fonts/` (see its README and
- * `fonts.json`); `../../assets/fonts/` resolves to it from both `src/exporters/` and
- * `dist/exporters/`.
+ * Only ever reached through a dynamic `import()` from {@link exportPdf}, so neither the WASM
+ * shaper nor any font bytes are part of the main bundle. Which file a family/weight maps to is
+ * decided by the public helpers in `fonts-manifest.ts` (same as the UI).
  */
 import type { ShapedGlyph, ShapingFace } from './pdf-text-layout.js';
-
-export type PdfFontFile =
-  | 'NotoSansArabic-Regular.ttf'
-  | 'NotoSansArabic-Bold.ttf'
-  | 'NotoSans-Regular.ttf'
-  | 'NotoSans-Bold.ttf';
-
-export async function loadFontBytes(fileName: PdfFontFile): Promise<Uint8Array> {
-  const isNode = typeof process !== 'undefined' && process.versions?.node != null;
-  if (isNode) {
-    const { createRequire } = await import('node:module');
-    const { readFile } = await import('node:fs/promises');
-    const req = createRequire(import.meta.url);
-    const resolved = req.resolve(`../../assets/fonts/${fileName}`);
-    return new Uint8Array(await readFile(resolved));
-  }
-  const url = new URL(`../../assets/fonts/${fileName}`, import.meta.url);
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to load PDF font ${fileName}: ${res.status} ${res.statusText}`);
-  }
-  return new Uint8Array(await res.arrayBuffer());
-}
+import { loadFontManifest, readFontAsset, resolveFontUrl, type FontManifestEntry } from './fonts-manifest.js';
 
 type HarfBuzz = typeof import('harfbuzzjs');
 
@@ -50,7 +24,8 @@ export function loadHarfBuzz(): Promise<HarfBuzz> {
 }
 
 export interface LoadedFace extends ShapingFace {
-  readonly file: PdfFontFile;
+  /** File name in the fonts folder (e.g. `Cairo-Bold.ttf`). */
+  readonly file: string;
   readonly bytes: Uint8Array;
 }
 
@@ -62,10 +37,11 @@ class HarfBuzzFace implements LoadedFace {
 
   constructor(
     private readonly hb: HarfBuzz,
-    readonly file: PdfFontFile,
+    readonly file: string,
     readonly bytes: Uint8Array,
+    id: string,
   ) {
-    this.id = file;
+    this.id = id;
     const blob = new hb.Blob(bytes);
     const face = new hb.Face(blob, 0);
     this.upem = face.upem;
@@ -100,17 +76,47 @@ class HarfBuzzFace implements LoadedFace {
   }
 }
 
-const faceCache = new Map<PdfFontFile, Promise<LoadedFace>>();
+/**
+ * One fonts folder and the faces loaded from it, each fetched at most once and only when a
+ * report asks for it. Nothing outside the folder is ever requested.
+ */
+export class FontLibrary {
+  private readonly faces = new Map<string, Promise<LoadedFace>>();
 
-export function loadFace(file: PdfFontFile): Promise<LoadedFace> {
-  let p = faceCache.get(file);
-  if (!p) {
-    p = (async () => {
-      const [hb, bytes] = await Promise.all([loadHarfBuzz(), loadFontBytes(file)]);
-      return new HarfBuzzFace(hb, file, bytes);
-    })();
-    p.catch(() => faceCache.delete(file));
-    faceCache.set(file, p);
+  /** @param fontsBaseUrl folder URL (trailing slash optional); default: the bundled folder. */
+  constructor(readonly fontsBaseUrl?: string) {}
+
+  manifest(): Promise<FontManifestEntry[]> {
+    return loadFontManifest(this.fontsBaseUrl);
   }
-  return p;
+
+  /** HarfBuzz face for an absolute font URL. */
+  private loadFace(url: string): Promise<LoadedFace> {
+    let p = this.faces.get(url);
+    if (!p) {
+      p = (async () => {
+        const [hb, bytes] = await Promise.all([loadHarfBuzz(), readFontAsset(url)]);
+        return new HarfBuzzFace(hb, url.slice(url.lastIndexOf('/') + 1), bytes, url);
+      })();
+      p.catch(() => this.faces.delete(url));
+      this.faces.set(url, p);
+    }
+    return p;
+  }
+
+  /** Face of `family` (name or CSS stack) at 400/700, or `null` if the manifest lacks it. */
+  async loadFamily(family: string, bold: boolean): Promise<LoadedFace | null> {
+    const url = await resolveFontUrl({ family, weight: bold ? 700 : 400 }, { format: 'ttf', fontsBaseUrl: this.fontsBaseUrl });
+    return url ? this.loadFace(url) : null;
+  }
+}
+
+const libraries = new Map<string, FontLibrary>();
+
+/** Shared {@link FontLibrary} per base URL (faces are cached across exports). */
+export function fontLibrary(fontsBaseUrl?: string): FontLibrary {
+  const key = fontsBaseUrl ?? '';
+  let lib = libraries.get(key);
+  if (!lib) libraries.set(key, (lib = new FontLibrary(fontsBaseUrl || undefined)));
+  return lib;
 }

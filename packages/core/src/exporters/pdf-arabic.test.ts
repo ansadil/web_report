@@ -207,6 +207,25 @@ describe('BUG-21: explicit dir wins over the locale (PDF)', () => {
   });
 });
 
+// Same corpus in each bundled family: the requested face draws what it covers, the Noto
+// fallback the rest (e.g. ٫ in Tajawal, ﷼ in Cairo), still one merged font per line.
+describe.each(['Cairo', 'Tajawal', 'Noto Naskh Arabic'])('PDF Arabic corpus in %s', (family) => {
+  let lines: DrawnLine[];
+  const corpus = [...CORPUS, 'الإجمالي ١٢٣٤٫٥٦ ﷼'];
+  beforeAll(async () => {
+    lines = await readDrawnLines(await pdfBytes(schema(corpus.map((t, i) => text(`c${i}`, t, i, { style: { font: family } })))));
+  });
+
+  it('every line is drawn in correct visual order with no missing ToUnicode entry', () => {
+    expect(lines.map((l) => l.visual)).toEqual(corpus.map((t) => expectedVisual(t, 'rtl')));
+  });
+
+  it('every line uses the one merged font led by the family', () => {
+    const stem = family.replace(/ /g, '');
+    for (const l of lines) expect(l.fonts, l.visual).toEqual([expect.stringMatching(new RegExp(`\\+${stem}-Regular$`))]);
+  });
+});
+
 describe('PDF layout', () => {
   it('wraps long text and clips to the element height', async () => {
     const long = 'هذا نص طويل جدا '.repeat(30).trim();

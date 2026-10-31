@@ -25,6 +25,30 @@ An array, one entry per face:
 
 `Noto Sans Arabic` and `Noto Sans` are the PDF default/fallback faces.
 
+## Using the folder (one source of truth)
+
+`@reports-web/core` exports the helpers the PDF exporter itself uses, so the UI picks exactly
+the same files:
+
+```ts
+import { DEFAULT_FONTS_BASE_URL, loadFontManifest, resolveFontUrl, type FontManifestEntry } from '@reports-web/core';
+
+const manifest: FontManifestEntry[] = await loadFontManifest(fontsBaseUrl);      // cached per base URL
+const url = await resolveFontUrl({ family: '"Cairo", sans-serif', weight: 700 },  // stack, case-insensitive,
+                                 { format: 'woff2', fontsBaseUrl });              // nearest weight → URL | null
+```
+
+- `fontsBaseUrl` defaults to `DEFAULT_FONTS_BASE_URL` (this folder, resolved from the module URL).
+  When an app bundler moves the core modules, copy this folder to the app's static assets and
+  pass its URL (`exportPdf({ schema, rows, fontsBaseUrl })` and the helpers above).
+- Accepted base URLs: `file://…` (Node — read from disk with `node:fs`, offline, no `fetch`),
+  `http(s)://…` (fetched), or relative (`/fonts/`: page-relative + fetched in a browser; in Node a
+  filesystem path resolved against `process.cwd()`). The `node:` modules are loaded with dynamic
+  `import()` on the Node path only, so browser bundles are unaffected.
+- PDF: a text element's `style.font` picks the family (first match of the stack), `style.bold`
+  the 700 face; unknown families use Noto Sans Arabic + Noto Sans. Fonts are read on the first
+  PDF export only — `fonts.json` plus the TTFs the report uses, nothing outside `fontsBaseUrl`.
+
 ## Regenerating
 
 ```sh

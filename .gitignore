@@ -14,3 +14,4 @@ coverage
 !.vscode/extensions.json
 visual-out/
 .cache/
+pnpm-lock.yaml

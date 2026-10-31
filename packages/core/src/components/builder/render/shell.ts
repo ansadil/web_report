@@ -27,9 +27,27 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
   const sideHidden = (tab: 'dictionary' | 'tools' | 'reportTree') => state.sideTab !== tab;
   return html`
     <header class="titlebar" data-testid="titlebar">
-      <div class="brand">${icon('layers')}<span>web_report</span><span class="product">${t(state.uiLocale, 'designerProduct')}</span></div>
-      <div class="title-actions">${renderActions(state.actions, cb.actions)}</div>
-      <div class="locale-note">${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</div>
+      <div class="brand">${icon('layers')}<b>web_report</b><span class="product">${t(state.uiLocale, 'designerProduct')}</span></div>
+      <div class="qa">
+        <button type="button" class="qa-btn" data-control="undo" data-testid="ribbon-btn-undo" aria-label=${t(state.uiLocale, 'undo')} title=${t(state.uiLocale, 'undo')} ?disabled=${!state.actions.canUndo} @click=${cb.actions.onUndo}>${icon('undo')}</button>
+        <button type="button" class="qa-btn" data-control="redo" data-testid="ribbon-btn-redo" aria-label=${t(state.uiLocale, 'redo')} title=${t(state.uiLocale, 'redo')} ?disabled=${!state.actions.canRedo} @click=${cb.actions.onRedo}>${icon('redo')}</button>
+        <button type="button" class="qa-btn" data-testid="title-save" aria-label=${t(state.uiLocale, 'save')} title=${t(state.uiLocale, 'save')} @click=${cb.actions.onSave}>${icon('save')}</button>
+      </div>
+      <div class="doc-center">
+        <input
+          id="report-name"
+          class="name"
+          data-testid="report-name"
+          aria-label=${t(state.uiLocale, 'document')}
+          .value=${state.name}
+          @input=${(e: Event) => cb.actions.onNameInput((e.target as HTMLInputElement).value)}
+        />
+        <span class="saved">${t(state.uiLocale, 'savedState')}</span>
+      </div>
+      <div class="tb-end">
+        <span>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</span>
+        <span class="avatar" aria-hidden="true">${icon('user')}</span>
+      </div>
     </header>
     <div class="ribbon-host">
       ${renderRibbon(state.ribbon, cb.ribbon)}
@@ -122,7 +140,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       ${renderSideSection(
         {
           key: 'properties',
-          title: t(state.uiLocale, 'properties'),
+          title: t(state.uiLocale, 'propertyGrid'),
           collapsed: state.collapsed.properties,
           testId: 'properties',
         },
@@ -131,32 +149,54 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       )}
     </aside>
     <div class="status-host">
-      ${renderStatusBar(state.status)}
+      ${renderStatusBar(state.status, renderActions(state.actions, cb.actions), cb.onSetZoom)}
     </div>
   `;
 }
 
+function fieldBadge(type: string): string {
+  if (type === 'number') return '#';
+  if (type === 'date') return 'D';
+  if (type === 'bool') return '✓';
+  if (type === 'image') return 'I';
+  return 'Aa';
+}
+
 function renderDictionary(state: BuilderViewState) {
   const source = state.properties.schema.dataset.source;
+  const adapter = state.properties.schema.dataset.adapter;
   const fields = state.toolbox.fields;
   const parameters = state.properties.schema.parameters ?? [];
   return html`
+    <div class="dict-tools">
+      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'dataSources')}>${icon('plus')}</button>
+      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'editItem')}>${icon('pencil')}</button>
+      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'delete')}>${icon('trash')}</button>
+      <button type="button" class="qa-btn" title=${t(state.uiLocale, 'refresh')}>${icon('refresh')}</button>
+    </div>
     <div class="dict" data-testid="dictionary-tree">
       <div class="dict-node root">${t(state.uiLocale, 'dataSources')}</div>
-      <div class="dict-node source">${source}</div>
+      <div class="dict-node source">${source}<span class="tmeta">${adapter}</span></div>
       ${fields.map(
-        (field) => html`<div class="dict-node field"><span class="tic tic-${field.type}">${field.type === 'number' ? '#' : field.type === 'date' ? 'D' : 'Aa'}</span><span>${field.name}</span></div>`,
+        (field, index) => html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.type}">${fieldBadge(field.type)}</span><span>${field.name}</span><span class="tmeta">${field.type}</span></div>`,
       )}
       <div class="dict-node root">${t(state.uiLocale, 'reportParameters')}</div>
-      ${parameters.map((parameter) => html`<div class="dict-node field"><span class="tic">Aa</span><span>${parameter.name}</span></div>`)}
+      ${parameters.map((parameter) => html`<div class="dict-node field"><span class="tic">${fieldBadge(parameter.type ?? 'string')}</span><span>${parameter.name}</span><span class="tmeta">${parameter.type ?? ''}</span></div>`)}
       <div class="dict-node root">${t(state.uiLocale, 'systemVariables')}</div>
-      <div class="dict-node field"><span class="tic">#</span><span>{page}</span></div>
+      <div class="dict-node field"><span class="tic">#</span><span>{page}</span><span class="tmeta">${t(state.uiLocale, 'statusPage')}</span></div>
       <div class="dict-node field"><span class="tic">#</span><span>{pages}</span></div>
+      <div class="dict-node field"><span class="tic tic-date">D</span><span>${t(state.uiLocale, 'typeDate')}</span></div>
+      <div class="dict-node field"><span class="tic">Aa</span><span>${t(state.uiLocale, 'document')}</span></div>
     </div>
   `;
 }
 
 function renderReportTree(state: BuilderViewState) {
-  const bands = Object.keys(state.canvas.bands);
-  return html`<div class="dict" data-testid="report-tree-list">${bands.map((band) => html`<div class="dict-node field">${t(state.uiLocale, band as 'detail')}</div>`)}</div>`;
+  const bands = state.canvas.bands;
+  return html`<div class="dict" data-testid="report-tree-list">
+    ${Object.entries(bands).map(([band, value]) => html`
+      <div class="dict-node root">${t(state.uiLocale, band as 'detail')}</div>
+      ${(value?.elements ?? []).map((el) => html`<div class="dict-node field"><span class="tic">${el.kind.slice(0, 1)}</span><span>${'value' in el && el.value ? el.value : el.id}</span></div>`)}
+    `)}
+  </div>`;
 }

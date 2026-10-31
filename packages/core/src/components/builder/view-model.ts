@@ -31,6 +31,7 @@ import {
   insertToolKind,
   patchSelectedStyle,
   updateElement,
+  setZoom,
   zoomIn,
   zoomOut,
   zoomReset,
@@ -58,7 +59,8 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
   const widthPx = widthMm * MM_TO_PX;
   const bandHeightsMm = BAND_KEYS.flatMap((key) => {
     const band = session.schema.bands[key];
-    return band ? [band.height] : [];
+    if (!band) return [];
+    return key === 'detail' ? [0, band.height] : [band.height];
   });
   const heightMm = bandHeightsMm.reduce((sum, height) => sum + height, 0);
   const heightPx = canvasHeightPx(session.schema.bands) + bandHeightsMm.length * BAND_HEAD_PX;
@@ -117,6 +119,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
         bold: Boolean(selectedOnly?.style?.bold),
         italic: Boolean(selectedOnly?.style?.italic),
         underline: Boolean(selectedOnly?.style?.underline),
+        strike: Boolean(selectedOnly?.style?.strike),
         color: selectedOnly?.style?.color ?? '#111111',
         align: selectedOnly?.style?.align ?? '',
       },
@@ -177,6 +180,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     onSideTab: (tab) => setSideTab(session, tab),
     onToggleSection: (key) => toggleSection(session, key),
     onHostContextMenu: ports.pointer.onHostContextMenu,
+    onSetZoom: (zoom) => setZoom(session, zoom),
     onCanvasPointerLeave: () => {
       session.cursorMm = null;
     },

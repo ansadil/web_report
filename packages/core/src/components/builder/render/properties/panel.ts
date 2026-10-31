@@ -62,57 +62,51 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
   const updateStyle = (patch: Partial<Style>) => update({ style: { ...(el.style ?? {}), ...patch } });
   const border = el.style?.border ?? {};
 
+  const cm = (mm: number) => (mm / 10).toFixed(2);
+  const setCm = (axis: 'x' | 'y' | 'w' | 'h', raw: string) => update({ pos: { ...el.pos, [axis]: Number(raw) * 10 } });
   return html`
-    <div class="props">
-      <div class="group">
-        <h4>${kindHeading(el, state.locale)}</h4>
-        <div class="grid4">
-          <label>x<input data-testid="prop-x" type="number" .value=${String(el.pos.x)} @input=${(e: Event) => update({ pos: { ...el.pos, x: Number((e.target as HTMLInputElement).value) } })} /></label>
-          <label>y<input data-testid="prop-y" type="number" .value=${String(el.pos.y)} @input=${(e: Event) => update({ pos: { ...el.pos, y: Number((e.target as HTMLInputElement).value) } })} /></label>
-          ${el.kind === 'line'
-            ? el.orientation === 'horizontal'
-              ? html`
-                  <label>w (length)<input data-testid="prop-width" type="number" min="5" .value=${String(el.pos.w)} @input=${(e: Event) => update({ pos: { ...el.pos, w: Number((e.target as HTMLInputElement).value) } })} /></label>
-                  <label>h (${t(state.locale, 'thickness')})<input data-testid="prop-height" type="number" readonly disabled .value=${String(lineThicknessMm(el.thickness ?? 1))} /></label>
-                `
-              : html`
-                  <label>w (${t(state.locale, 'thickness')})<input data-testid="prop-width" type="number" readonly disabled .value=${String(lineThicknessMm(el.thickness ?? 1))} /></label>
-                  <label>h (length)<input data-testid="prop-height" type="number" min="5" .value=${String(el.pos.h)} @input=${(e: Event) => update({ pos: { ...el.pos, h: Number((e.target as HTMLInputElement).value) } })} /></label>
-                `
-            : html`
-                <label>w<input data-testid="prop-width" type="number" .value=${String(el.pos.w)} @input=${(e: Event) => update({ pos: { ...el.pos, w: Number((e.target as HTMLInputElement).value) } })} /></label>
-                <label>h<input data-testid="prop-height" type="number" .value=${String(el.pos.h)} @input=${(e: Event) => update({ pos: { ...el.pos, h: Number((e.target as HTMLInputElement).value) } })} /></label>
-              `}
-        </div>
-        <label>${t(state.locale, 'visibleWhen')}<input data-testid="prop-visible-when" .value=${el.visibleWhen ?? ''} placeholder="amount &gt; 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
-      </div>
-
-      <div class="group">
-        <h4>${t(state.locale, 'style')}</h4>
-        <label>${t(state.locale, 'fontFamily')}<input data-testid="prop-font-family" .value=${el.style?.font ?? ''} placeholder=${t(state.locale, 'inherit')} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} /></label>
-        <div class="grid2">
-          <label>${t(state.locale, 'fontSize')}<input data-testid="prop-font-size" type="number" min="4" max="96" .value=${String(el.style?.fontSize ?? 10)} @input=${(e: Event) => updateStyle({ fontSize: Number((e.target as HTMLInputElement).value) })} /></label>
-          <label>${t(state.locale, 'align')}
-            <select data-testid="prop-align" @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
-              <option value="">-</option>
-              <option value="start" ?selected=${el.style?.align === 'start'}>${t(state.locale, 'alignStart')}</option>
-              <option value="center" ?selected=${el.style?.align === 'center'}>${t(state.locale, 'alignCenter')}</option>
-              <option value="end" ?selected=${el.style?.align === 'end'}>${t(state.locale, 'alignEnd')}</option>
-              <option value="justify" ?selected=${el.style?.align === 'justify'}>${t(state.locale, 'alignJustify')}</option>
-            </select>
-          </label>
-        </div>
-        <div class="grid2">
-          <label>${t(state.locale, 'color')}<input data-testid="prop-color" type="color" .value=${colorInputValue(el.style?.color)} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></label>
-          <label>${t(state.locale, 'background')}<input data-testid="prop-background" type="color" .value=${el.style?.background ?? '#ffffff'} @input=${(e: Event) => updateStyle({ background: (e.target as HTMLInputElement).value })} /></label>
-        </div>
-        <div class="grid4">
-          <label><input data-testid="prop-bold" type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'bold')}</label>
-          <label><input data-testid="prop-italic" type="checkbox" .checked=${!!el.style?.italic} @change=${(e: Event) => updateStyle({ italic: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'italic')}</label>
-          <label><input data-testid="prop-underline" type="checkbox" .checked=${!!el.style?.underline} @change=${(e: Event) => updateStyle({ underline: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'underline')}</label>
-          <label>${t(state.locale, 'padding')}<input data-testid="prop-padding" type="number" min="0" max="40" .value=${String(el.style?.padding ?? 0)} @input=${(e: Event) => updateStyle({ padding: Number((e.target as HTMLInputElement).value) || undefined })} /></label>
+    <div class="prop-grid" data-testid="property-grid">
+      <div class="prop-card">
+        <span class="prop-card-icon">${t(state.locale, 'text').slice(0, 1)}</span>
+        <div>
+          <b>${elementStatusName(el, state.locale)}</b>
+          <small>${kindHeading(el, state.locale)}</small>
         </div>
       </div>
+      <div class="ptoggle">
+        <button type="button" class="on" @click=${(e: Event) => toggleInspector(e, false)}>${t(state.locale, 'properties')}</button>
+        <button type="button" @click=${(e: Event) => toggleInspector(e, true)}>${t(state.locale, 'events')}</button>
+      </div>
+      <div class="prop-search"><input placeholder=${t(state.locale, 'properties')} @input=${filterRows} /></div>
+      <div class="props-body">
+      <section class="cat">
+        <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">4</span></div>
+        ${gridRow('x', html`<input data-testid="prop-x" .value=${cm(el.pos.x)} @input=${(e: Event) => setCm('x', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        ${gridRow('y', html`<input data-testid="prop-y" .value=${cm(el.pos.y)} @input=${(e: Event) => setCm('y', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        ${gridRow('w', html`<input data-testid="prop-width" .value=${cm(el.pos.w)} @input=${(e: Event) => setCm('w', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        ${gridRow('h', html`<input data-testid="prop-height" .value=${el.kind === 'line' ? String(lineThicknessMm(el.kind === 'line' ? el.thickness ?? 1 : 1)) : cm(el.pos.h)} ?disabled=${el.kind === 'line' && el.orientation === 'horizontal'} @input=${(e: Event) => setCm('h', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+      </section>
+      <section class="cat">
+        <div class="cat-h">${t(state.locale, 'textAndFont')}<span class="cnt">6</span></div>
+        ${gridRow(t(state.locale, 'fontFamily'), html`<input data-testid="prop-font-family" .value=${el.style?.font ?? ''} placeholder=${t(state.locale, 'inherit')} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} />`)}
+        ${gridRow(t(state.locale, 'fontSize'), html`<input data-testid="prop-font-size" .value=${String(el.style?.fontSize ?? 10)} @input=${(e: Event) => updateStyle({ fontSize: Number((e.target as HTMLInputElement).value) })} />`, t(state.locale, 'unitPt'))}
+        ${gridRow(t(state.locale, 'align'), html`<select data-testid="prop-align" @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
+          <option value="">-</option>
+          <option value="start" ?selected=${el.style?.align === 'start'}>${t(state.locale, 'alignStart')}</option>
+          <option value="center" ?selected=${el.style?.align === 'center'}>${t(state.locale, 'alignCenter')}</option>
+          <option value="end" ?selected=${el.style?.align === 'end'}>${t(state.locale, 'alignEnd')}</option>
+          <option value="justify" ?selected=${el.style?.align === 'justify'}>${t(state.locale, 'alignJustify')}</option>
+        </select>`)}
+        ${gridRow(t(state.locale, 'color'), html`<input data-testid="prop-color" type="color" .value=${colorInputValue(el.style?.color)} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} />`)}
+        ${gridRow(t(state.locale, 'bold'), html`<input data-testid="prop-bold" type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} />`)}
+        ${gridRow(t(state.locale, 'padding'), html`<input data-testid="prop-padding" .value=${String(el.style?.padding ?? 0)} @input=${(e: Event) => updateStyle({ padding: Number((e.target as HTMLInputElement).value) || undefined })} />`)}
+      </section>
+      <details class="cat">
+        <summary class="cat-h">${t(state.locale, 'style')}</summary>
+        <label>${t(state.locale, 'visibleWhen')}<input data-testid="prop-visible-when" .value=${el.visibleWhen ?? ''} @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
+        <label><input data-testid="prop-italic" type="checkbox" .checked=${!!el.style?.italic} @change=${(e: Event) => updateStyle({ italic: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'italic')}</label>
+        <label><input data-testid="prop-underline" type="checkbox" .checked=${!!el.style?.underline} @change=${(e: Event) => updateStyle({ underline: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'underline')}</label>
+        <label>${t(state.locale, 'background')}<input data-testid="prop-background" type="color" .value=${el.style?.background ?? '#ffffff'} @input=${(e: Event) => updateStyle({ background: (e.target as HTMLInputElement).value })} /></label>
 
       <div class="group">
         <h4>${t(state.locale, 'border')}</h4>
@@ -134,8 +128,31 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
       ${renderKindSpecific({ el, fields: state.fields, locale: state.locale }, { update })}
 
       <button class="danger" type="button" @click=${cb.deleteSelected}>${t(state.locale, 'delete')}</button>
+      </details>
+      </div>
+      <div class="events-body">${t(state.locale, 'events')}</div>
     </div>
   `;
+}
+
+function gridRow(label: string, control: unknown, unit?: string) {
+  return html`<div class="prow"><span class="k">${label}</span><span class="v">${control}${unit ? html`<span class="u">${unit}</span>` : ''}</span></div>`;
+}
+
+function filterRows(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const q = input.value.trim().toLowerCase();
+  const grid = input.closest('.prop-grid');
+  grid?.querySelectorAll('.prow').forEach((row) => {
+    const name = row.querySelector('.k')?.textContent?.toLowerCase() ?? '';
+    (row as HTMLElement).hidden = q.length > 0 && !name.includes(q);
+  });
+}
+
+function toggleInspector(event: Event, events: boolean): void {
+  const grid = (event.target as HTMLElement).closest('.prop-grid');
+  grid?.classList.toggle('show-events', events);
+  grid?.querySelectorAll('.ptoggle button').forEach((button, index) => button.classList.toggle('on', events ? index === 1 : index === 0));
 }
 
 function renderCondRule(

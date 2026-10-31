@@ -69,6 +69,13 @@ const map = {
   borderAll: 'grid-2x2',
   layers: 'layers',
   database: 'database',
+  strike: 'strikethrough',
+  valignStart: 'align-vertical-justify-start',
+  valignCenter: 'align-vertical-justify-center',
+  valignEnd: 'align-vertical-justify-end',
+  refresh: 'refresh-cw',
+  pencil: 'pencil',
+  user: 'user',
 };
 
 const entries = [];

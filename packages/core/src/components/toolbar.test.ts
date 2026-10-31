@@ -282,7 +282,7 @@ describe('reports-builder toolbar + collapsible panels', () => {
 
     const grid = builder.shadowRoot!.querySelector('.tool-grid') as HTMLElement;
     expect(grid).toBeTruthy();
-    expect(getComputedStyle(grid).gridTemplateColumns).toContain('repeat(6');
+    expect(getComputedStyle(grid).gridTemplateColumns).toContain('repeat(3');
     const tools = grid.querySelectorAll('.tool');
     expect(tools.length).toBe(12);
     expect(tools[0]!.getAttribute('title')).toBe('Text');

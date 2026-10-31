@@ -170,7 +170,24 @@ type StringKey =
   | 'localeLtr'
   | 'localeRtl'
   | 'reportParameters'
-  | 'elements';
+  | 'elements'
+  | 'savedState'
+  | 'propertyGrid'
+  | 'events'
+  | 'positionSize'
+  | 'textAndFont'
+  | 'unitCm'
+  | 'unitPt'
+  | 'dataHeader'
+  | 'formatPainter'
+  | 'noBorders'
+  | 'bottomBorder'
+  | 'borderWeight'
+  | 'growFont'
+  | 'shrinkFont'
+  | 'strike'
+  | 'refresh'
+  | 'editItem';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -344,6 +361,23 @@ const en: Record<StringKey, string> = {
   localeRtl: 'Arabic · right to left',
   reportParameters: 'Parameters',
   elements: 'Elements',
+  savedState: 'Saved',
+  propertyGrid: 'Property grid',
+  events: 'Events',
+  positionSize: 'Position & size',
+  textAndFont: 'Text & font',
+  unitCm: 'cm',
+  unitPt: 'pt',
+  dataHeader: 'Data header',
+  formatPainter: 'Format painter',
+  noBorders: 'No borders',
+  bottomBorder: 'Bottom border',
+  borderWeight: 'Weight & style',
+  growFont: 'Grow font',
+  shrinkFont: 'Shrink font',
+  strike: 'Strikethrough',
+  refresh: 'Refresh',
+  editItem: 'Edit',
 };
 
 const ar: Record<StringKey, string> = {
@@ -518,6 +552,23 @@ const ar: Record<StringKey, string> = {
   localeRtl: 'العربية · من اليمين لليسار',
   reportParameters: 'المعاملات',
   elements: 'العناصر',
+  savedState: 'تم الحفظ',
+  propertyGrid: 'جدول الخصائص',
+  events: 'الأحداث',
+  positionSize: 'الموضع والحجم',
+  textAndFont: 'النص والخط',
+  unitCm: 'سم',
+  unitPt: 'نقطة',
+  dataHeader: 'ترويسة البيانات',
+  formatPainter: 'نسخ التنسيق',
+  noBorders: 'بلا حدود',
+  bottomBorder: 'حد سفلي',
+  borderWeight: 'السمك والنمط',
+  growFont: 'تكبير الخط',
+  shrinkFont: 'تصغير الخط',
+  strike: 'يتوسطه خط',
+  refresh: 'تحديث',
+  editItem: 'تعديل',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

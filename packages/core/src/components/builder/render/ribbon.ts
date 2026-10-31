@@ -17,6 +17,7 @@ export interface RibbonFontState {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  strike: boolean;
   color: string;
   align: Style['align'] | '';
 }
@@ -136,7 +137,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               <div class="ribbon-smallcol">
                 ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
                 ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
-                ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete)}
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-format-painter" ?disabled=${!state.canCut}><span>${t(state.locale, 'formatPainter')}</span></button>
               </div>
             `,
           )}
@@ -144,46 +145,69 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             state.locale,
             'ribbonGroupFont',
             html`
-              <select
-                data-testid="ribbon-font-family"
-                ?disabled=${!font.enabled}
-                @change=${(ev: Event) => cb.onStyle({ font: (ev.target as HTMLSelectElement).value || undefined })}
-              >
-                <option value="" ?selected=${font.family === ''}>—</option>
-                ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family}>${family}</option>`)}
-              </select>
-              <input
-                data-testid="ribbon-font-size"
-                type="text"
-                inputmode="numeric"
-                ?disabled=${!font.enabled}
-                .value=${fontSizeLabel}
-                @change=${(ev: Event) => {
-                  const size = parseLocalizedNumber((ev.target as HTMLInputElement).value);
-                  if (Number.isFinite(size)) cb.onStyle({ fontSize: size });
-                }}
-              />
-              <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-bold" aria-label=${t(state.locale, 'bold')} title=${t(state.locale, 'bold')} aria-pressed=${font.bold ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ bold: !font.bold })}>${icon('bold')}</button>
-              <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-italic" aria-label=${t(state.locale, 'italic')} title=${t(state.locale, 'italic')} aria-pressed=${font.italic ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ italic: !font.italic })}>${icon('italic')}</button>
-              <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-underline" aria-label=${t(state.locale, 'underline')} title=${t(state.locale, 'underline')} aria-pressed=${font.underline ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ underline: !font.underline })}>${icon('underline')}</button>
-              <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
+              <div class="ribbon-fontcol">
+                <div class="row">
+                  <select
+                    data-testid="ribbon-font-family"
+                    ?disabled=${!font.enabled}
+                    @change=${(ev: Event) => cb.onStyle({ font: (ev.target as HTMLSelectElement).value || undefined })}
+                  >
+                    <option value="" ?selected=${font.family === ''}>—</option>
+                    ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family}>${family}</option>`)}
+                  </select>
+                  <input
+                    data-testid="ribbon-font-size"
+                    type="text"
+                    inputmode="numeric"
+                    ?disabled=${!font.enabled}
+                    .value=${fontSizeLabel}
+                    @change=${(ev: Event) => {
+                      const size = parseLocalizedNumber((ev.target as HTMLInputElement).value);
+                      if (Number.isFinite(size)) cb.onStyle({ fontSize: size });
+                    }}
+                  />
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-grow" aria-label=${t(state.locale, 'growFont')} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ fontSize: font.size + 1 })}>A+</button>
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-shrink" aria-label=${t(state.locale, 'shrinkFont')} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ fontSize: font.size - 1 })}>A−</button>
+                </div>
+                <div class="row">
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-bold" aria-label=${t(state.locale, 'bold')} title=${t(state.locale, 'bold')} aria-pressed=${font.bold ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ bold: !font.bold })}>${icon('bold')}</button>
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-italic" aria-label=${t(state.locale, 'italic')} title=${t(state.locale, 'italic')} aria-pressed=${font.italic ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ italic: !font.italic })}>${icon('italic')}</button>
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-underline" aria-label=${t(state.locale, 'underline')} title=${t(state.locale, 'underline')} aria-pressed=${font.underline ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ underline: !font.underline })}>${icon('underline')}</button>
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-font-strike" aria-label=${t(state.locale, 'strike')} title=${t(state.locale, 'strike')} aria-pressed=${font.strike ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ strike: !font.strike })}>${icon('strike')}</button>
+                  <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
+                </div>
+              </div>
             `,
           )}
           ${cluster(
             state.locale,
             'ribbonGroupAlign',
             html`
-              ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
-              ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
-              ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
-              ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
+              <div class="ribbon-fontcol">
+                <div class="row">
+                  ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
+                  ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
+                  ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
+                  ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
+                </div>
+                <div class="row">
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-valign-start" aria-label=${t(state.locale, 'alignTop')} ?disabled=${!font.enabled}>${icon('valignStart')}</button>
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-valign-center" aria-label=${t(state.locale, 'alignMiddle')} ?disabled=${!font.enabled}>${icon('valignCenter')}</button>
+                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-valign-end" aria-label=${t(state.locale, 'alignBottom')} ?disabled=${!font.enabled}>${icon('valignEnd')}</button>
+                </div>
+              </div>
             `,
           )}
           ${cluster(
             state.locale,
             'border',
             html`
-              ${bigBtn(state.locale, 'borders', 'borderAll', 'allBorders', 'slate', false, () => undefined)}
+              ${bigBtn(state.locale, 'borders', 'borderAll', 'allBorders', 'slate', !font.enabled, () => cb.onStyle({ border: { top: 0.3, right: 0.3, bottom: 0.3, left: 0.3 } }))}
+              <div class="ribbon-smallcol">
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-none" ?disabled=${!font.enabled} @click=${() => cb.onStyle({ border: { top: 0, right: 0, bottom: 0, left: 0 } })}><span>${t(state.locale, 'noBorders')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-bottom" ?disabled=${!font.enabled} @click=${() => cb.onStyle({ border: { top: 0, right: 0, bottom: 0.3, left: 0 } })}><span>${t(state.locale, 'bottomBorder')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-border-weight" ?disabled=${!font.enabled}><span>${t(state.locale, 'borderWeight')}</span></button>
+              </div>
             `,
           )}
           ${cluster(

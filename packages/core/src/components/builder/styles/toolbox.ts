@@ -3,7 +3,7 @@ import { css } from 'lit';
 export const toolboxStyles = css`    .panel-title { font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 8px; letter-spacing: 0.5px; }
     .tool-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 4px;
     }
     .tool {

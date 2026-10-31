@@ -37,6 +37,7 @@ export interface BuilderViewCallbacks {
   onToggleSection: (key: SideSectionKey) => void;
   onHostContextMenu: (ev: Event) => void;
   onCanvasPointerLeave: () => void;
+  onSetZoom: (zoom: number) => void;
   ribbon: RibbonCallbacks;
   actions: ActionsCallbacks;
   toolbox: ToolboxCallbacks;

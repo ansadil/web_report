@@ -38,13 +38,7 @@
         padding: 0 8px;
         cursor: pointer;
       }
-      #reports-list {
-        display: flex;
-        gap: 6px;
-        overflow: auto;
-        flex: 1;
-        min-width: 0;
-      }
+      #reports-list { display: block; }
       header.playground-bar .tabs {
         display: flex;
         gap: 4px;
@@ -127,7 +121,8 @@
         box-shadow: 0 0 0 1px #2563eb;
       }
       .report-card .name { font-weight: 600; color: #1e293b; }
-      .report-card .desc, .report-card .dataset { display: none; }
+      .report-card .desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+      .report-card .dataset { font-size: 10px; color: #94a3b8; margin-top: 4px; }
       .saved-item {
         display: flex;
         justify-content: space-between;
@@ -203,20 +198,19 @@
     <div id="app">
       <header class="playground-bar">
         <button id="btn-samples" type="button">Samples</button>
-        <div id="reports-list"></div>
+      </header>
 
+      <aside class="sidebar" id="sample-drawer">
+        <h3>Sample Reports</h3>
+        <div id="reports-list"></div>
         <div class="tabs" role="tablist">
           <button id="tab-builder" class="active">Builder</button>
           <button id="tab-viewer">Viewer</button>
         </div>
-
         <div class="locale-switch">
           <button id="btn-en" class="active">EN · LTR</button>
           <button id="btn-ar">AR · RTL</button>
         </div>
-      </header>
-
-      <aside class="sidebar" id="sample-drawer">
         <h3>My Saved Reports</h3>
         <div id="saved-list"></div>
 

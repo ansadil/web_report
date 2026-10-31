@@ -56,17 +56,30 @@ export const chromeStyles = css`
   .ribbon-big.c-slate .ic { background: #edf0f5; color: #475569; }
   .ribbon-big:disabled { opacity: 0.45; cursor: not-allowed; }
   .ribbon-smallcol { display: flex; flex-direction: column; gap: 2px; }
+  .ribbon-fontcol { display: flex; flex-direction: column; gap: 4px; }
+  .ribbon .row { display: flex; gap: 3px; align-items: center; }
   .titlebar {
-    height: 34px; background: #15233a; color: #e8eef8; display: flex; align-items: center; gap: 10px; padding: 0 10px; min-width: 0;
+    height: 34px; max-height: 34px; overflow: hidden; background: #15233a; color: #e8eef8;
+    display: flex; align-items: center; gap: 12px; padding: 0 10px; min-width: 0; z-index: 3;
   }
-  .titlebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; white-space: nowrap; }
+  .titlebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; white-space: nowrap; flex: none; }
   .titlebar .brand .product { font-weight: 500; color: #9fb0c8; }
-  .titlebar .locale-note { color: #b7c4d8; font-size: 11.5px; white-space: nowrap; }
-  .title-actions { flex: 1; min-width: 0; }
-  .titlebar .toolbar, .titlebar .doc-name { background: transparent; color: inherit; }
-  .titlebar .doc-name label { color: #9fb0c8; }
-  .titlebar button { color: #c6d2e4; }
-  .titlebar .toolbar button.primary { background: #1f5fa8; color: #fff; border-color: #1f5fa8; }
+  .titlebar .qa { display: flex; gap: 2px; flex: none; }
+  .titlebar .qa-btn {
+    width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #c6d2e4;
+    display: grid; place-items: center; padding: 0; cursor: pointer;
+  }
+  .titlebar .qa-btn:disabled { opacity: 0.35; cursor: default; }
+  .titlebar .doc-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .titlebar .doc-center input {
+    width: min(280px, 46%); border: 0; background: transparent; color: #fff; text-align: center; font: inherit; font-weight: 600;
+  }
+  .titlebar .saved { color: #b7c4d8; font-size: 12px; white-space: nowrap; }
+  .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #b7c4d8; font-size: 11.5px; white-space: nowrap; flex: none; }
+  .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #2d4466; color: #fff; display: grid; place-items: center; }
+  .status-spacer { flex: 1; }
+  .status-bar .toolbar { background: transparent; padding: 0; gap: 4px; flex: none; }
+  .status-bar .zoom input[type='range'] { width: 110px; accent-color: #1f5fa8; }
   .page-tabs {
     display: flex; align-items: flex-end; gap: 2px; padding: 0 10px; background: #f3f5f8; border-top: 1px solid #dfe4ec;
   }
@@ -77,6 +90,10 @@ export const chromeStyles = css`
   .page-tab.on { background: #fff; color: #1f5fa8; font-weight: 700; }
   .dict { padding: 4px 8px 8px; }
   .dict-node { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 4px; border-radius: 5px; }
+  .dict-tools { display: flex; gap: 2px; justify-content: flex-end; padding: 4px 8px; }
+  .dict-tools .qa-btn { width: 24px; height: 24px; border: 0; background: transparent; color: #1f5fa8; display: grid; place-items: center; cursor: pointer; }
+  .dict-node.cur { background: #e7f0fb; color: #174a85; font-weight: 600; }
+  .tmeta { margin-inline-start: auto; color: var(--rb-muted); font-size: 10.5px; }
   .dict-node.root { font-weight: 700; margin-top: 6px; }
   .dict-node.source, .dict-node.field { padding-inline-start: 18px; }
   .tic { width: 18px; height: 18px; border-radius: 4px; display: grid; place-items: center; font-size: 9px; font-weight: 800; background: #fdf1dc; color: #b86b06; }
@@ -104,6 +121,7 @@ export const chromeStyles = css`
   .band-strip[data-band='reportHeader'] .band { background-color: #faf8ff; border-color: #c9bdf0; }
   .band-strip[data-band='pageHeader'] .band-head { background: #2f6fc0; }
   .band-strip[data-band='pageHeader'] .band { background-color: #f6faff; border-color: #bcd3f1; }
+  .band-strip[data-band='dataHeader'] .band-head { background: #0f8a7c; }
   .band-strip[data-band='detail'] .band-head { background: #c47a12; }
   .band-strip[data-band='detail'] .band { background-color: #fffaf0; border-color: #efd4a6; }
   .band-strip[data-band='reportFooter'] .band-head { background: #be3a5a; }

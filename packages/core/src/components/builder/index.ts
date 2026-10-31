@@ -17,6 +17,7 @@ export {
   type BuilderAction,
   type ContextMenuState,
   type MarqueeState,
+  type RibbonTab,
   type SideSectionKey,
 } from './types.js';
 export { buildViewModel } from './view-model.js';

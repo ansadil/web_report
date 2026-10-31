@@ -52,6 +52,7 @@ export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
         type="button"
         class="icon-only"
         data-control="undo"
+        data-testid="ribbon-btn-undo"
         aria-label=${t(state.locale, 'undo')}
         title=${`${t(state.locale, 'undo')} (Ctrl+Z)`}
         ?disabled=${!state.canUndo}
@@ -61,6 +62,7 @@ export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
         type="button"
         class="icon-only"
         data-control="redo"
+        data-testid="ribbon-btn-redo"
         aria-label=${t(state.locale, 'redo')}
         title=${`${t(state.locale, 'redo')} (Ctrl+Y)`}
         ?disabled=${!state.canRedo}
@@ -71,7 +73,8 @@ export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
         <button
           type="button"
           class="icon-only"
-          data-control="zoom-out"
+            data-control="zoom-out"
+            data-testid="ribbon-btn-zoom-out"
           aria-label=${t(state.locale, 'zoomOut')}
           title=${t(state.locale, 'zoomOut')}
           ?disabled=${state.zoom <= MIN_BUILDER_ZOOM}
@@ -80,7 +83,8 @@ export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
         <button
           type="button"
           class="zoom-value"
-          data-control="zoom-reset"
+            data-control="zoom-reset"
+            data-testid="ribbon-btn-zoom-reset"
           aria-label=${t(state.locale, 'zoomReset')}
           title=${t(state.locale, 'zoomReset')}
           @click=${cb.onZoomReset}
@@ -88,7 +92,8 @@ export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
         <button
           type="button"
           class="icon-only"
-          data-control="zoom-in"
+            data-control="zoom-in"
+            data-testid="ribbon-btn-zoom-in"
           aria-label=${t(state.locale, 'zoomIn')}
           title=${t(state.locale, 'zoomIn')}
           ?disabled=${state.zoom >= MAX_BUILDER_ZOOM}
@@ -126,7 +131,8 @@ function renderToolbarAction(state: ActionsState, cb: ActionsCallbacks, a: Build
   if (a === 'save') {
     return html`<button
       type="button"
-      data-action="save"
+        data-action="save"
+        data-testid="ribbon-btn-save"
       class="primary"
       aria-label=${t(state.locale, 'save')}
       title=${t(state.locale, 'save')}
@@ -136,7 +142,8 @@ function renderToolbarAction(state: ActionsState, cb: ActionsCallbacks, a: Build
   if (a === 'json') {
     return html`<button
       type="button"
-      data-action="json"
+        data-action="json"
+        data-testid="ribbon-btn-json"
       aria-label="JSON"
       title="JSON"
       @click=${cb.onExportJson}
@@ -145,7 +152,8 @@ function renderToolbarAction(state: ActionsState, cb: ActionsCallbacks, a: Build
   if (a === 'preview') {
     return html`<button
       type="button"
-      data-action="preview"
+        data-action="preview"
+        data-testid="ribbon-btn-preview"
       class="icon-only"
       aria-label=${t(state.locale, 'preview')}
       title=${t(state.locale, 'preview')}

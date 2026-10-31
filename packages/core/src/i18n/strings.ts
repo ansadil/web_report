@@ -106,7 +106,17 @@ type StringKey =
   | 'bringToFront'
   | 'bringForward'
   | 'sendToBack'
-  | 'sendBackward';
+  | 'sendBackward'
+  | 'ribbonHome'
+  | 'ribbonInsert'
+  | 'ribbonPage'
+  | 'ribbonView'
+  | 'dictionary'
+  | 'reportTree'
+  | 'comingLater'
+  | 'statusCursor'
+  | 'statusSelection'
+  | 'statusPage';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -121,6 +131,16 @@ const en: Record<StringKey, string> = {
   toolbox: 'Toolbox',
   properties: 'Properties',
   preview: 'Preview',
+  ribbonHome: 'Home',
+  ribbonInsert: 'Insert',
+  ribbonPage: 'Page',
+  ribbonView: 'View',
+  dictionary: 'Dictionary',
+  reportTree: 'Report tree',
+  comingLater: 'Coming in a later update.',
+  statusCursor: 'Cursor',
+  statusSelection: 'Selection',
+  statusPage: 'Page',
   actions: 'Actions',
   save: 'Save',
   delete: 'Delete',
@@ -231,6 +251,16 @@ const ar: Record<StringKey, string> = {
   toolbox: 'الأدوات',
   properties: 'الخصائص',
   preview: 'معاينة',
+  ribbonHome: 'الرئيسية',
+  ribbonInsert: 'إدراج',
+  ribbonPage: 'الصفحة',
+  ribbonView: 'عرض',
+  dictionary: 'القاموس',
+  reportTree: 'شجرة التقرير',
+  comingLater: 'يأتي في تحديث لاحق.',
+  statusCursor: 'المؤشر',
+  statusSelection: 'التحديد',
+  statusPage: 'الصفحة',
   actions: 'الإجراءات',
   save: 'حفظ',
   delete: 'حذف',

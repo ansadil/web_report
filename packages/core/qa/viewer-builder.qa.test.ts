@@ -99,6 +99,24 @@ describe('reports-viewer', () => {
     expect(text).not.toMatch(/\{pages?\}/);
     expect(text).toMatch(/صفحة [1١] من [0-9٠-٩]+/);
   });
+  const viewerText = async (value: string) => {
+    const v = await mountViewer(withFooter(value));
+    return (v.shadowRoot?.textContent ?? '') + (v.textContent ?? '');
+  };
+  it('BUG-15 viewer Arabic aliases «صفحة {صفحة} من {صفحات}» → «صفحة 1 من N»', async () => {
+    const text = await viewerText('صفحة {صفحة} من {صفحات}');
+    expect(text).not.toMatch(/\{(page|pages|صفحة|صفحات)\}/);
+    expect(text).toMatch(/صفحة [1١] من [0-9٠-٩]+/);
+  });
+  it('BUG-15 viewer token mid-sentence «هذه الصفحة {page} من التقرير»', async () => {
+    const text = await viewerText('هذه الصفحة {page} من التقرير');
+    expect(text).toMatch(/هذه الصفحة [1١] من التقرير/);
+  });
+  it('BUG-15 viewer multiple/mixed tokens «{page} و {صفحة} من {pages} و {صفحات}»', async () => {
+    const text = await viewerText('{page} و {صفحة} من {pages} و {صفحات}');
+    expect(text).not.toMatch(/\{(page|pages|صفحة|صفحات)\}/);
+    expect(text).toMatch(/[1١] و [1١] من ([0-9٠-٩]+) و \1/);
+  });
 });
 
 describe('reports-builder', () => {

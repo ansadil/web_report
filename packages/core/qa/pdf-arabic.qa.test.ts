@@ -154,6 +154,47 @@ describe('PDF layout', () => {
   });
 });
 
+describe('PDF page tokens — approved: {page}/{pages} + aliases {صفحة}/{صفحات}, replaced anywhere in text', () => {
+  const pn = (value: string) => mustValidate({
+    version: '1', id: 'qa-pn2', meta: { name: 'QA', locale: 'ar', dir: 'rtl' },
+    dataset: { adapter: 'static', source: 't' }, fields: [],
+    bands: {
+      reportHeader: { height: 10, pageBreakAfter: true, elements: [{ id: 't', kind: 'text', value: '777', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
+      detail: { height: 0, elements: [] },
+      reportFooter: { height: 10, elements: [{ id: 'f', kind: 'text', value: '888', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
+      pageFooter: { height: 8, elements: [{ id: 'pn', kind: 'text', value, pos: { x: 0, y: 0, w: 180, h: 6 } }] },
+    },
+  });
+  const pages = async (value: string) => {
+    const t = await extractPdfText(await toBytes(await exportPdf({ schema: pn(value), rows: [] })));
+    expect(t.numPages).toBe(2);
+    return [1, 2].map((p) => t.lines.filter((l) => l.page === p).map((l) => l.text).join('\n'));
+  };
+  it('BUG-15 PDF Arabic aliases «صفحة {صفحة} من {صفحات}» → «صفحة 1 من 2» / «صفحة 2 من 2»', async () => {
+    const [p1, p2] = await pages('صفحة {صفحة} من {صفحات}');
+    expect(p1 + p2).not.toMatch(/[{}]/);
+    expect(p1).toMatch(/صفحة [1١] من [2٢]/);
+    expect(p2).toMatch(/صفحة [2٢] من [2٢]/);
+  });
+  it('BUG-15 PDF alias {صفحات} alone renders total pages', async () => {
+    const [p1, p2] = await pages('{صفحات}');
+    expect(p1).toMatch(/(^|\n)[2٢]($|\n)/);
+    expect(p2).toMatch(/(^|\n)[2٢]($|\n)/);
+  });
+  it('BUG-15 PDF token mid-sentence «هذه الصفحة {page} من التقرير»', async () => {
+    const [p1, p2] = await pages('هذه الصفحة {page} من التقرير');
+    expect(p1 + p2).not.toMatch(/[{}]/);
+    expect(p1).toMatch(/هذه الصفحة [1١] من التقرير/);
+    expect(p2).toMatch(/هذه الصفحة [2٢] من التقرير/);
+  });
+  it('BUG-15 PDF multiple/mixed tokens in one string «{page} و {صفحة} من {pages} و {صفحات}»', async () => {
+    const [p1, p2] = await pages('{page} و {صفحة} من {pages} و {صفحات}');
+    expect(p1 + p2).not.toMatch(/[{}]/);
+    expect(p1).toMatch(/[1١] و [1١] من [2٢] و [2٢]/);
+    expect(p2).toMatch(/[2٢] و [2٢] من [2٢] و [2٢]/);
+  });
+});
+
 describe('PDF non-text elements', () => {
   const PNG_1PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
   const one = async (el: Record<string, unknown>) => {

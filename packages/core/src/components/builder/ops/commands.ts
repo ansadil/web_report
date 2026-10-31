@@ -1,4 +1,4 @@
-import type { Band, Group, ReportElement, ReportSchemaV1, Watermark } from '../api.js';
+import type { Band, Group, ReportElement, ReportSchemaV1, Style, Watermark } from '../api.js';
 import { logger } from '../api.js';
 import { newId } from '../ids.js';
 import { bandBounds, clampElementPos, clampZoom } from '../geometry.js';
@@ -56,6 +56,15 @@ export function updateBand(
   const next = mapBand(session.schema, band, updater);
   if (!next) return;
   commitSchema(session, next, opts);
+}
+
+export function patchSelectedStyle(session: BuilderSession, patch: Partial<Style>): void {
+  if (!session.selectedBand || session.selectedIds.size === 0) return;
+  const ids = session.selectedIds;
+  updateBand(session, session.selectedBand, (band) => ({
+    ...band,
+    elements: band.elements.map((el) => (ids.has(el.id) ? { ...el, style: { ...el.style, ...patch } } : el)),
+  }));
 }
 
 export function updateElement(

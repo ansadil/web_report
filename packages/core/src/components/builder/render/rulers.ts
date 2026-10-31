@@ -1,4 +1,5 @@
 import { html } from 'lit';
+import { formatLocalizedNumber } from '../status-bar.js';
 import { rulerMarks, rulerTickInsetPx, verticalRulerTickTopPx } from '../ruler.js';
 
 export interface RulerState {
@@ -8,6 +9,8 @@ export interface RulerState {
   bandHeightsMm: readonly number[];
   zoom: number;
   dir: 'ltr' | 'rtl';
+  locale: string;
+  digits: 'locale' | 'latn';
 }
 
 export function renderHorizontalRuler(state: RulerState) {
@@ -18,7 +21,7 @@ export function renderHorizontalRuler(state: RulerState) {
           <span
             class="ruler-tick ${mark.major ? 'major' : ''}"
             style="inset-inline-start:${rulerTickInsetPx(mark.mm, state.zoom)}px"
-          >${mark.major ? String(mark.mm) : ''}</span>
+          >${mark.major ? formatLocalizedNumber(mark.mm, { locale: state.locale, digits: state.digits }) : ''}</span>
         `,
       )}
     </div>
@@ -31,7 +34,7 @@ export function renderVerticalRuler(state: RulerState) {
       ${rulerMarks(state.heightMm).map(
         (mark) => html`
           <span class="ruler-tick ${mark.major ? 'major' : ''}" style="top:${verticalRulerTickTopPx(mark.mm, state.bandHeightsMm, state.zoom)}px"
-            >${mark.major ? String(mark.mm) : ''}</span
+            >${mark.major ? formatLocalizedNumber(mark.mm, { locale: state.locale, digits: state.digits }) : ''}</span
           >
         `,
       )}

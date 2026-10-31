@@ -13,7 +13,15 @@ export const chromeStyles = css`
   .ribbon-body { display: flex; align-items: center; gap: 8px; padding: 6px 8px; min-height: 52px; overflow: auto; }
   .ribbon-pane { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .ribbon-pane[hidden] { display: none; }
-  .ribbon-group, .ribbon-insert { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ribbon-group, .ribbon-insert { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .ribbon-cluster { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .ribbon-caption { font-size: 10px; color: var(--rb-muted); line-height: 1.2; }
+  .ribbon-file { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
+  .ribbon-group select, .ribbon-group input[type='number'] {
+    font: inherit; font-size: 12px; border: 1px solid var(--rb-border); border-radius: 6px; padding: 4px 6px; background: var(--rb-panel);
+  }
+  .ribbon-group input[type='number'] { width: 56px; }
+  .ribbon-group input[type='color'] { width: 28px; height: 28px; padding: 0; border: 1px solid var(--rb-border); background: transparent; }
   .ribbon-cmd, .ribbon-insert-btn {
     display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--rb-border);
     background: var(--rb-panel); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: inherit; font-size: 12px;

@@ -67,6 +67,9 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
       line-height: 1.2;
       padding-block: 1px;
       padding-inline: 2px 2.4em;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
     }
     .element .kind {
       position: absolute;

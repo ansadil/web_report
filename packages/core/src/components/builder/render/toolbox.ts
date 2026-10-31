@@ -13,6 +13,14 @@ export interface ToolboxCallbacks {
   onFieldDragStart: (ev: DragEvent, field: FieldMeta) => void;
 }
 
+function fieldTypeKey(type: string): 'typeString' | 'typeNumber' | 'typeDate' | 'typeBool' | 'typeImage' {
+  if (type === 'number') return 'typeNumber';
+  if (type === 'date') return 'typeDate';
+  if (type === 'bool') return 'typeBool';
+  if (type === 'image') return 'typeImage';
+  return 'typeString';
+}
+
 export function renderToolbox(state: ToolboxState, cb: ToolboxCallbacks) {
   return html`
     <div class="tool-grid">
@@ -40,7 +48,7 @@ export function renderToolbox(state: ToolboxState, cb: ToolboxCallbacks) {
             (f) => html`
               <div class="field-row" draggable="true" @dragstart=${(e: DragEvent) => cb.onFieldDragStart(e, f)}>
                 <span>${resolveLabel(f.label, state.locale, f.name)}</span>
-                <span class="type">${f.type}</span>
+                <span class="type">${t(state.locale, fieldTypeKey(f.type))}</span>
               </div>
             `,
           )}

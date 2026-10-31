@@ -117,6 +117,13 @@ describe('reports-viewer', () => {
     expect(text).not.toMatch(/\{(page|pages|صفحة|صفحات)\}/);
     expect(text).toMatch(/[1١] و [1١] من ([0-9٠-٩]+) و \1/);
   });
+  it('BUG-15 data values containing "{page}" are NOT replaced (only static template text is)', async () => {
+    const s = withFooter('صفحة {page} من {pages}');
+    const v = await mountViewer(s, [{ item: 'SKU-{page}-01', qty: 1, price: 1, date: '2026-10-01' }, { item: 'X-{pages}-{صفحة}', qty: 1, price: 1, date: '2026-10-01' }]);
+    const text = (v.shadowRoot?.textContent ?? '') + (v.textContent ?? '');
+    expect(text).toContain('SKU-{page}-01');
+    expect(text).toContain('X-{pages}-{صفحة}');
+  });
 });
 
 describe('reports-builder', () => {

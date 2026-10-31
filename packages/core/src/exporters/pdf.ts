@@ -16,14 +16,16 @@ export interface PdfExportInput {
    *
    * A TTF the custom folder's `fonts.json` lists but that is missing or unloadable, and a
    * custom folder without Noto Sans Arabic / Noto Sans (the fallback fonts), do not fail the
-   * export: the bundled faces are used instead and {@link onWarning} is called once per face.
+   * export: the bundled faces are used instead and {@link onWarning} is called once per
+   * code, family, weight and url.
    * The export fails only if the bundled fonts cannot be loaded either (or `fonts.json`
    * itself cannot be read).
    */
   readonly fontsBaseUrl?: string;
   /**
    * Non-fatal problems (codes: {@link PdfWarningCode}), e.g. a font that fell back to the
-   * bundled one. Default: `console.warn`.
+   * bundled one. Default: `console.warn`. If it throws, the error is logged with
+   * `console.error` and the export continues.
    */
   readonly onWarning?: (warning: PdfWarning) => void;
 }

@@ -9,6 +9,9 @@
  * Noto Sans, no longer rejects: the bundled face is used and `onWarning` (default
  * `console.warn`) reports FONT_FILE_UNAVAILABLE / FONT_FALLBACK_MISSING once per face per
  * export. A missing or 404 `fonts.json` still rejects.
+ *
+ * v6 (fix/pdf-font-robustness 12e15cb): BUG-25 fixed (asserted for all families); PdfWarning
+ * carries the requested face's `weight` (400/700) and `style` ('normal'), asserted exactly.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { existsSync, readFileSync, readdirSync, mkdtempSync, cpSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -360,16 +363,13 @@ const DOTTED: Record<string, string> = {
 // ffb99e3 alike (pre-existing positioning heuristic) — judged by the drawn-order oracle too.
 const ORACLE = new Set(['arabicDigits', 'mixed', 'tashkeel']);
 const FAMILIES_23 = [...SELECTABLE, undefined] as const;
-// BUG-25 (open at ffb99e3): Naskh dot glyphs are positioned with NEGATIVE /W advances; with the
-// U+200B targets pdf.js now merges a Naskh line into ONE rtl item whose width is over-counted
-// (e.g. 283pt for 234pt of ink), so the item runs past the page's right edge and pdf.js drops
-// the glyphs it believes are off-page: the first word(s) of long lines vanish from pdf.js text
-// ("بيت ثابت … تخت" → "ت ثابت … تخت"; Bold → "ثابت … تخت"). Poppler keeps every letter.
+// BUG-25 (found at ffb99e3, fixed in e2a66bc): Naskh dot glyphs had NEGATIVE /W advances, so
+// pdf.js over-counted a Naskh line's width and dropped the first word(s) of long lines as
+// off-page ("بيت ثابت … تخت" → "ت ثابت … تخت"). Now asserted as a regression for every family.
 /** drawn-order oracle: one run equals the UAX #9 visual order, or — when GPOS mark positioning
  *  splits a line into one run per glyph (tashkeel) — the contiguous drawn sequence contains it. */
 const drawnVisual = (runs: string[], logical: string) =>
   drawnContainsVisual(runs, logical) || inkOnly(runs.join('')).includes(visualOrderRtl(logical));
-const BUG25 = (family: string | undefined) => family === 'Noto Naskh Arabic';
 const HAS_PDFTOTEXT = (() => { try { execFileSync('pdftotext', ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } })();
 /** every char of `got` (multiset) occurs in `want` — "no junk", independent of completeness */
 const subBag = (got: string, want: string) => {
@@ -406,7 +406,7 @@ describe.skipIf(!HAS_API)('BUG-23 ToUnicode / text extraction (dotted letters, A
       expect(subBag(all, SOURCE), JSON.stringify(t.lines.map((l) => l.text))).toBe(true);
     });
 
-    (BUG25(family) ? it.fails : it)(`${BUG25(family) ? 'BUG-25 (expected to fail until fixed): ' : ''}pdf.js: each line extracts back completely (U+200B ignored); digit/tashkeel lines match the drawn-order oracle`, async () => {
+    it(`${family === 'Noto Naskh Arabic' ? 'BUG-25 regression: ' : ''}pdf.js: each line extracts back completely (U+200B ignored); digit/tashkeel lines match the drawn-order oracle`, async () => {
       const t = withoutZw(await extractPdfText(bytes));
       const dump = JSON.stringify(t.lines.map((l) => l.text));
       const runs = (await drawnRuns(bytes)).map((r) => r.text.replace(ZWSP, ''));
@@ -455,8 +455,9 @@ describe.skipIf(!HAS_API)('BUG-22 subset tags (ISO 32000-1 §9.6.4: distinct tag
 });
 
 // ------------------------------------------------------------------------------------------
-type Warning = { code: string; message: string; family?: string; url?: string };
-const W = (code: string, family: string, url: string) => ({ code, family, url, message: expect.any(String) });
+type Warning = { code: string; message: string; family?: string; weight?: number; style?: string; url?: string };
+/** Expected PdfWarning: `weight`/`style` are those of the face the PDF asked for (12e15cb). */
+const W = (code: string, family: string, weight: 400 | 700, url: string) => ({ code, family, weight, style: 'normal', url, message: expect.any(String) });
 
 describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
   let dir: string;
@@ -554,8 +555,8 @@ describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
       expect(r.ps).toEqual(['Cairo-Bold', 'Cairo-Regular']);
       expect(r.fonts).toEqual(bundled.fonts); // same tag ⇒ the bundled Cairo face was embedded
       expect(r.warnings).toEqual([
-        W('FONT_FILE_UNAVAILABLE', 'Cairo', `${base}/${ttfOf('Cairo', 700)}`),
-        W('FONT_FILE_UNAVAILABLE', 'Cairo', `${base}/${ttfOf('Cairo', 400)}`),
+        W('FONT_FILE_UNAVAILABLE', 'Cairo', 700, `${base}/${ttfOf('Cairo', 700)}`),
+        W('FONT_FILE_UNAVAILABLE', 'Cairo', 400, `${base}/${ttfOf('Cairo', 400)}`),
       ]);
       expect(r.warnings.every((w) => w.message.length > 0)).toBe(true);
     });
@@ -564,7 +565,7 @@ describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
       const base = pathToFileURL(join(dir, 'corrupt-ttf')).href;
       const r = await run(multi([['Cairo', false], ['Cairo', false]]), base);
       expect(r.ps).toEqual(['Cairo-Regular']);
-      expect(r.warnings).toEqual([W('FONT_FILE_UNAVAILABLE', 'Cairo', `${base}/${ttfOf('Cairo', 400)}`)]);
+      expect(r.warnings).toEqual([W('FONT_FILE_UNAVAILABLE', 'Cairo', 400, `${base}/${ttfOf('Cairo', 400)}`)]);
     });
 
     it('warnings are de-duplicated per export, not per process: a second export warns again', async () => {
@@ -581,7 +582,7 @@ describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
         await exportPdf({ schema: multi([['Cairo', false], ['Cairo', false], ['Cairo', false]]), rows: [], fontsBaseUrl: base });
         expect(spy).toHaveBeenCalledTimes(1);
         expect(spy.mock.calls[0]![0]).toMatch(/^\[reports-web pdf\] FONT_FILE_UNAVAILABLE: /);
-        expect(spy.mock.calls[0]![1]).toEqual(W('FONT_FILE_UNAVAILABLE', 'Cairo', `${base}/${ttfOf('Cairo', 400)}`));
+        expect(spy.mock.calls[0]![1]).toEqual(W('FONT_FILE_UNAVAILABLE', 'Cairo', 400, `${base}/${ttfOf('Cairo', 400)}`));
       } finally {
         spy.mockRestore();
       }
@@ -589,7 +590,7 @@ describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
 
     it('FONT_FALLBACK_MISSING: custom folder without Noto Sans Arabic → bundled Noto Sans Arabic, one warning (family + fonts.json url)', async () => {
       const base = pathToFileURL(join(dir, 'no-noto-sans-arabic')).href;
-      const want = [W('FONT_FALLBACK_MISSING', 'Noto Sans Arabic', `${base}/fonts.json`)];
+      const want = [W('FONT_FALLBACK_MISSING', 'Noto Sans Arabic', 400, `${base}/fonts.json`)];
       const cairo = await run(multi([['Cairo', false], ['Cairo', false]]), base);
       expect(cairo.ps).toEqual(['Cairo-Regular']);
       expect(cairo.warnings).toEqual(want);
@@ -631,13 +632,13 @@ describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
       requests.length = 0;
       const r = await run(multi([['Cairo', false], ['Cairo', false], ['Cairo', false]]), `${http}missing-ttf/`);
       expect(r.ps).toEqual(['Cairo-Regular']);
-      expect(r.warnings).toEqual([W('FONT_FILE_UNAVAILABLE', 'Cairo', `${http}missing-ttf/${ttfOf('Cairo', 400)}`)]);
+      expect(r.warnings).toEqual([W('FONT_FILE_UNAVAILABLE', 'Cairo', 400, `${http}missing-ttf/${ttfOf('Cairo', 400)}`)]);
       expect(requests.filter((u) => u === `/missing-ttf/${ttfOf('Cairo', 400)}`)).toHaveLength(1);
     });
 
     it('http FONT_FALLBACK_MISSING carries the http fonts.json url', async () => {
       const r = await run(multi([['Cairo', false]]), `${http}no-noto-sans-arabic/`);
-      expect(r.warnings).toEqual([W('FONT_FALLBACK_MISSING', 'Noto Sans Arabic', `${http}no-noto-sans-arabic/fonts.json`)]);
+      expect(r.warnings).toEqual([W('FONT_FALLBACK_MISSING', 'Noto Sans Arabic', 400, `${http}no-noto-sans-arabic/fonts.json`)]);
     });
   });
 });

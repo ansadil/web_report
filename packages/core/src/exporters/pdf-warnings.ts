@@ -22,15 +22,26 @@ export const PdfWarningCode = {
 
 export type PdfWarningCode = (typeof PdfWarningCode)[keyof typeof PdfWarningCode];
 
+/**
+ * One non-fatal problem. Each is reported once per export for the same `code`, `family`
+ * (case-insensitive), `weight` and `url`.
+ */
 export interface PdfWarning {
   readonly code: PdfWarningCode;
   /** Human-readable, English. */
   readonly message: string;
   readonly family?: string;
+  /** CSS weight of the face the PDF asked for (400 regular, 700 bold). */
+  readonly weight?: number;
+  /** CSS style of the face the PDF asked for (PDF text is always `normal`). */
+  readonly style?: 'normal' | 'italic';
   readonly url?: string;
 }
 
-/** Default `onWarning`: `console.warn`. */
+/**
+ * Default `onWarning`: `console.warn`. A custom `onWarning` that throws does not fail the
+ * export: the error is logged with `console.error`.
+ */
 export function defaultPdfWarning(w: PdfWarning): void {
   console.warn(`[reports-web pdf] ${w.code}: ${w.message}`, w);
 }

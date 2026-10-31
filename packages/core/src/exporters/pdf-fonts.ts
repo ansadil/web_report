@@ -8,6 +8,7 @@
 import type { ShapedGlyph, ShapingFace } from './pdf-text-layout.js';
 import fontkit from '@pdf-lib/fontkit';
 import { loadFontManifest, readFontAsset, resolveFontUrl, resolveFontsBaseUrl, type FontManifestEntry } from './fonts-manifest.js';
+import { InvalidFontError, validateTrueType } from './pdf-font-validate.js';
 import { PdfWarningCode, type PdfWarning } from './pdf-warnings.js';
 
 type HarfBuzz = typeof import('harfbuzzjs');
@@ -119,26 +120,34 @@ export class FontLibrary {
   }
 }
 
-/** sfnt magic (TrueType 1.0 / 'true' / 'OTTO') and a parseable table directory. */
+const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * Rejects (with the URL in the message) a file that is not a structurally sound glyf-based
+ * TrueType font, before fontkit or HarfBuzz touch it (BUG-24): see {@link validateTrueType}.
+ * fontkit then parses it eagerly here, inside the caller's promise, so any remaining parse
+ * error rejects instead of surfacing later.
+ */
 function assertFont(bytes: Uint8Array, url: string): void {
-  const magic = bytes.length >= 12 ? ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) >>> 0 : 0;
-  let ok = magic === 0x00010000 || magic === 0x74727565 || magic === 0x4f54544f;
-  if (ok) {
-    try {
-      ok = fontkit.create(bytes).numGlyphs > 0;
-    } catch {
-      ok = false;
-    }
+  try {
+    validateTrueType(bytes);
+    const font = fontkit.create(bytes);
+    if (!(font.numGlyphs > 0)) throw new InvalidFontError('font has no glyphs');
+    // Touch the tables the PDF writer reads later (metrics, cmap, outlines of .notdef).
+    void font.unitsPerEm;
+    void font.bbox;
+    font.glyphForCodePoint(0x20);
+    void font.getGlyph(0).advanceWidth;
+  } catch (err) {
+    throw new Error(`PDF font asset ${url} is not a usable TrueType font: ${errorText(err)}`);
   }
-  if (!ok) throw new Error(`PDF font asset ${url} is not a TrueType/OpenType font`);
 }
 
-const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /**
  * The faces one PDF export uses: its {@link FontLibrary} plus the fallback to the bundled
  * fonts folder when a custom `fontsBaseUrl` cannot provide a face. Each fallback is reported
- * once per face (family + weight) through `onWarning`.
+ * once per code, family, weight and url through `onWarning`.
  */
 export class FontSession {
   private readonly warned = new Set<string>();
@@ -165,11 +174,20 @@ export class FontSession {
     return this.customPromise;
   }
 
-  private warn(w: PdfWarning, bold: boolean): void {
-    const key = `${w.code}|${(w.family ?? '').toLowerCase()}|${bold ? 700 : 400}`;
+  /**
+   * Reports `w` (with the weight/style of the requested face) once per code, family
+   * (case-insensitive), weight and url. A throwing `onWarning` is logged, never fatal.
+   */
+  private warn(warning: Omit<PdfWarning, 'weight' | 'style'>, bold: boolean): void {
+    const w: PdfWarning = { ...warning, weight: bold ? 700 : 400, style: 'normal' };
+    const key = `${w.code}|${(w.family ?? '').toLowerCase()}|${w.weight}|${w.url ?? ''}`;
     if (this.warned.has(key)) return;
     this.warned.add(key);
-    this.onWarning(w);
+    try {
+      this.onWarning(w);
+    } catch (err) {
+      console.error('[reports-web pdf] onWarning threw; the export continues:', err);
+    }
   }
 
   /**

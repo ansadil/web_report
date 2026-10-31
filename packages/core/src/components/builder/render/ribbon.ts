@@ -320,3 +320,11 @@ async function readOpenFile(ev: Event, onOpenText: (text: string) => void): Prom
   if (!file) return;
   onOpenText(await file.text());
 }
+
+async function readOpenFile(ev: Event, onOpenText: (text: string) => void): Promise<void> {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  onOpenText(await file.text());
+}

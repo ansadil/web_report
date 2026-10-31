@@ -50,3 +50,20 @@ describe('escapeHtml', () => {
     expect(escapeHtml(`<a href="x">&'</a>`)).toBe('&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;');
   });
 });
+
+describe('applyPattern date:hijri (Umm al-Qura)', () => {
+  const H = (o: Intl.DateTimeFormatOptions, d: Date, l = 'ar-SA-u-ca-islamic-umalqura') => new Intl.DateTimeFormat(l, o).format(d);
+  const d = new Date(2026, 9, 15, 12);
+  it('defaults to Intl islamic-umalqura dateStyle medium', () => {
+    expect(applyPattern(d, 'date:hijri', 'ar')).toBe(H({ dateStyle: 'medium' }, d));
+    expect(new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura').resolvedOptions().calendar).toBe('islamic-umalqura');
+  });
+  it('reads an ISO date as that local calendar day', () => {
+    expect(applyPattern('2026-10-15', 'date:hijri', 'ar')).toBe(H({ dateStyle: 'medium' }, d));
+  });
+  it('honours options.dateStyle and the English locale', () => {
+    expect(applyPattern(d, 'date:hijri', 'ar', { dateStyle: 'long' })).toBe(H({ dateStyle: 'long' }, d));
+    expect(applyPattern(d, 'date:hijri', 'en', { dateStyle: 'full' })).toBe(H({ dateStyle: 'full' }, d, 'en-u-ca-islamic-umalqura'));
+    expect(applyPattern('nope-not-date', 'date:hijri', 'ar')).toBe('nope-not-date');
+  });
+});

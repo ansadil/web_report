@@ -51,10 +51,18 @@ export class CidFontWriter {
     this.ref = pdf.context.nextRef();
   }
 
-  /** CID for glyph `gid` of source `src` whose advance (1/1000 em) inside the run is `width`. */
+  private notdefUsed = false;
+
+  /**
+   * CID for glyph `gid` of source `src` with advance `width` (1/1000 em) and ToUnicode
+   * `text`. Every .notdef maps to CID 0, which keeps the first width it was given: callers
+   * position the next glyph from {@link widthOf}.
+   */
   cid(src: number, gid: number, width: number, text: string): number {
     if (gid === 0) {
-      this.entries[0] = { src: 0, gid: 0, width, text: this.entries[0]!.text || text };
+      const e = this.entries[0]!;
+      this.entries[0] = { src: 0, gid: 0, width: this.notdefUsed ? e.width : width, text: e.text || text };
+      this.notdefUsed = true;
       return 0;
     }
     const key = `${src}|${gid}|${width}|${text}`;
@@ -66,6 +74,11 @@ export class CidFontWriter {
       this.cids.set(key, cid);
     }
     return cid;
+  }
+
+  /** /W width (1/1000 em) of `cid`. */
+  widthOf(cid: number): number {
+    return this.entries[cid]!.width;
   }
 
   /** Write font program, descriptor, CID font and Type0 dictionaries. Call once, before save. */
@@ -185,6 +198,17 @@ export class CidFontWriter {
       }),
     );
   }
+}
+
+/**
+ * Whether text extractors give a glyph with this ToUnicode text no advance: pdf.js
+ * (`buildTextContentItem`) skips format characters (\p{Cf}: ZWSP, ZWNJ, ZWJ, LRM, RLM...)
+ * entirely and draws non-spacing marks (\p{Mn}) with width 0, whatever /W says; a leading
+ * white-space character wins. Such glyphs are written with /W 0 (BUG-25).
+ */
+export function advancelessForExtractors(text: string): boolean {
+  const m = /^(\s)|(\p{Mn})|(\p{Cf})$/u.exec(text || ZWSP);
+  return m !== null && m[1] === undefined;
 }
 
 /** Hex string operand for a sequence of CIDs (Identity-H: two bytes each). */

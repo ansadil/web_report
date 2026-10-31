@@ -3,9 +3,12 @@ import {
   PDFName,
   PDFOperator,
   StandardFonts,
+  beginMarkedContent,
   beginText,
   degrees,
+  endMarkedContent,
   endText,
+  moveText,
   popGraphicsState,
   pushGraphicsState,
   rgb,
@@ -32,7 +35,7 @@ import { TextLayouter, wrapText, type FaceChain, type LaidOutLine } from './pdf-
 import { FontSession, fontLibrary, type LoadedFace } from './pdf-fonts.js';
 import { defaultPdfWarning } from './pdf-warnings.js';
 import { FALLBACK_ARABIC_FAMILY, FALLBACK_LATIN_FAMILY, resolveFontFamily, type FontManifestEntry } from './fonts-manifest.js';
-import { CidFontWriter, cidHex } from './pdf-cid-font.js';
+import { CidFontWriter, advancelessForExtractors, cidHex } from './pdf-cid-font.js';
 import type { PdfExportInput } from './pdf.js';
 import { drawBarcodeBars, drawImageContain, drawQr, embedRaster, encodeBarcode, loadImageBytes } from './pdf-graphics.js';
 
@@ -310,12 +313,23 @@ class HarfBuzzEngine implements TextEngine {
   }
 
   /**
-   * A line is written in visual order as one positioned string: the Arabic face and the Latin
-   * fallback are glyph sources of the same merged PDF font, so a mixed line never switches
-   * fonts. Each glyph gets a CID whose width equals the distance to the next glyph, so the PDF
-   * viewer reproduces HarfBuzz' positions exactly and never re-orders or re-shapes anything.
-   * Marks with a vertical offset are raised/lowered with `Ts` (text rise) inside the same text
-   * object, so extractors still see one continuous string.
+   * A line is written in visual order: the Arabic face and the Latin fallback are glyph
+   * sources of the same merged PDF font, so a mixed line never switches fonts, and the PDF
+   * viewer never re-orders or re-shapes anything.
+   *
+   * Positions (BUG-25): a CID's /W width is 0 when its ToUnicode text is a format character
+   * (ZWSP for the extra glyphs of a decomposed cluster, ZWNJ...) or a non-spacing mark —
+   * glyphs text extractors such as pdf.js do not advance over. Every other glyph spans to the
+   * next spacing glyph of the line as HarfBuzz placed it (the last one: its advance), so
+   * an extractor sees a gap-free run and inserts no fake spaces; widths are never
+   * negative. Wherever the pen then differs from the next glyph's position, the string is
+   * ended and `Td` moves to the exact position: viewers draw every glyph exactly where
+   * HarfBuzz put it (same positions as before) and extractors track the same pen. Before,
+   * ZWSP-mapped dots carried non-zero (mostly negative) widths that pdf.js skips, so its pen
+   * drifted right and glyphs past the page edge — the first words of long RTL lines — were
+   * dropped.
+   * Marks with a vertical offset are raised/lowered with `Ts` (text rise) inside the same
+   * text object. A line drawn mark-first is wrapped in a `/Span` marked-content sequence.
    */
   draw(page: PDFPage, line: EngineLine, o: DrawOptions): void {
     const { laid, slots } = line as UnicodeLine;
@@ -327,47 +341,70 @@ class HarfBuzzEngine implements TextEngine {
     const ops: PDFOperator[] = [];
     const useGs = o.opacity != null && o.opacity < 1;
     if (useGs) ops.push(pushGraphicsState(), setGraphicsState(this.gsKey(page, o.opacity!)));
+    // pdf.js appends a non-spacing mark to the text item that is still open, i.e. the previous
+    // line's, when no spacing glyph comes first (an RTL line ending with a haraka is drawn
+    // mark-first). A marked-content span makes it start a new item; viewers ignore it.
+    const markFirst = advancelessForExtractors(laid.glyphs[0]!.text);
+    if (markFirst) ops.push(beginMarkedContent('Span'));
     ops.push(beginText(), setFillingColor(o.color));
 
-    // Integer positions in 1/1000 em, so run widths add up exactly.
+    // Integer positions in 1/1000 em, so widths and moves add up exactly.
     const q = (n: number): number => Math.round(n * 1000);
+    // Text-space distance of `units` 1/1000 em (exact up to 1e-6, no 1e-3 rounding drift).
+    const dist = (units: number): number => Math.round(units * o.size * 1000) / 1e6;
     const glyphs = laid.glyphs;
     const slot = (k: number): FontSlot => slots.get(glyphs[k]!.face as LoadedFace)!;
     let currentWriter: CidFontWriter | null = null;
     let rise = 0;
-    let i = 0;
-    while (i < glyphs.length) {
-      const first = glyphs[i]!;
-      const { writer, name } = slot(i);
-      const y = q(first.y);
-      // A run: same PDF font and same vertical offset.
-      let j = i + 1;
-      while (j < glyphs.length && slot(j).writer === writer && q(glyphs[j]!.y) === y) j++;
-      const cids: number[] = [];
-      for (let k = i; k < j; k++) {
-        const g = glyphs[k]!;
-        // Width = distance to the next glyph of the line; the last glyph keeps its advance.
-        const width = k + 1 < glyphs.length ? q(glyphs[k + 1]!.x) - q(g.x) : q(g.advance);
-        cids.push(writer.cid(slot(k).src, g.gid, width, g.text));
-      }
+    let lineX = 0; // x of the text line matrix (Tm / last Td), 1/1000 em
+    let pen = 0; // where the next glyph of the current string will be drawn, 1/1000 em
+    const cids: number[] = [];
+    const flush = (): void => {
+      if (cids.length) ops.push(showText(cidHex(cids)));
+      cids.length = 0;
+    };
+    for (let k = 0; k < glyphs.length; k++) {
+      const g = glyphs[k]!;
+      const { writer, name, src } = slot(k);
+      const x = q(g.x);
       if (writer !== currentWriter) {
+        flush();
         ops.push(setFontAndSize(this.fontKey(page, writer, name), o.size));
         if (currentWriter === null) {
-          const gx = (q(first.x) / 1000) * o.size;
+          const gx = (x / 1000) * o.size;
           ops.push(setTextMatrix(r(cos), r(sin), r(-sin), r(cos), r(o.x + gx * cos), r(o.y + gx * sin)));
+          lineX = pen = x;
         }
         currentWriter = writer;
       }
-      const wantRise = r((y / 1000) * o.size);
+      if (x !== pen) {
+        flush();
+        ops.push(moveText(dist(x - lineX), 0));
+        lineX = pen = x;
+      }
+      const wantRise = r((q(g.y) / 1000) * o.size);
       if (wantRise !== rise) {
+        flush();
         ops.push(setTextRise(wantRise));
         rise = wantRise;
       }
-      ops.push(showText(cidHex(cids)));
-      i = j;
+      // A spacing glyph spans to the next spacing glyph (as HarfBuzz placed it), so extractors
+      // see one gap-free run; glyphs extractors do not advance over get 0. Never negative:
+      // where the pen and the next glyph differ, `Td` repositions.
+      let width = 0;
+      if (!advancelessForExtractors(g.text)) {
+        let j = k + 1;
+        while (j < glyphs.length && advancelessForExtractors(glyphs[j]!.text)) j++;
+        width = Math.max(0, j < glyphs.length ? q(glyphs[j]!.x) - x : q(g.advance));
+      }
+      const cid = writer.cid(src, g.gid, width, g.text);
+      cids.push(cid);
+      pen = x + writer.widthOf(cid);
     }
+    flush();
     if (rise !== 0) ops.push(setTextRise(0));
     ops.push(endText());
+    if (markFirst) ops.push(endMarkedContent());
     if (useGs) ops.push(popGraphicsState());
     page.pushOperators(...ops);
   }

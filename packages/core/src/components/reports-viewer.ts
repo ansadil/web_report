@@ -10,6 +10,7 @@ import type { ChartAdapter, ChartHandle } from '../adapters/chart/index.js';
 import { createChartJsAdapter } from '../adapters/chart/index.js';
 import { interpret } from '../engine/interpreter.js';
 import { renderHtml } from '../engine/renderer-html.js';
+import { buildDataQuery, ParameterValidationError, parameterValuesEqual, type ParameterValues } from '../engine/parameters.js';
 import { t } from '../i18n/strings.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
@@ -226,6 +227,13 @@ export class ReportsViewerElement extends LitElement {
   /** When set, render as one continuous scroll (no stacked page sheets). */
   @property({ type: Boolean, attribute: 'hide-page-boundaries' }) hidePageBoundaries = false;
   @property({ attribute: false }) actions: readonly ViewerAction[] = VIEWER_DEFAULT_ACTIONS;
+  /**
+   * Report parameter values keyed by `ParameterDef.name`. Resolved against `schema.parameters`
+   * (value ?? default, type coercion, required check) and merged into `DataQuery.params` on fetch.
+   * Compared structurally, so passing an equal new object does not refetch.
+   */
+  @property({ attribute: false, hasChanged: (a: ParameterValues | null, b: ParameterValues | null) => !parameterValuesEqual(a, b) })
+  params: ParameterValues | null = null;
 
   @state() private _phase: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
   @state() private _error = '';
@@ -261,6 +269,7 @@ export class ReportsViewerElement extends LitElement {
       changed.has('schema') ||
       changed.has('rows') ||
       changed.has('dataAdapter') ||
+      changed.has('params') ||
       changed.has('locale') ||
       changed.has('dir') ||
       changed.has('hidePageBoundaries')
@@ -286,7 +295,8 @@ export class ReportsViewerElement extends LitElement {
     this._destroyCharts();
     this._clearCodes();
     this._abort?.abort();
-    this._abort = new AbortController();
+    const abort = new AbortController();
+    this._abort = abort;
 
     if (!this.schema) {
       this._phase = 'idle';
@@ -326,11 +336,11 @@ export class ReportsViewerElement extends LitElement {
       if (this.rows) {
         rows = this.rows;
       } else {
+        const query = buildDataQuery(finalSchema, this.params);
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
-        rows = await adapter.fetch(
-          { source: finalSchema.dataset.source, params: finalSchema.dataset.params ?? {} },
-          this._abort.signal,
-        );
+        rows = await adapter.fetch(query, abort.signal);
+        // a newer render (e.g. parameter change) superseded this one
+        if (abort.signal.aborted) return;
       }
       const tree = interpret({ schema: finalSchema, rows });
       const rendered = renderHtml(tree, { idPrefix: 'rw-v', visualPages: !this.hidePageBoundaries });
@@ -343,9 +353,15 @@ export class ReportsViewerElement extends LitElement {
       void this._renderCodes(this._codeIds);
       this.dispatchEvent(new CustomEvent('report-rendered', { detail: { sections: tree.sections.length, rows: rows.length } }));
     } catch (e) {
+      if (abort.signal.aborted) return;
       this._phase = 'error';
       this._error = e instanceof Error ? e.message : String(e);
-      logger.error('reports-viewer', 'render failed', { error: this._error });
+      if (e instanceof ParameterValidationError) {
+        logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
+        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues } }));
+      } else {
+        logger.error('reports-viewer', 'render failed', { error: this._error });
+      }
       this._html = '';
       this._chartIds = [];
       this._codeIds = [];
@@ -590,7 +606,7 @@ export class ReportsViewerElement extends LitElement {
       let rows = this.rows;
       if (!rows) {
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
-        rows = await adapter.fetch({ source: finalSchema.dataset.source, params: finalSchema.dataset.params ?? {} });
+        rows = await adapter.fetch(buildDataQuery(finalSchema, this.params));
       }
       if (kind === 'pdf') {
         const { exportPdf } = await import('../exporters/pdf.js');

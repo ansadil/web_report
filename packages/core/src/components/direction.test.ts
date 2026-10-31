@@ -89,3 +89,30 @@ describe('reports-builder canvas follows the template', () => {
     b.remove();
   });
 });
+
+describe('host dir attribute follows the template without becoming an override', () => {
+  it('viewer host gets dir=rtl, then flips back when the template becomes English', async () => {
+    const v = document.createElement('reports-viewer') as ReportsViewerElement;
+    document.body.appendChild(v);
+    v.schema = schema({ locale: 'ar' });
+    v.rows = [{ x: 1 }];
+    await rendered(v);
+    expect(v.getAttribute('dir')).toBe('rtl');
+    expect(v.dir).toBe('');
+    v.schema = schema({ locale: 'en' });
+    await rendered(v);
+    expect(v.getAttribute('dir')).toBe('ltr');
+    v.remove();
+  });
+  it('an explicit dir attribute is kept as an override', async () => {
+    const v = document.createElement('reports-viewer') as ReportsViewerElement;
+    v.setAttribute('dir', 'ltr');
+    document.body.appendChild(v);
+    v.schema = schema({ locale: 'ar' });
+    v.rows = [{ x: 1 }];
+    await rendered(v);
+    expect(v.dir).toBe('ltr');
+    expect(v.shadowRoot!.querySelector('.surface')!.getAttribute('dir')).toBe('ltr');
+    v.remove();
+  });
+});

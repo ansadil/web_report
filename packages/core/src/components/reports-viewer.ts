@@ -13,7 +13,7 @@ import { renderHtml } from '../engine/renderer-html.js';
 import { t } from '../i18n/strings.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
-import { resolveDir, resolveLocale } from './direction.js';
+import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 
 type ViewerAction = 'print' | 'pdf' | 'excel' | 'csv' | 'image';
 const VIEWER_ACTION_KIND: Record<ViewerAction, 'print' | 'pdf' | 'excel' | 'csv' | 'png'> = {
@@ -195,15 +195,31 @@ export class ReportsViewerElement extends LitElement {
   @property({ attribute: false }) chartAdapter: ChartAdapter | null = null;
   /** Optional host override. When unset, the template's meta.locale is used. */
   @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
-  /** Optional host override. When unset, the template's meta.dir (or its locale) decides. */
-  @property({ type: String, reflect: true }) override dir: 'rtl' | 'ltr' | '' = '';
+  /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
+  @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
+  private _syncingDir = false;
+
+  override attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    if (name === 'dir' && this._syncingDir) return;
+    super.attributeChangedCallback(name, old, value);
+  }
+
+  private _syncHostDir(effective: 'rtl' | 'ltr'): void {
+    if (this.getAttribute('dir') === effective) return;
+    this._syncingDir = true;
+    try {
+      this.setAttribute('dir', effective);
+    } finally {
+      this._syncingDir = false;
+    }
+  }
 
   private get _locale(): 'ar' | 'en' {
     return resolveLocale(this.locale, this.schema?.meta);
   }
 
   private get _dir(): 'rtl' | 'ltr' {
-    return resolveDir(this.dir, this.schema?.meta, this._locale);
+    return resolveDir(this.dirOverride, this.schema?.meta, this._locale);
   }
   @property({ type: Boolean, attribute: 'no-toolbar' }) noToolbar = false;
   @property({ type: Boolean, attribute: 'hide-view-controls' }) hideViewControls = false;
@@ -240,6 +256,7 @@ export class ReportsViewerElement extends LitElement {
   }
 
   override updated(changed: Map<PropertyKey, unknown>): void {
+    this._syncHostDir(this._dir);
     if (
       changed.has('schema') ||
       changed.has('rows') ||
@@ -300,7 +317,7 @@ export class ReportsViewerElement extends LitElement {
 
     const finalSchema: ReportSchemaV1 = {
       ...validation.value,
-      meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dir, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) },
+      meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dirOverride, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) },
     };
 
     this._phase = 'loading';
@@ -569,7 +586,7 @@ export class ReportsViewerElement extends LitElement {
       }
       const validation = validateReport(this.schema);
       if (!validation.ok) throw new Error(validation.error);
-      const finalSchema: ReportSchemaV1 = { ...validation.value, meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dir, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) } };
+      const finalSchema: ReportSchemaV1 = { ...validation.value, meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dirOverride, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) } };
       let rows = this.rows;
       if (!rows) {
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
@@ -630,6 +647,8 @@ export class ReportsViewerElement extends LitElement {
     `;
   }
 }
+
+installDirOverride(ReportsViewerElement.prototype);
 
 if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer')) {
   customElements.define('reports-viewer', ReportsViewerElement);

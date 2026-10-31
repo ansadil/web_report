@@ -20,3 +20,21 @@ export function resolveDir(host: string | undefined | null, meta?: MetaLike | nu
   if (meta?.dir) return meta.dir;
   return (locale ?? meta?.locale) === 'ar' ? 'rtl' : 'ltr';
 }
+
+/**
+ * `dir` is a host override (explicit attribute or property). When it is unset,
+ * the component still writes the resolved direction to its own `dir` attribute
+ * so the host element lays out correctly, without that write counting as an override.
+ */
+export function installDirOverride(proto: object): void {
+  Object.defineProperty(proto, 'dir', {
+    configurable: true,
+    enumerable: true,
+    get(this: { dirOverride: '' | 'rtl' | 'ltr' }) {
+      return this.dirOverride;
+    },
+    set(this: { dirOverride: '' | 'rtl' | 'ltr' }, v: unknown) {
+      this.dirOverride = v === 'rtl' || v === 'ltr' ? v : '';
+    },
+  });
+}

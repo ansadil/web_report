@@ -2,7 +2,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
 import type { FieldMeta, Row } from '@reports-web/shared';
 import { MM_TO_PX } from '@reports-web/shared';
-import { resolveDir, resolveLocale } from './direction.js';
+import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 import type {
   Element as ReportElement,
   Band,
@@ -777,15 +777,31 @@ export class ReportsBuilderElement extends LitElement {
   @property({ attribute: false }) sampleRows: readonly Row[] | null = null;
   /** UI language override. When unset, follows the template's meta.locale. */
   @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
-  /** UI chrome direction override. The canvas always follows the template's meta.dir. */
-  @property({ type: String, reflect: true }) override dir: 'rtl' | 'ltr' | '' = '';
+  /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
+  @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
+  private _syncingDir = false;
+
+  override attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    if (name === 'dir' && this._syncingDir) return;
+    super.attributeChangedCallback(name, old, value);
+  }
+
+  private _syncHostDir(effective: 'rtl' | 'ltr'): void {
+    if (this.getAttribute('dir') === effective) return;
+    this._syncingDir = true;
+    try {
+      this.setAttribute('dir', effective);
+    } finally {
+      this._syncingDir = false;
+    }
+  }
 
   private get _uiLocale(): 'ar' | 'en' {
     return resolveLocale(this.locale, this._schema.meta);
   }
 
   private get _uiDir(): 'rtl' | 'ltr' {
-    return resolveDir(this.dir, null, this._uiLocale);
+    return resolveDir(this.dirOverride, this._schema.meta, this._uiLocale);
   }
 
   /** Direction of the report canvas: always the template's own. */
@@ -900,6 +916,7 @@ export class ReportsBuilderElement extends LitElement {
   }
 
   override updated(changed: Map<PropertyKey, unknown>): void {
+    this._syncHostDir(this._uiDir);
     let schemaChanged = false;
     if (changed.has('schema') && this.schema) {
       const v = validateReport(this.schema);
@@ -2714,6 +2731,8 @@ export class ReportsBuilderElement extends LitElement {
     this._replaceSchema(v.value, { resetHistory: true });
   }
 }
+
+installDirOverride(ReportsBuilderElement.prototype);
 
 if (typeof customElements !== 'undefined' && !customElements.get('reports-builder')) {
   customElements.define('reports-builder', ReportsBuilderElement);

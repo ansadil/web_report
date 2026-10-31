@@ -10,6 +10,7 @@ import {
   pdfHasImageXObject, embeddedFontSummary, norm, drawnRuns, type PdfText,
 } from './helpers/pdf-text.js';
 import { arabicSchema, CORPUS, ROWS, singleElementSchema, mustValidate } from './helpers/fixtures.js';
+import { visualOrderRtl, drawnContainsVisual, inkOnly } from './helpers/visual-order.js';
 
 const MM = 72 / 25.4;
 let bytes: Uint8Array;
@@ -43,7 +44,21 @@ describe('PDF numbers keep digit order', () => {
   it('BUG-02 Hijri date string «١٥ رمضان ١٤٤٧ هـ»', () => expectLogical(CORPUS.hijri));
   it('BUG-02 formatted price field 1234.56 (decimal2, ar)', () => expectLogical(applyPattern(1234.56, 'decimal2', 'ar')));
   it('BUG-02 formatted price field 23.50 (decimal2, ar)', () => expectLogical(applyPattern(23.5, 'decimal2', 'ar')));
-  it('BUG-02 formatted date field 2026-10-15 (date:short, ar)', () => expectLogical(applyPattern('2026-10-15', 'date:short', 'ar')));
+  // date:short in 'ar' contains U+200F RLM between the parts (Intl output). The RLMs are
+  // invisible, so pdf.js cannot rebuild the logical string from the drawn glyphs; judge the
+  // date by its actual drawing order (drawnRuns) against the UAX #9 visual order instead.
+  // See evidence/after/claims (QA verification of fix/pdf-arabic-text).
+  it('BUG-02 formatted date field 2026-10-15 (date:short, ar) is drawn in UAX#9 RTL visual order', async () => {
+    const logical = applyPattern('2026-10-15', 'date:short', 'ar');
+    const runs = (await drawnRuns(bytes)).map((r) => r.text);
+    expect(
+      drawnContainsVisual(runs, logical),
+      `expected a drawn run «${visualOrderRtl(logical)}» (visual L→R of «${inkOnly(logical)}»); drawn: ${JSON.stringify(runs.map(inkOnly).filter((r) => /[0-9٠-٩]/.test(r)))}`,
+    ).toBe(true);
+  });
+  it('BUG-02 formatted date field 2026-10-15 (date:short, ar): every digit group is extractable', () => {
+    for (const part of inkOnly(applyPattern('2026-10-15', 'date:short', 'ar')).split(/[^0-9٠-٩]+/).filter(Boolean)) expectLogical(part);
+  });
   it('BUG-02 report total sum(price) = 1258.06', () => expectLogical(applyPattern(1258.06, 'decimal2', 'ar')));
 });
 
@@ -188,10 +203,33 @@ describe('PDF page tokens — approved: {page}/{pages} + aliases {صفحة}/{ص�
     expect(p2).toMatch(/هذه الصفحة [2٢] من التقرير/);
   });
   it('BUG-15 PDF multiple/mixed tokens in one string «{page} و {صفحة} من {pages} و {صفحات}»', async () => {
-    const [p1, p2] = await pages('{page} و {صفحة} من {pages} و {صفحات}');
-    expect(p1 + p2).not.toMatch(/[{}]/);
-    expect(p1).toMatch(/[1١] و [1١] من [2٢] و [2٢]/);
-    expect(p2).toMatch(/[2٢] و [2٢] من [2٢] و [2٢]/);
+    // pdf.js classifies this digit-heavy line as LTR and re-orders it (extracts «2 و 1 من 2 و 1»
+    // for a correctly drawn page 1), so the order is judged by drawnRuns against UAX #9 instead.
+    const b = await toBytes(await exportPdf({ schema: pn('{page} و {صفحة} من {pages} و {صفحات}'), rows: [] }));
+    const t = await extractPdfText(b);
+    expect(t.numPages).toBe(2);
+    expect(t.lines.map((l) => l.text).join('\n')).not.toMatch(/[{}]/);
+    const runs = await drawnRuns(b);
+    const ok = (page: number, logicalWestern: string) => {
+      const onPage = runs.filter((r) => r.page === page).map((r) => r.text);
+      const eastern = logicalWestern.replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[+d]);
+      return {
+        pass: drawnContainsVisual(onPage, logicalWestern) || drawnContainsVisual(onPage, eastern),
+        msg: `page ${page}: expected drawn «${visualOrderRtl(logicalWestern)}» (or Eastern digits); drawn: ${JSON.stringify(onPage.map(inkOnly))}`,
+      };
+    };
+    const r1 = ok(1, '1 و 1 من 2 و 2');
+    const r2 = ok(2, '2 و 2 من 2 و 2');
+    expect(r1.pass, r1.msg).toBe(true);
+    expect(r2.pass, r2.msg).toBe(true);
+  });
+  it('QA oracle: visualOrderRtl matches UAX #9 / Chromium for pinned cases', () => {
+    // Pinned from Chromium (ICU) rendering in dir=rtl — guards the oracle itself.
+    expect(visualOrderRtl('1 و 1 من 2 و 2')).toBe('2 و 2 نم 1 و 1');
+    expect(visualOrderRtl('١٥\u200f/١٠\u200f/٢٠٢٦')).toBe('٢٠٢٦/١٠/١٥');
+    expect(visualOrderRtl('١٥/١٠/٢٠٢٦')).toBe('١٥/١٠/٢٠٢٦');
+    expect(visualOrderRtl('صفحة 1 من 8')).toBe('8 نم 1 ةحفص');
+    expect(visualOrderRtl('منتج ABC-123 (إصدار 2)')).toBe(')2 رادصإ( ABC-123 جتنم');
   });
 });
 

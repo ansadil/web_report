@@ -55,7 +55,9 @@ describe('docs and test quality', () => {
   }, 180_000);
 
   it('BUG-09 default suite contains a PDF text-content assertion (not only "%PDF" magic bytes)', () => {
-    const r = sh(`grep -rlE "getTextContent|pdfjs-dist|extractPdfText" --include=*.test.ts packages/*/src || true`, ROOT);
+    // Accept either an extractor (pdf.js) or reading drawn text back via the font ToUnicode CMap
+    // (bfchar/bfrange) — both inspect real PDF text, unlike a "%PDF" magic-bytes check.
+    const r = sh(`grep -rlE "getTextContent|pdfjs-dist|extractPdfText|beginbfchar|beginbfrange" --include=*.test.ts packages/*/src || true`, ROOT);
     expect(r.stdout.trim(), 'no default test inspects PDF text').not.toBe('');
   });
 });

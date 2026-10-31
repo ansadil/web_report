@@ -23,6 +23,8 @@ export const propertiesStyles = css`
     .cat.closed .cat-b { display: none; }
     .cat-h .cnt { margin-inline-start: auto; color: var(--rb-muted); font-weight: 500; font-size: 10.5px; }
     .prow { display: grid; grid-template-columns: 44% 56%; border-top: 1px solid #eef1f6; min-height: 27px; }
+    /* Author display beats the UA [hidden] rule, so a search hit never hid the row. */
+    .prow[hidden] { display: none !important; }
     .prow.hl { background: #fff8f2; }
     .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .bool { display: flex; align-items: center; gap: 4px; }
@@ -35,14 +37,23 @@ export const propertiesStyles = css`
     .prow .v input:hover, .prow .v select:hover { border-color: var(--rb-border); }
     .prow .v input:focus { border-color: #8db7e8; background: #fff; }
     .prow .v select.pick, .prow .v select {
-      appearance: none; padding-inline: 2px 18px; cursor: pointer; width: 100%;
+      appearance: none; padding-top: 0; padding-bottom: 0; padding-inline: 2px 18px; cursor: pointer; width: 100%;
+      height: 26px; min-height: 26px; line-height: 20px; box-sizing: border-box;
       background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
-      background-position: calc(100% - 10px) 10px, calc(100% - 6px) 10px;
+      background-position: calc(100% - 10px) 11px, calc(100% - 6px) 11px;
       background-size: 4px 4px, 4px 4px;
       background-repeat: no-repeat;
     }
+    .prow .v .pick select { height: 100%; min-height: 0; line-height: inherit; padding: 0; }
     .color-value { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
-    .color-value .swatch { width: 16px; height: 16px; padding: 0; border: 1px solid rgba(0,0,0,.15); border-radius: 4px; flex: none; background: transparent; }
+    .prow .v .color-value input.swatch {
+      appearance: none; -webkit-appearance: none;
+      width: 16px; height: 16px; min-width: 16px; max-width: 16px; min-height: 16px;
+      padding: 0; flex: 0 0 16px; box-sizing: border-box;
+      border: 1px solid rgba(0,0,0,.15); border-radius: 4px; background: transparent;
+    }
+    .prow .v .color-value input.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    .prow .v .color-value input.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
     .color-value .hex { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: start; }
     .prow .name-value { direction: ltr; text-align: start; }
     .pick { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; }

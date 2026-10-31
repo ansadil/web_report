@@ -62,4 +62,87 @@ describe('property grid editing and RTL digits', () => {
     expect(builder.getSchema().bands.detail.elements[0]?.pos.x).toBe(10);
     expect(builder.getAttribute('dir')).toBe('rtl');
   });
+
+  it('BUG-46: property selects fit their closed text', async () => {
+    builder = document.createElement('reports-builder');
+    document.body.appendChild(builder);
+    builder.locale = 'ar';
+    builder.dir = 'rtl';
+    builder.schema = schema();
+    await flush(builder);
+
+    const check = (select: HTMLSelectElement) => {
+      const cs = getComputedStyle(select);
+      expect(parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)).toBe(0);
+      const line = parseFloat(cs.lineHeight);
+      const height = select.getBoundingClientRect().height || parseFloat(cs.height);
+      if (Number.isFinite(line) && Number.isFinite(height) && height > 0) expect(line).toBeLessThanOrEqual(height);
+      if (select.clientHeight > 0) expect(select.scrollHeight).toBeLessThanOrEqual(select.clientHeight);
+      expect((select.selectedOptions[0]?.textContent ?? '').length).toBeGreaterThan(0);
+    };
+
+    for (const id of ['prop-paper-size', 'prop-page-orientation', 'prop-locale', 'prop-direction']) {
+      check(builder.shadowRoot!.querySelector<HTMLSelectElement>(`[data-testid="${id}"]`)!);
+    }
+
+    const element = builder.shadowRoot!.querySelector<HTMLElement>('[data-testid="element-title"]')!;
+    element.setPointerCapture = () => undefined;
+    element.releasePointerCapture = () => undefined;
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 8, clientY: 8 }));
+    await flush(builder);
+    const font = builder.shadowRoot!.querySelector<HTMLSelectElement>('[data-testid="prop-font-family"]')!;
+    expect(font.selectedOptions[0]?.textContent).toBe('Cairo');
+    check(font);
+  });
+
+  it('BUG-48: the color swatch is a square', async () => {
+    builder = document.createElement('reports-builder');
+    document.body.appendChild(builder);
+    builder.locale = 'en';
+    builder.dir = 'ltr';
+    builder.schema = schema();
+    await flush(builder);
+    const element = builder.shadowRoot!.querySelector<HTMLElement>('[data-testid="element-title"]')!;
+    element.setPointerCapture = () => undefined;
+    element.releasePointerCapture = () => undefined;
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 8, clientY: 8 }));
+    await flush(builder);
+    const swatch = builder.shadowRoot!.querySelector<HTMLElement>('.color-value input.swatch')!;
+    const cs = getComputedStyle(swatch);
+    expect(cs.width).toBe(cs.height);
+    expect(parseFloat(cs.width)).toBe(16);
+    expect(parseFloat(cs.height)).toBe(16);
+  });
+
+  it('BUG-51: searching خط shows only matching property rows', async () => {
+    builder = document.createElement('reports-builder');
+    document.body.appendChild(builder);
+    builder.locale = 'ar';
+    builder.dir = 'rtl';
+    builder.schema = schema();
+    await flush(builder);
+    const element = builder.shadowRoot!.querySelector<HTMLElement>('[data-testid="element-title"]')!;
+    element.setPointerCapture = () => undefined;
+    element.releasePointerCapture = () => undefined;
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: 8, clientY: 8 }));
+    await flush(builder);
+
+    const input = builder.shadowRoot!.querySelector<HTMLInputElement>('.prop-search input')!;
+    input.value = 'خط';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const rows = [...builder.shadowRoot!.querySelectorAll<HTMLElement>('.prow')];
+    const matched = rows.filter((row) => (row.querySelector('.k')?.textContent ?? '').includes('خط'));
+    const rest = rows.filter((row) => !(row.querySelector('.k')?.textContent ?? '').includes('خط'));
+    expect(matched.length).toBeGreaterThan(0);
+    expect(rest.length).toBeGreaterThan(0);
+    for (const row of matched) {
+      expect(row.hidden).toBe(false);
+      expect(getComputedStyle(row).display).not.toBe('none');
+    }
+    for (const row of rest) {
+      expect(row.hidden).toBe(true);
+      expect(getComputedStyle(row).display).toBe('none');
+    }
+  });
 });

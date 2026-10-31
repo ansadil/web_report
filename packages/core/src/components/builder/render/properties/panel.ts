@@ -2,7 +2,7 @@ import { html } from 'lit';
 import type { FieldMeta } from '@reports-web/shared';
 import { lineThicknessMm, t } from '../../api.js';
 import type { ConditionalFormatRule, ReportElement, Style } from '../../api.js';
-import { elementStatusName } from '../../status-bar.js';
+import { elementStatusName, formatLocalizedNumber, parseLocalizedNumber } from '../../status-bar.js';
 import type { BandKey } from '../../types.js';
 import { renderDocumentProperties, type DocumentCallbacks, type DocumentState } from './document.js';
 import { renderKindSpecific } from './kinds/index.js';
@@ -61,8 +61,21 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
   const updateStyle = (patch: Partial<Style>) => update({ style: { ...(el.style ?? {}), ...patch } });
   const border = el.style?.border ?? {};
 
-  const cm = (mm: number) => (mm / 10).toFixed(2);
-  const setCm = (axis: 'x' | 'y' | 'w' | 'h', raw: string) => update({ pos: { ...el.pos, [axis]: Number(raw) * 10 } });
+  const fmt = { locale: state.locale, digits: state.schema.meta.pageNumberDigits ?? ('locale' as const) };
+  const cm = (mm: number) => formatLocalizedNumber(mm / 10, fmt, 2);
+  const setCm = (axis: 'x' | 'y' | 'w' | 'h', raw: string) => {
+    const n = parseLocalizedNumber(raw);
+    if (Number.isFinite(n)) update({ pos: { ...el.pos, [axis]: n * 10 } });
+  };
+  const arabic = state.locale.toLowerCase().startsWith('ar');
+  const xLabel = t(state.locale, !arabic && state.schema.meta.dir !== 'rtl' ? 'propXLeft' : 'propXRight');
+  const family = (el.style?.font ?? '').split(',')[0]?.trim().replace(/^['"]|['"]$/g, '') || 'Cairo';
+  const hex = colorInputValue(el.style?.color);
+  const alignLabel = el.style?.align === 'start' ? t(state.locale, 'alignStart')
+    : el.style?.align === 'center' ? t(state.locale, 'alignCenter')
+    : el.style?.align === 'end' ? t(state.locale, 'alignEnd')
+    : el.style?.align === 'justify' ? t(state.locale, 'alignJustify')
+    : '—';
   return html`
     <div class="prop-grid" data-testid="property-grid">
       <div class="prop-card">
@@ -79,24 +92,25 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
       <div class="prop-search"><input placeholder=${t(state.locale, 'properties')} @input=${filterRows} /></div>
       <div class="props-body">
       <section class="cat">
-        <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">4</span></div>
-        ${gridRow('x', html`<input data-testid="prop-x" .value=${cm(el.pos.x)} @input=${(e: Event) => setCm('x', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
-        ${gridRow('y', html`<input data-testid="prop-y" .value=${cm(el.pos.y)} @input=${(e: Event) => setCm('y', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
-        ${gridRow('w', html`<input data-testid="prop-width" .value=${cm(el.pos.w)} @input=${(e: Event) => setCm('w', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
-        ${gridRow('h', html`<input data-testid="prop-height" .value=${el.kind === 'line' ? String(lineThicknessMm(el.kind === 'line' ? el.thickness ?? 1 : 1)) : cm(el.pos.h)} ?disabled=${el.kind === 'line' && el.orientation === 'horizontal'} @input=${(e: Event) => setCm('h', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">5</span></div>
+        ${gridRow(t(state.locale, 'propName'), html`<input class="name-value" data-testid="prop-name" .value=${elementStatusName(el, state.locale)} readonly />`)}
+        ${gridRow(xLabel, html`<input data-testid="prop-x" .value=${cm(el.pos.x)} @input=${(e: Event) => setCm('x', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        ${gridRow(t(state.locale, 'propYTop'), html`<input data-testid="prop-y" .value=${cm(el.pos.y)} @input=${(e: Event) => setCm('y', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        ${gridRow(t(state.locale, 'propWidth'), html`<input data-testid="prop-width" .value=${cm(el.pos.w)} @input=${(e: Event) => setCm('w', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        ${gridRow(t(state.locale, 'propHeight'), html`<input data-testid="prop-height" .value=${el.kind === 'line' ? formatLocalizedNumber(lineThicknessMm(el.thickness ?? 1) / 10, fmt, 2) : cm(el.pos.h)} ?disabled=${el.kind === 'line' && el.orientation === 'horizontal'} @input=${(e: Event) => setCm('h', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
       </section>
       <section class="cat">
         <div class="cat-h">${t(state.locale, 'textAndFont')}<span class="cnt">6</span></div>
-        ${gridRow(t(state.locale, 'fontFamily'), html`<input data-testid="prop-font-family" .value=${el.style?.font ?? ''} placeholder=${t(state.locale, 'inherit')} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} />`)}
-        ${gridRow(t(state.locale, 'fontSize'), html`<input data-testid="prop-font-size" .value=${String(el.style?.fontSize ?? 10)} @input=${(e: Event) => updateStyle({ fontSize: Number((e.target as HTMLInputElement).value) })} />`, t(state.locale, 'unitPt'))}
-        ${gridRow(t(state.locale, 'align'), html`<select data-testid="prop-align" @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
+        ${gridRow(t(state.locale, 'fontFamily'), html`<input data-testid="prop-font-family" .value=${family} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} />`)}
+        ${gridRow(t(state.locale, 'fontSize'), html`<input data-testid="prop-font-size" .value=${formatLocalizedNumber(el.style?.fontSize ?? 10, fmt, 0)} @input=${(e: Event) => { const n = parseLocalizedNumber((e.target as HTMLInputElement).value); if (Number.isFinite(n)) updateStyle({ fontSize: n }); }} />`, t(state.locale, 'unitPt'))}
+        ${gridRow(t(state.locale, 'align'), html`<span class="pick"><span class="pick-label">${alignLabel}</span><select data-testid="prop-align" @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
           <option value="">-</option>
           <option value="start" ?selected=${el.style?.align === 'start'}>${t(state.locale, 'alignStart')}</option>
           <option value="center" ?selected=${el.style?.align === 'center'}>${t(state.locale, 'alignCenter')}</option>
           <option value="end" ?selected=${el.style?.align === 'end'}>${t(state.locale, 'alignEnd')}</option>
           <option value="justify" ?selected=${el.style?.align === 'justify'}>${t(state.locale, 'alignJustify')}</option>
-        </select>`)}
-        ${gridRow(t(state.locale, 'color'), html`<input data-testid="prop-color" type="color" .value=${colorInputValue(el.style?.color)} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} />`)}
+        </select></span>`)}
+        ${gridRow(t(state.locale, 'color'), html`<span class="color-value"><input type="color" class="swatch" .value=${hex} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /><input data-testid="prop-color" class="hex" .value=${hex} @change=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></span>`)}
         ${gridRow(t(state.locale, 'bold'), html`<input data-testid="prop-bold" type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} />`)}
         ${gridRow(t(state.locale, 'padding'), html`<input data-testid="prop-padding" .value=${String(el.style?.padding ?? 0)} @input=${(e: Event) => updateStyle({ padding: Number((e.target as HTMLInputElement).value) || undefined })} />`)}
       </section>

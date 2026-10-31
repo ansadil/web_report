@@ -1,6 +1,7 @@
 import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { t } from '../../api.js';
+import { formatLocalizedNumber, parseLocalizedNumber } from '../../status-bar.js';
 import type { ReportSchemaV1 } from '../../api.js';
 import { renderGroupsBandsEditor, renderReportBandsEditor, type BandsCallbacks } from './bands.js';
 import { renderWatermarkEditor, type WatermarkCallbacks } from './watermark.js';
@@ -19,7 +20,12 @@ export interface DocumentCallbacks extends BandsCallbacks, WatermarkCallbacks {
 export function renderDocumentProperties(state: DocumentState, cb: DocumentCallbacks) {
   const meta = state.schema.meta;
   const page = state.schema.page;
-  const cm = (mm: number) => (mm / 10).toFixed(2);
+  const fmt = { locale: state.locale, digits: state.schema.meta.pageNumberDigits ?? ('locale' as const) };
+  const cm = (mm: number) => formatLocalizedNumber(mm / 10, fmt, 2);
+  const readCm = (raw: string) => {
+    const n = parseLocalizedNumber(raw);
+    return Number.isFinite(n) ? n * 10 : 0;
+  };
   return html`
     <div class="prop-grid" data-testid="property-grid">
       <div class="prop-card">
@@ -39,10 +45,10 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
           <option value="portrait" ?selected=${page.orientation === 'portrait'}>${t(state.locale, 'portrait')}</option>
           <option value="landscape" ?selected=${page.orientation === 'landscape'}>${t(state.locale, 'landscape')}</option>
         </select></span></div>
-        <div class="prow"><span class="k">${t(state.locale, 'top')}</span><span class="v"><input data-testid="prop-margin-top" .value=${cm(page.margins.top)} @input=${(e: Event) => cb.updateMargins({ top: Number((e.target as HTMLInputElement).value) * 10 })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-        <div class="prow"><span class="k">${t(state.locale, 'right')}</span><span class="v"><input data-testid="prop-margin-right" .value=${cm(page.margins.right)} @input=${(e: Event) => cb.updateMargins({ right: Number((e.target as HTMLInputElement).value) * 10 })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-        <div class="prow"><span class="k">${t(state.locale, 'bottom')}</span><span class="v"><input data-testid="prop-margin-bottom" .value=${cm(page.margins.bottom)} @input=${(e: Event) => cb.updateMargins({ bottom: Number((e.target as HTMLInputElement).value) * 10 })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-        <div class="prow"><span class="k">${t(state.locale, 'left')}</span><span class="v"><input data-testid="prop-margin-left" .value=${cm(page.margins.left)} @input=${(e: Event) => cb.updateMargins({ left: Number((e.target as HTMLInputElement).value) * 10 })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
+        <div class="prow"><span class="k">${t(state.locale, 'top')}</span><span class="v"><input data-testid="prop-margin-top" .value=${cm(page.margins.top)} @input=${(e: Event) => cb.updateMargins({ top: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
+        <div class="prow"><span class="k">${t(state.locale, 'right')}</span><span class="v"><input data-testid="prop-margin-right" .value=${cm(page.margins.right)} @input=${(e: Event) => cb.updateMargins({ right: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
+        <div class="prow"><span class="k">${t(state.locale, 'bottom')}</span><span class="v"><input data-testid="prop-margin-bottom" .value=${cm(page.margins.bottom)} @input=${(e: Event) => cb.updateMargins({ bottom: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
+        <div class="prow"><span class="k">${t(state.locale, 'left')}</span><span class="v"><input data-testid="prop-margin-left" .value=${cm(page.margins.left)} @input=${(e: Event) => cb.updateMargins({ left: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
       </section>
       <section class="cat">
         <div class="cat-h">${t(state.locale, 'document')}<span class="cnt">3</span></div>

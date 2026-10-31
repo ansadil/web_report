@@ -21,12 +21,23 @@ export const propertiesStyles = css`
       width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; height: 24px;
       font: inherit; font-size: 12px; color: inherit; text-overflow: ellipsis;
     }
-    .prow .v select {
-      appearance: none; padding-inline: 2px 18px; cursor: pointer;
+    .prow .v select.pick, .prow .v select {
+      appearance: none; padding-inline: 2px 18px; cursor: pointer; width: 100%;
       background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
       background-position: calc(100% - 10px) 10px, calc(100% - 6px) 10px;
       background-size: 4px 4px, 4px 4px;
       background-repeat: no-repeat;
+    }
+    .color-value { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+    .color-value .swatch { width: 16px; height: 16px; padding: 0; border: 1px solid rgba(0,0,0,.15); border-radius: 4px; flex: none; background: transparent; }
+    .color-value .hex { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: start; }
+    .prow .name-value { direction: ltr; text-align: start; }
+    .pick { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; }
+    .pick-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-inline-end: 14px; }
+    .pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .pick::after {
+      content: ''; position: absolute; inset-inline-end: 4px; top: 9px; width: 0; height: 0;
+      border-inline-start: 4px solid transparent; border-inline-end: 4px solid transparent; border-top: 5px solid #64748b;
     }
     :host([dir='rtl']) .prow .v select {
       background-position: 10px 10px, 6px 10px;

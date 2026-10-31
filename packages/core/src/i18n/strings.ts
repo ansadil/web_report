@@ -194,7 +194,13 @@ type StringKey =
   | 'dirLtr'
   | 'dirRtl'
   | 'typeStatic'
-  | 'reportData';
+  | 'reportData'
+  | 'propName'
+  | 'propXLeft'
+  | 'propXRight'
+  | 'propYTop'
+  | 'propWidth'
+  | 'propHeight';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -392,6 +398,12 @@ const en: Record<StringKey, string> = {
   dirRtl: 'Right to left',
   typeStatic: 'Static',
   reportData: 'Report data',
+  propName: 'Name',
+  propXLeft: 'Left',
+  propXRight: 'Right',
+  propYTop: 'Top',
+  propWidth: 'Width',
+  propHeight: 'Height',
 };
 
 const ar: Record<StringKey, string> = {
@@ -590,6 +602,12 @@ const ar: Record<StringKey, string> = {
   dirRtl: 'من اليمين لليسار',
   typeStatic: 'ثابت',
   reportData: 'بيانات التقرير',
+  propName: 'الاسم',
+  propXLeft: 'اليسار',
+  propXRight: 'اليمين (X)',
+  propYTop: 'الأعلى (Y)',
+  propWidth: 'العرض',
+  propHeight: 'الارتفاع',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

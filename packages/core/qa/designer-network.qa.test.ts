@@ -74,6 +74,7 @@ describe('playground designer stays on the local origin', () => {
       if (!isLocal(req.url())) foreign.push(req.url());
     });
     await page.goto(ORIGIN);
+    await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#tab-builder');
     await page.waitForFunction(() => {
@@ -98,6 +99,7 @@ describe('playground designer stays on the local origin', () => {
   it('BUG-27: Cairo text stays visible inside each text and field element', async () => {
     const page = await browser.newPage();
     await page.goto(ORIGIN);
+    await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#btn-ar');
     await page.locator('#reports-list .report-card').filter({ hasText: 'المبيعات حسب المنطقة' }).click();
@@ -163,8 +165,10 @@ describe('playground designer stays on the local origin', () => {
   it('renders the File and Layout tabs and the Font and Alignment groups', async () => {
     const page = await browser.newPage();
     await page.goto(ORIGIN);
+    await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#tab-builder');
+    await page.click('#btn-samples');
     const root = page.locator('reports-builder');
     await root.locator('[data-testid="ribbon"]').waitFor();
     const shown = (id: string) =>

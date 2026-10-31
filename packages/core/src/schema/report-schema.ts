@@ -33,6 +33,7 @@ export const StyleSchema = z
     bold: z.boolean().optional(),
     italic: z.boolean().optional(),
     underline: z.boolean().optional(),
+    strike: z.boolean().optional(),
     color: z.string().optional(),
     background: z.string().optional(),
     align: z.enum(['start', 'center', 'end', 'justify']).optional(),

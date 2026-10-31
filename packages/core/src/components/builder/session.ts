@@ -2,7 +2,7 @@ import type { FieldMeta, LocaleTag, Row } from '@reports-web/shared';
 import type { DataAdapter, ReportSchemaV1, StorageAdapter } from './api.js';
 import type { ElementClipboard } from './ops/clipboard.js';
 import type { HistoryStore } from './state/history.js';
-import type { BandKey, BuilderAction, ContextMenuState, MarqueeState, RibbonTab, SideSectionKey } from './types.js';
+import type { BandKey, BuilderAction, ContextMenuState, MarqueeState, RibbonTab, SideSectionKey, SideTab } from './types.js';
 
 /** Mutable builder state. Render modules never see this object. */
 export interface BuilderSession {
@@ -14,6 +14,7 @@ export interface BuilderSession {
   hoverBand: BandKey | null;
   marquee: MarqueeState | null;
   leftCollapsed: boolean;
+  sideTab: SideTab;
   menuOpen: boolean;
   zoom: number;
   collapsedSections: Record<SideSectionKey, boolean>;

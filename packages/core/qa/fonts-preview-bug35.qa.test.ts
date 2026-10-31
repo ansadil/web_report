@@ -74,6 +74,7 @@ describe.skipIf(!hasBrowser)('BUG-35: production build loads fonts from its own 
       if (/\/fonts\/|\.woff2$|\.ttf$/.test(res.url())) fonts.set(res.url(), res.status());
     });
     await page.goto(ORIGIN);
+    await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#btn-ar');
     // PDF export through the viewer: same fonts folder, TTF faces (sample reports use the

@@ -36,7 +36,21 @@ export interface CanvasCallbacks {
 }
 
 export function renderBands(state: CanvasState, cb: CanvasCallbacks) {
-  return BAND_KEYS.map((name) => renderBand(state, cb, name));
+  return BAND_KEYS.flatMap((name) => {
+    const band = renderBand(state, cb, name);
+    if (name !== 'detail' || !state.bands.detail) return [band];
+    return [renderDataHeader(state), band];
+  });
+}
+
+function renderDataHeader(state: CanvasState) {
+  return html`
+    <div class="band-strip" data-band="dataHeader">
+      <div class="band-head" data-testid="band-head-dataHeader">
+        <span class="band-label">${t(state.locale, 'dataHeader')}</span>
+      </div>
+    </div>
+  `;
 }
 
 function renderBand(state: CanvasState, cb: CanvasCallbacks, name: BandKey) {
@@ -44,7 +58,7 @@ function renderBand(state: CanvasState, cb: CanvasCallbacks, name: BandKey) {
   if (!band) return nothing;
   const dropClass = state.hoverBand === name ? 'band-drop-on' : '';
   return html`
-    <div class="band-strip">
+    <div class="band-strip" data-band=${name}>
       <div class="band-head" data-testid=${`band-head-${name}`}>
         <span class="band-label">${t(state.locale, name as 'reportHeader')}</span>
       </div>
@@ -181,7 +195,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     ${el.style?.background ? `background:${el.style.background};` : ''}
     ${el.style?.bold ? 'font-weight:700;' : ''}
     ${el.style?.italic ? 'font-style:italic;' : ''}
-    ${el.style?.underline ? 'text-decoration:underline;' : ''}
+    ${el.style?.underline || el.style?.strike ? `text-decoration:${[el.style?.underline ? 'underline' : '', el.style?.strike ? 'line-through' : ''].filter(Boolean).join(' ')};` : ''}
     ${el.style?.align ? `text-align:${el.style.align};` : ''}
     ${canvasDecor ? `;${canvasDecor}` : ''}
   `;

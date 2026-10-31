@@ -39,39 +39,7 @@ export function renderActions(state: ActionsState, cb: ActionsCallbacks) {
   const items = (state.actions ?? BUILDER_DEFAULT_ACTIONS).filter((a) => a === 'save' || a === 'json' || a === 'preview');
   const zoomLabel = formatZoomPercent(state.zoom, { locale: state.locale, digits: state.digits });
   return html`
-    <div class="doc-name">
-      <label for="report-name">${t(state.locale, 'document')}</label>
-      <input
-        id="report-name"
-        class="name"
-        data-testid="report-name"
-        aria-label=${t(state.locale, 'document')}
-        .value=${state.name}
-        @input=${(e: Event) => cb.onNameInput((e.target as HTMLInputElement).value)}
-      />
-    </div>
     <div class="toolbar" role="toolbar" data-testid="toolbar">
-      <button
-        type="button"
-        class="icon-only"
-        data-control="undo"
-        data-testid="ribbon-btn-undo"
-        aria-label=${t(state.locale, 'undo')}
-        title=${`${t(state.locale, 'undo')} (Ctrl+Z)`}
-        ?disabled=${!state.canUndo}
-        @click=${cb.onUndo}
-      >${icon('undo')}</button>
-      <button
-        type="button"
-        class="icon-only"
-        data-control="redo"
-        data-testid="ribbon-btn-redo"
-        aria-label=${t(state.locale, 'redo')}
-        title=${`${t(state.locale, 'redo')} (Ctrl+Y)`}
-        ?disabled=${!state.canRedo}
-        @click=${cb.onRedo}
-      >${icon('redo')}</button>
-      <span class="sep"></span>
       <div class="zoom-tools" aria-label=${t(state.locale, 'zoomReset')}>
         <button
           type="button"

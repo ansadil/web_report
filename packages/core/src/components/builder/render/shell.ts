@@ -23,7 +23,33 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
     locale: state.uiLocale,
     digits: state.status.digits,
   };
+  const sideHidden = (tab: 'dictionary' | 'tools' | 'reportTree') => state.sideTab !== tab;
   return html`
+    <header class="titlebar" data-testid="titlebar">
+      <div class="brand">${icon('layers')}<b>web_report</b><span class="product">${t(state.uiLocale, 'designerProduct')}</span></div>
+      <div class="qa">
+        <button type="button" class="qa-btn" data-control="undo" data-testid="ribbon-btn-undo" aria-label=${t(state.uiLocale, 'undo')} title=${t(state.uiLocale, 'undo')} ?disabled=${!state.actions.canUndo} @click=${cb.actions.onUndo}>${icon('undo')}</button>
+        <button type="button" class="qa-btn" data-control="redo" data-testid="ribbon-btn-redo" aria-label=${t(state.uiLocale, 'redo')} title=${t(state.uiLocale, 'redo')} ?disabled=${!state.actions.canRedo} @click=${cb.actions.onRedo}>${icon('redo')}</button>
+        ${state.actions.actions.includes('save')
+          ? html`<button type="button" class="qa-btn" data-testid="title-save" data-action="save" aria-label=${t(state.uiLocale, 'save')} title=${t(state.uiLocale, 'save')} @click=${cb.actions.onSave}>${icon('save')}</button>`
+          : html`<button type="button" class="qa-btn" data-testid="title-save" aria-label=${t(state.uiLocale, 'save')} title=${t(state.uiLocale, 'save')} @click=${cb.actions.onSave}>${icon('save')}</button>`}
+      </div>
+      <div class="doc-center">
+        <input
+          id="report-name"
+          class="name"
+          data-testid="report-name"
+          aria-label=${t(state.uiLocale, 'document')}
+          .value=${state.name}
+          @input=${(e: Event) => cb.actions.onNameInput((e.target as HTMLInputElement).value)}
+        />
+        <span class="saved">${t(state.uiLocale, 'savedState')}</span>
+      </div>
+      <div class="tb-end">
+        <span>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</span>
+        <span class="avatar" aria-hidden="true">${icon('user')}</span>
+      </div>
+    </header>
     <div class="ribbon-host">
       ${renderRibbon(state.ribbon, cb.ribbon)}
     </div>
@@ -42,47 +68,49 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       </div>
       ${state.leftCollapsed
         ? nothing
-        : html`<div class="side-body">
-            ${renderSideSection(
-              {
-                key: 'dictionary',
-                title: t(state.uiLocale, 'dictionary'),
-                collapsed: state.collapsed.dictionary,
-                testId: 'dictionary',
-              },
-              { onToggle: () => cb.onToggleSection('dictionary') },
-              html`<p class="empty-hint">${t(state.uiLocale, 'comingLater')}</p>`,
-            )}
-            ${renderSideSection(
-              {
-                key: 'tools',
-                title: t(state.uiLocale, 'toolbox'),
-                collapsed: state.collapsed.tools,
-                testId: 'toolbox',
-              },
-              { onToggle: () => cb.onToggleSection('tools') },
-              renderToolbox(state.toolbox, cb.toolbox),
-            )}
-            ${renderSideSection(
-              {
-                key: 'reportTree',
-                title: t(state.uiLocale, 'reportTree'),
-                collapsed: state.collapsed.reportTree,
-                testId: 'report-tree',
-              },
-              { onToggle: () => cb.onToggleSection('reportTree') },
-              html`<p class="empty-hint">${t(state.uiLocale, 'comingLater')}</p>`,
-            )}
-            ${renderSideSection(
-              {
-                key: 'properties',
-                title: t(state.uiLocale, 'properties'),
-                collapsed: state.collapsed.properties,
-                testId: 'properties',
-              },
-              { onToggle: () => cb.onToggleSection('properties') },
-              renderProperties(state.properties, cb.properties),
-            )}
+        : html`<div class="side-tabs" role="tablist">
+            <button type="button" class=${state.sideTab === 'dictionary' ? 'on' : ''} @click=${() => cb.onSideTab('dictionary')}>${icon('database')}<span>${t(state.uiLocale, 'dictionary')}</span></button>
+            <button type="button" class=${state.sideTab === 'tools' ? 'on' : ''} @click=${() => cb.onSideTab('tools')}>${icon('toolBox')}<span>${t(state.uiLocale, 'elements')}</span></button>
+            <button type="button" class=${state.sideTab === 'reportTree' ? 'on' : ''} @click=${() => cb.onSideTab('reportTree')}>${icon('layers')}<span>${t(state.uiLocale, 'reportTree')}</span></button>
+          </div>
+          <div class="side-body">
+            <div ?hidden=${sideHidden('dictionary')}>
+              ${renderSideSection(
+                {
+                  key: 'dictionary',
+                  title: t(state.uiLocale, 'dictionary'),
+                  collapsed: state.collapsed.dictionary,
+                  testId: 'dictionary',
+                },
+                { onToggle: () => cb.onToggleSection('dictionary') },
+                renderDictionary(state),
+              )}
+              <p class="dict-hint">${t(state.uiLocale, 'dictionaryHint')}</p>
+            </div>
+            <div ?hidden=${sideHidden('tools')}>
+              ${renderSideSection(
+                {
+                  key: 'tools',
+                  title: t(state.uiLocale, 'toolbox'),
+                  collapsed: state.collapsed.tools,
+                  testId: 'toolbox',
+                },
+                { onToggle: () => cb.onToggleSection('tools') },
+                renderToolbox(state.toolbox, cb.toolbox),
+              )}
+            </div>
+            <div ?hidden=${sideHidden('reportTree')}>
+              ${renderSideSection(
+                {
+                  key: 'reportTree',
+                  title: t(state.uiLocale, 'reportTree'),
+                  collapsed: state.collapsed.reportTree,
+                  testId: 'report-tree',
+                },
+                { onToggle: () => cb.onToggleSection('reportTree') },
+                renderReportTree(state),
+              )}
+            </div>
           </div>`}
     </aside>
 
@@ -105,8 +133,98 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       </div>
       ${renderContextMenu(state.contextMenu, cb.contextMenu)}
     </main>
+    <div class="page-tabs" data-testid="page-tabs">
+      <button type="button" class="page-tab on"><span>${t(state.uiLocale, 'pageOne')}</span></button>
+      <button type="button" class="page-tab add" aria-label=${t(state.uiLocale, 'pageOne')}>${icon('plus')}</button>
+    </div>
+    <aside class="props" data-testid="properties-dock">
+      ${renderSideSection(
+        {
+          key: 'properties',
+          title: t(state.uiLocale, 'propertyGrid'),
+          collapsed: state.collapsed.properties,
+          testId: 'properties',
+        },
+        { onToggle: () => cb.onToggleSection('properties') },
+        renderProperties(state.properties, cb.properties),
+      )}
+    </aside>
     <div class="status-host">
-      ${renderStatusBar(state.status)}
+      ${renderStatusBar(state.status, { onIn: cb.actions.onZoomIn, onOut: cb.actions.onZoomOut, onReset: cb.actions.onZoomReset, onSet: cb.onSetZoom })}
     </div>
   `;
+}
+
+function fieldBadge(type: string): string {
+  if (type === 'number') return '#';
+  if (type === 'date') return 'D';
+  if (type === 'bool') return '✓';
+  if (type === 'image') return 'I';
+  return 'Aa';
+}
+
+function typeLabel(state: BuilderViewState, type: string): string {
+  if (type === 'number') return t(state.uiLocale, 'typeNumber');
+  if (type === 'date') return t(state.uiLocale, 'typeDate');
+  if (type === 'bool') return t(state.uiLocale, 'typeBool');
+  if (type === 'image') return t(state.uiLocale, 'typeImage');
+  if (type === 'static') return t(state.uiLocale, 'typeStatic');
+  return t(state.uiLocale, 'typeString');
+}
+
+function adapterTag(state: BuilderViewState, adapter: string): string {
+  if (adapter === 'static') return t(state.uiLocale, 'typeStatic');
+  if (/rest|json/i.test(adapter)) return 'REST · JSON';
+  return adapter;
+}
+
+function renderDictionary(state: BuilderViewState) {
+  const source = state.properties.schema.dataset.source;
+  const adapter = state.properties.schema.dataset.adapter;
+  const fields = state.toolbox.fields;
+  const parameters = state.properties.schema.parameters ?? [];
+  return html`
+    <div class="dict-head"><b>${t(state.uiLocale, 'reportData')}</b>
+      <div class="dict-tools">
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'dataSources')}>${icon('plus')}</button>
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'editItem')}>${icon('pencil')}</button>
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'delete')}>${icon('trash')}</button>
+        <button type="button" class="qa-btn" title=${t(state.uiLocale, 'refresh')}>${icon('refresh')}</button>
+      </div>
+    </div>
+    <div class="dict" data-testid="dictionary-tree">
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}${icon('folder')}<span>${t(state.uiLocale, 'dataSources')}</span></summary>
+        <details open>
+          <summary class="dict-node source">${icon('sectionDown')}${icon('table')}<span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
+          ${fields.map(
+            (field, index) => html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.type}">${fieldBadge(field.type)}</span><span>${field.name}</span><span class="tmeta">${typeLabel(state, field.type)}</span></div>`,
+          )}
+        </details>
+      </details>
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}<span>${t(state.uiLocale, 'reportParameters')}</span></summary>
+        ${parameters.map((parameter) => html`<div class="dict-node field"><span class="tic">${fieldBadge(parameter.type)}</span><span>${parameter.name}</span><span class="tmeta">${typeLabel(state, parameter.type)}</span></div>`)}
+      </details>
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}<span>${t(state.uiLocale, 'systemVariables')}</span></summary>
+        <div class="dict-node field"><span class="tic">#</span><span>{page}</span><span class="tmeta">${t(state.uiLocale, 'statusPage')}</span></div>
+        <div class="dict-node field"><span class="tic">#</span><span>{pages}</span></div>
+        <div class="dict-node field"><span class="tic tic-date">D</span><span>${t(state.uiLocale, 'typeDate')}</span></div>
+        <div class="dict-node field"><span class="tic">Aa</span><span>${t(state.uiLocale, 'document')}</span></div>
+      </details>
+    </div>
+  `;
+}
+
+function renderReportTree(state: BuilderViewState) {
+  const bands = state.canvas.bands;
+  return html`<div class="dict" data-testid="report-tree-list">
+    ${Object.entries(bands).map(([band, value]) => html`
+      <details open>
+        <summary class="dict-node root">${icon('sectionDown')}<span>${t(state.uiLocale, band as 'detail')}</span></summary>
+        ${(value?.elements ?? []).map((el) => html`<div class="dict-node field"><span class="tic">${t(state.uiLocale, el.kind === 'expr' ? 'expression' : el.kind === 'richtext' ? 'html' : el.kind === 'text' || el.kind === 'field' || el.kind === 'line' || el.kind === 'box' || el.kind === 'image' || el.kind === 'chart' || el.kind === 'aggregate' || el.kind === 'qr' || el.kind === 'barcode' ? el.kind : 'text').slice(0, 1)}</span><span>${'value' in el && typeof el.value === 'string' && el.value ? el.value : el.id}</span></div>`)}
+      </details>
+    `)}
+  </div>`;
 }

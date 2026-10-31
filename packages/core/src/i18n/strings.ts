@@ -157,7 +157,50 @@ type StringKey =
   | 'labelsField'
   | 'chartType'
   | 'title'
-  | 'elementMissing';
+  | 'elementMissing'
+  | 'designerProduct'
+  | 'dataSources'
+  | 'systemVariables'
+  | 'dictionaryHint'
+  | 'allBorders'
+  | 'numberFormat'
+  | 'styles'
+  | 'conditionalFormat'
+  | 'pageOne'
+  | 'localeLtr'
+  | 'localeRtl'
+  | 'reportParameters'
+  | 'elements'
+  | 'savedState'
+  | 'propertyGrid'
+  | 'events'
+  | 'positionSize'
+  | 'textAndFont'
+  | 'unitCm'
+  | 'unitPt'
+  | 'dataHeader'
+  | 'formatPainter'
+  | 'noBorders'
+  | 'bottomBorder'
+  | 'borderWeight'
+  | 'growFont'
+  | 'shrinkFont'
+  | 'strike'
+  | 'refresh'
+  | 'editItem'
+  | 'elementWord'
+  | 'localeEnglish'
+  | 'localeArabic'
+  | 'dirLtr'
+  | 'dirRtl'
+  | 'typeStatic'
+  | 'reportData'
+  | 'propName'
+  | 'propXLeft'
+  | 'propXRight'
+  | 'propYTop'
+  | 'propWidth'
+  | 'propHeight';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -318,6 +361,49 @@ const en: Record<StringKey, string> = {
   chartType: 'Type',
   title: 'Title',
   elementMissing: 'Element not found',
+  designerProduct: 'Report designer',
+  dataSources: 'Data sources',
+  systemVariables: 'System variables',
+  dictionaryHint: 'Drag a field onto a band to create a bound element.',
+  allBorders: 'All borders',
+  numberFormat: 'Number format',
+  styles: 'Styles',
+  conditionalFormat: 'Conditional',
+  pageOne: 'Page 1',
+  localeLtr: 'English · left to right',
+  localeRtl: 'Arabic · right to left',
+  reportParameters: 'Parameters',
+  elements: 'Elements',
+  savedState: 'Saved',
+  propertyGrid: 'Property grid',
+  events: 'Events',
+  positionSize: 'Position & size',
+  textAndFont: 'Text & font',
+  unitCm: 'cm',
+  unitPt: 'pt',
+  dataHeader: 'Data header',
+  formatPainter: 'Format painter',
+  noBorders: 'No borders',
+  bottomBorder: 'Bottom border',
+  borderWeight: 'Weight & style',
+  growFont: 'Grow font',
+  shrinkFont: 'Shrink font',
+  strike: 'Strikethrough',
+  refresh: 'Refresh',
+  editItem: 'Edit',
+  elementWord: 'Element',
+  localeEnglish: 'English',
+  localeArabic: 'Arabic',
+  dirLtr: 'Left to right',
+  dirRtl: 'Right to left',
+  typeStatic: 'Static',
+  reportData: 'Report data',
+  propName: 'Name',
+  propXLeft: 'Left',
+  propXRight: 'Right',
+  propYTop: 'Top',
+  propWidth: 'Width',
+  propHeight: 'Height',
 };
 
 const ar: Record<StringKey, string> = {
@@ -479,6 +565,49 @@ const ar: Record<StringKey, string> = {
   chartType: 'النوع',
   title: 'العنوان',
   elementMissing: 'العنصر غير موجود',
+  designerProduct: 'مصمم التقارير',
+  dataSources: 'مصادر البيانات',
+  systemVariables: 'متغيرات النظام',
+  dictionaryHint: 'اسحب أي حقل إلى شريط في الصفحة لإنشاء عنصر مربوط بالبيانات.',
+  allBorders: 'كل الحدود',
+  numberFormat: 'تنسيق الأرقام',
+  styles: 'الأنماط',
+  conditionalFormat: 'تنسيق شرطي',
+  pageOne: 'الصفحة 1',
+  localeLtr: 'English · left to right',
+  localeRtl: 'العربية · من اليمين لليسار',
+  reportParameters: 'المعاملات',
+  elements: 'العناصر',
+  savedState: 'تم الحفظ',
+  propertyGrid: 'جدول الخصائص',
+  events: 'الأحداث',
+  positionSize: 'الموضع والحجم',
+  textAndFont: 'النص والخط',
+  unitCm: 'سم',
+  unitPt: 'نقطة',
+  dataHeader: 'ترويسة البيانات',
+  formatPainter: 'نسخ التنسيق',
+  noBorders: 'بلا حدود',
+  bottomBorder: 'حد سفلي',
+  borderWeight: 'السمك والنمط',
+  growFont: 'تكبير الخط',
+  shrinkFont: 'تصغير الخط',
+  strike: 'يتوسطه خط',
+  refresh: 'تحديث',
+  editItem: 'تعديل',
+  elementWord: 'عنصر',
+  localeEnglish: 'الإنجليزية',
+  localeArabic: 'العربية',
+  dirLtr: 'من اليسار لليمين',
+  dirRtl: 'من اليمين لليسار',
+  typeStatic: 'ثابت',
+  reportData: 'بيانات التقرير',
+  propName: 'الاسم',
+  propXLeft: 'اليسار',
+  propXRight: 'اليمين (X)',
+  propYTop: 'الأعلى (Y)',
+  propWidth: 'العرض',
+  propHeight: 'الارتفاع',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

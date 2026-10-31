@@ -19,6 +19,7 @@ export {
   type MarqueeState,
   type RibbonTab,
   type SideSectionKey,
+  type SideTab,
 } from './types.js';
 export { buildViewModel } from './view-model.js';
 export { formatCursorMm } from './status-bar.js';

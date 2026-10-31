@@ -14,6 +14,7 @@ export const LINE_RESIZE_HANDLES: Record<'horizontal' | 'vertical', readonly Res
 };
 
 export type SideSectionKey = 'actions' | 'tools' | 'properties' | 'dictionary' | 'reportTree';
+export type SideTab = 'dictionary' | 'tools' | 'reportTree';
 export type RibbonTab = 'file' | 'home' | 'insert' | 'layout' | 'page' | 'view' | 'preview';
 export type PosMm = { x: number; y: number; w: number; h: number };
 export type RectMm = PosMm;

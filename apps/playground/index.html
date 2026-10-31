@@ -15,43 +15,38 @@
       }
       #app {
         display: grid;
-        grid-template-columns: 280px 1fr;
-        grid-template-rows: 56px 1fr;
-        grid-template-areas: 'header header' 'sidebar main';
+        grid-template-columns: 1fr;
+        grid-template-rows: 40px 1fr;
         height: 100vh;
       }
-      header.top {
-        grid-area: header;
-        background: linear-gradient(90deg, #0f172a, #1e293b);
-        color: #f8fafc;
-        padding: 0 18px;
+      header.playground-bar {
+        background: #f7f9fc;
+        color: #1b2433;
+        border-bottom: 1px solid #dfe4ec;
+        padding: 0 10px;
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 8px;
+        min-width: 0;
       }
-      header.top h1 {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 600;
-        flex: 1;
-        letter-spacing: 0.3px;
+      header.playground-bar h1 { display: none; }
+      #btn-samples {
+        border: 1px solid #dfe4ec;
+        background: #fff;
+        border-radius: 6px;
+        height: 28px;
+        padding: 0 8px;
+        cursor: pointer;
       }
-      header.top .badge {
-        font-size: 11px;
-        background: #2563eb;
-        color: #fff;
-        padding: 2px 8px;
-        border-radius: 4px;
-        letter-spacing: 0.5px;
-      }
-      header.top .tabs {
+      #reports-list { display: block; }
+      header.playground-bar .tabs {
         display: flex;
         gap: 4px;
         background: #1e293b;
         padding: 4px;
         border-radius: 8px;
       }
-      header.top .tabs button {
+      header.playground-bar .tabs button {
         background: transparent;
         color: #cbd5e1;
         border: none;
@@ -61,15 +56,15 @@
         font-size: 13px;
         font-weight: 500;
       }
-      header.top .tabs button.active {
+      header.playground-bar .tabs button.active {
         background: #2563eb;
         color: #fff;
       }
-      header.top .locale-switch {
+      header.playground-bar .locale-switch {
         display: flex;
         gap: 4px;
       }
-      header.top .locale-switch button {
+      header.playground-bar .locale-switch button {
         background: transparent;
         color: #cbd5e1;
         border: 1px solid #334155;
@@ -78,18 +73,26 @@
         cursor: pointer;
         font-size: 12px;
       }
-      header.top .locale-switch button.active {
+      header.playground-bar .locale-switch button.active {
         background: #2563eb;
         color: #fff;
         border-color: #2563eb;
       }
       aside.sidebar {
-        grid-area: sidebar;
+        display: none;
+        position: absolute;
+        z-index: 20;
+        top: 40px;
+        inset-inline-start: 8px;
+        width: 280px;
+        max-height: calc(100vh - 56px);
         background: #fff;
-        border-inline-end: 1px solid #e5e7eb;
+        border: 1px solid #e5e7eb;
         overflow: auto;
         padding: 16px;
+        box-shadow: 0 10px 30px rgba(15,25,45,.12);
       }
+      aside.sidebar.open { display: block; }
       aside.sidebar h3 {
         font-size: 11px;
         text-transform: uppercase;
@@ -118,8 +121,8 @@
         box-shadow: 0 0 0 1px #2563eb;
       }
       .report-card .name { font-weight: 600; color: #1e293b; }
-      .report-card .desc { font-size: 12px; color: #64748b; margin-top: 2px; line-height: 1.4; }
-      .report-card .dataset { font-size: 10px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .report-card .desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+      .report-card .dataset { font-size: 10px; color: #94a3b8; margin-top: 4px; }
       .saved-item {
         display: flex;
         justify-content: space-between;
@@ -164,12 +167,12 @@
         border: 1px solid #cbd5e1;
       }
       main.main {
-        grid-area: main;
-        overflow: auto;
-        background: #f1f5f9;
+        overflow: hidden;
+        background: #eef1f5;
+        min-height: 0;
       }
-      #view-viewer reports-viewer { display: block; min-height: calc(100vh - 56px); }
-      #view-builder reports-builder { display: grid; height: calc(100vh - 56px); }
+      #view-viewer reports-viewer { display: block; height: calc(100vh - 40px); }
+      #view-builder reports-builder { display: grid; height: calc(100vh - 40px); }
       [hidden] { display: none !important; }
       .toast {
         position: fixed;
@@ -193,25 +196,21 @@
   </head>
   <body>
     <div id="app">
-      <header class="top">
-        <h1>Reports Web</h1>
-        <span class="badge">v0.1.0</span>
+      <header class="playground-bar">
+        <button id="btn-samples" type="button">Samples</button>
+      </header>
 
+      <aside class="sidebar" id="sample-drawer">
+        <h3>Sample Reports</h3>
+        <div id="reports-list"></div>
         <div class="tabs" role="tablist">
-          <button id="tab-viewer" class="active">Viewer</button>
-          <button id="tab-builder">Builder</button>
+          <button id="tab-builder" class="active">Builder</button>
+          <button id="tab-viewer">Viewer</button>
         </div>
-
         <div class="locale-switch">
           <button id="btn-en" class="active">EN · LTR</button>
           <button id="btn-ar">AR · RTL</button>
         </div>
-      </header>
-
-      <aside class="sidebar">
-        <h3>Sample Reports</h3>
-        <div id="reports-list"></div>
-
         <h3>My Saved Reports</h3>
         <div id="saved-list"></div>
 
@@ -227,10 +226,10 @@
       </aside>
 
       <main class="main">
-        <div id="view-viewer">
+        <div id="view-viewer" hidden>
           <reports-viewer id="viewer"></reports-viewer>
         </div>
-        <div id="view-builder" hidden>
+        <div id="view-builder">
           <reports-builder id="builder"></reports-builder>
         </div>
       </main>

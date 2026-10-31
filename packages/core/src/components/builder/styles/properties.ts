@@ -1,6 +1,52 @@
 import { css } from 'lit';
 
-export const propertiesStyles = css`    .props {
+export const propertiesStyles = css`
+    .prop-grid { display: flex; flex-direction: column; min-width: 0; }
+    .prop-card { display: flex; align-items: center; gap: 8px; margin: 0 10px 6px; border: 1px solid var(--rb-border); border-radius: 7px; padding: 5px 8px; background: #f7f9fc; }
+    .prop-card b { display: block; font-size: 12.5px; }
+    .prop-card small { color: var(--rb-muted); }
+    .prop-card-icon { width: 26px; height: 26px; border-radius: 6px; background: #fff3ea; color: #f0752a; display: grid; place-items: center; border: 1px solid #fbd5bb; flex: none; font-weight: 700; }
+    .ptoggle { display: flex; gap: 4px; margin: 0 10px 6px; }
+    .ptoggle button { flex: 1; border: 1px solid var(--rb-border); background: #fff; border-radius: 6px; height: 26px; cursor: pointer; color: #4a5568; }
+    .ptoggle button.on { background: #e7f0fb; border-color: #b9d2f1; color: #1f5fa8; font-weight: 600; }
+    .prop-search { margin: 0 10px 6px; }
+    .prop-search input { width: 100%; height: 30px; border: 1px solid var(--rb-border); border-radius: 7px; padding: 0 8px; }
+    .cat { border-top: 1px solid var(--rb-border); }
+    .cat-h { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: #f7f9fc; font-weight: 700; font-size: 12px; }
+    .cat-h .cnt { margin-inline-start: auto; color: var(--rb-muted); font-weight: 500; font-size: 10.5px; }
+    .prow { display: grid; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); border-top: 1px solid #eef1f6; min-height: 27px; }
+    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; overflow: hidden; }
+    .prow .v { position: relative; padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%; }
+    .prow .v input, .prow .v select {
+      width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; height: 24px;
+      font: inherit; font-size: 12px; color: inherit; text-overflow: ellipsis;
+    }
+    .prow .v select.pick, .prow .v select {
+      appearance: none; padding-inline: 2px 18px; cursor: pointer; width: 100%;
+      background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
+      background-position: calc(100% - 10px) 10px, calc(100% - 6px) 10px;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    .color-value { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+    .color-value .swatch { width: 16px; height: 16px; padding: 0; border: 1px solid rgba(0,0,0,.15); border-radius: 4px; flex: none; background: transparent; }
+    .color-value .hex { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: start; }
+    .prow .name-value { direction: ltr; text-align: start; }
+    .pick { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; }
+    .pick-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-inline-end: 14px; }
+    .pick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .pick::after {
+      content: ''; position: absolute; inset-inline-end: 4px; top: 9px; width: 0; height: 0;
+      border-inline-start: 4px solid transparent; border-inline-end: 4px solid transparent; border-top: 5px solid #64748b;
+    }
+    :host([dir='rtl']) .prow .v select {
+      background-position: 10px 10px, 6px 10px;
+    }
+    .prow .u { color: var(--rb-muted); font-size: 10.5px; }
+    .prop-grid .events-body { display: none; padding: 12px; color: var(--rb-muted); }
+    .prop-grid.show-events .props-body { display: none; }
+    .prop-grid.show-events .events-body { display: block; }
+    .props {
       display: grid;
       gap: 8px;
       min-width: 0;

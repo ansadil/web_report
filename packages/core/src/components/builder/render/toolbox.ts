@@ -45,6 +45,7 @@ export function renderToolbox(state: ToolboxState, cb: ToolboxCallbacks) {
             }}
           >
             ${toolIconForKind(tool.kind)}
+            <span class="tool-label">${label}</span>
           </button>
         `;
       })}

@@ -12,11 +12,13 @@
  *
  * v6 (fix/pdf-font-robustness 12e15cb): BUG-25 fixed (asserted for all families); PdfWarning
  * carries the requested face's `weight` (400/700) and `style` ('normal'), asserted exactly.
+ * v6b: BUG-24 in a child process with a timeout (truncated 2k/20k/60k, random bytes, sfnt header +
+ * random; corrupt bundled face), throwing onWarning, warning dedupe, no negative /W in any face.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import { existsSync, readFileSync, readdirSync, mkdtempSync, cpSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, mkdtempSync, cpSync, rmSync, statSync, writeFileSync, symlinkSync, mkdirSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -601,11 +603,8 @@ describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
       expect(await findNotdefGlyphs(await toBytes(await exportPdf({ schema: report('Cairo', false), rows: [], fontsBaseUrl: base, onWarning: () => {} } as Parameters<typeof exportPdf>[0])))).toEqual([]);
     });
 
-    // BUG-24 (found in v5 QA): a TRUNCATED TTF with a valid sfnt header passes the font check,
-    // then fontkit throws inside a timer while subsetting: uncaught exception (kills Node) and
-    // the export promise never settles. Not asserted here because it would crash the worker;
-    // repro: /workspace/qa/evidence/fonts-v2/bug24/repro.mjs.
-    it.todo('BUG-24: truncated listed TTF → FONT_FILE_UNAVAILABLE fallback (today: uncaught error + hung export)');
+    // BUG-24 (truncated TTF → uncaught fontkit error + hung export): asserted in a child process
+    // with a timeout in 'BUG-24 corrupt TTFs' below, so a regression cannot kill the worker.
   });
 
   describe('http', () => {
@@ -708,4 +707,216 @@ export function mutate(w: PdfWarning): void { (w as PdfWarning).code = PdfWarnin
       expect(neg.some((m) => m.startsWith('TS2540'))).toBe(true); // readonly
     }, 60_000);
   }
+});
+
+// ------------------------------------------------------------------------------------------
+// BUG-24 + warning hardening (fix/pdf-font-robustness). The export runs in a CHILD PROCESS with a
+// hard timeout: before the fix a truncated TTF threw inside a fontkit timer (uncaught → Node exits
+// non-zero) and the promise never settled (→ timeout). Uses the built dist (pnpm build first).
+const DIST = resolve(__dirname, '../dist');
+const HAS_DIST = existsSync(join(DIST, 'exporters/index.js'));
+const CHILD = `
+import { readFileSync, writeFileSync } from 'node:fs';
+const [, , DIST, SCHEMA, BASE, OUT] = process.argv;
+const { exportPdf } = await import(DIST + '/exporters/index.js');
+const warnings = [];
+const res = {};
+try {
+  const p = exportPdf({ schema: JSON.parse(readFileSync(SCHEMA, 'utf8')), rows: [], ...(BASE === '-' ? {} : { fontsBaseUrl: BASE }), onWarning: (w) => { warnings.push(w); } });
+  const blob = await Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('PENDING after 15s')), 15000))]);
+  writeFileSync(OUT, new Uint8Array(await blob.arrayBuffer()));
+  res.state = 'resolved';
+} catch (e) { res.state = 'rejected'; res.error = String(e && e.message || e); }
+await new Promise((r) => setTimeout(r, 300)); // let stray fontkit timers fire (the BUG-24 crash path)
+res.warnings = warnings;
+console.log('RESULT ' + JSON.stringify(res));
+`;
+
+describe.skipIf(!HAS_API || !HAS_DIST)('BUG-24 corrupt TTFs (child process + timeout)', () => {
+  let dir: string;
+  let child: string;
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'qa-fonts-b24-'));
+    child = join(dir, 'child.mjs');
+    writeFileSync(child, CHILD);
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  type ChildResult = { status: number | null; signal: string | null; stderr: string; state?: 'resolved' | 'rejected'; error?: string; warnings: Warning[]; pdf?: Uint8Array };
+  let n = 0;
+  const exportInChild = (schema: unknown, base: string | '-', dist = DIST): ChildResult => {
+    const id = ++n;
+    const schemaFile = join(dir, `schema-${id}.json`);
+    const out = join(dir, `out-${id}.pdf`);
+    writeFileSync(schemaFile, JSON.stringify(schema));
+    const p = spawnSync(process.execPath, [child, pathToFileURL(dist).href, schemaFile, base, out], { encoding: 'utf8', timeout: 30_000 });
+    const line = (p.stdout ?? '').split('\n').find((l) => l.startsWith('RESULT '));
+    const r = line ? JSON.parse(line.slice(7)) : { warnings: [] };
+    return { status: p.status, signal: p.signal, stderr: p.stderr ?? '', ...r, pdf: existsSync(out) ? new Uint8Array(readFileSync(out)) : undefined };
+  };
+  const psList = async (pdf: Uint8Array | undefined) => (await embeddedFontSummary(pdf!)).map((f) => fontName(f.name)).sort();
+  /** Deterministic pseudo-random bytes (LCG), so failures reproduce. */
+  const noise = (len: number, seed = 24) => {
+    const b = new Uint8Array(len);
+    let x = seed >>> 0;
+    for (let i = 0; i < len; i++) { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; b[i] = x >>> 24; }
+    return b;
+  };
+  const CAIRO = () => bytesOf(ttfOf('Cairo', 400)!);
+  const customWith = (name: string, bytes: Uint8Array) => {
+    const d = join(dir, name);
+    cpSync(FONTS_DIR, d, { recursive: true });
+    writeFileSync(join(d, ttfOf('Cairo', 400)!), bytes);
+    return pathToFileURL(d).href;
+  };
+  // Used twice + case variant: still exactly ONE warning for the face.
+  const SCHEMA = () => multi([['Cairo', false, 'بيت ثابت abc 123'], ['Cairo', false], ['"cairo", sans-serif', false]]);
+  let bundled: string[];
+  beforeAll(async () => {
+    const r = exportInChild(SCHEMA(), '-');
+    expect(r.state, r.stderr).toBe('resolved');
+    bundled = await psList(r.pdf);
+  });
+
+  const header = () => { const c = CAIRO(); const h = new DataView(c.buffer, c.byteOffset).getUint16(4); const b = noise(60_000, 7); b.set(c.subarray(0, 12 + 16 * h)); return b; };
+  const CASES: [string, () => Uint8Array][] = [
+    ['truncated to 2,000 bytes', () => CAIRO().subarray(0, 2000)],
+    ['truncated to 20,000 bytes', () => CAIRO().subarray(0, 20_000)],
+    ['truncated to 60,000 bytes', () => CAIRO().subarray(0, 60_000)],
+    ['60,000 random bytes', () => noise(60_000)],
+    ['valid sfnt header + table directory, random body', header],
+  ];
+  it.each(CASES)('custom Cairo-Regular %s: child exits 0, export resolves with the bundled face, exactly one FONT_FILE_UNAVAILABLE', async (name, bytes) => {
+    const base = customWith(name.replace(/\W+/g, '-'), bytes());
+    const r = exportInChild(SCHEMA(), base);
+    expect(r.signal, 'killed by timeout ⇒ export hung').toBeNull();
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stderr).not.toMatch(/Uncaught|unhandled|RangeError|TypeError/i);
+    expect(r.state, r.error).toBe('resolved');
+    expect(r.warnings).toEqual([W('FONT_FILE_UNAVAILABLE', 'Cairo', 400, `${base}/${ttfOf('Cairo', 400)}`)]);
+    expect(r.warnings[0]!.message).toMatch(/bundled/);
+    expect(await psList(r.pdf)).toEqual(bundled); // same subset tag ⇒ the bundled Cairo-Regular
+    expect(await findNotdefGlyphs(r.pdf!)).toEqual([]);
+  }, 40_000);
+
+  describe('corrupt BUNDLED face (copy of the package with assets/fonts/Cairo-Regular.ttf truncated)', () => {
+    let pkg: string;
+    beforeAll(() => {
+      pkg = join(dir, 'pkg');
+      mkdirSync(pkg);
+      cpSync(DIST, join(pkg, 'dist'), { recursive: true });
+      cpSync(resolve(__dirname, '../package.json'), join(pkg, 'package.json'));
+      cpSync(FONTS_DIR, join(pkg, 'assets/fonts'), { recursive: true });
+      symlinkSync(resolve(__dirname, '../node_modules'), join(pkg, 'node_modules'), 'dir');
+      writeFileSync(join(pkg, 'assets/fonts', ttfOf('Cairo', 400)!), CAIRO().subarray(0, 20_000));
+    });
+
+    it('a report using it rejects with a clear error naming the file; no crash, no hang, no warning', () => {
+      const r = exportInChild(SCHEMA(), '-', join(pkg, 'dist'));
+      expect(r.signal).toBeNull();
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.state).toBe('rejected');
+      expect(r.error).toMatch(/Cairo-Regular\.ttf is not a usable TrueType font/);
+      expect(r.warnings).toEqual([]);
+    }, 40_000);
+
+    it('custom face corrupt AND bundled fallback corrupt: rejects naming both, no crash', () => {
+      const base = customWith('both-corrupt', noise(60_000, 3));
+      const r = exportInChild(SCHEMA(), base, join(pkg, 'dist'));
+      expect(r.signal).toBeNull();
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.state).toBe('rejected');
+      expect(r.error).toMatch(/bundled fallback failed too/);
+    }, 40_000);
+
+    it('other faces are unaffected: a Tajawal-only report still exports from the same package', async () => {
+      const r = exportInChild(multi([['Tajawal', false], ['Tajawal', true]]), '-', join(pkg, 'dist'));
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.state, r.error).toBe('resolved');
+      expect((await psList(r.pdf)).map(psOf)).toEqual(['Tajawal-Bold', 'Tajawal-Regular']);
+    }, 40_000);
+  });
+});
+
+describe.skipIf(!HAS_API)('PdfWarning delivery: throwing onWarning, dedupe', () => {
+  let dir: string;
+  let missing: string;
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'qa-fonts-w-'));
+    const d = join(dir, 'missing');
+    cpSync(FONTS_DIR, d, { recursive: true });
+    for (const f of ['Cairo', 'Tajawal']) for (const w of [400, 700]) rmSync(join(d, ttfOf(f, w)!));
+    missing = pathToFileURL(d).href;
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('a throwing onWarning never fails the export: console.error once per warning, delivery continues, no console.warn', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const boom = new Error('QA onWarning boom');
+    const onWarning = vi.fn(() => { throw boom; });
+    try {
+      const blob = await exportPdf({ schema: multi([['Cairo', false], ['Cairo', true]]), rows: [], fontsBaseUrl: missing, onWarning } as Parameters<typeof exportPdf>[0]);
+      const fonts = (await embeddedFontSummary(await toBytes(blob))).map((f) => psOf(f.name)).sort();
+      expect(fonts).toEqual(['Cairo-Bold', 'Cairo-Regular']);
+      expect(onWarning).toHaveBeenCalledTimes(2); // the first throw does not swallow the second warning
+      expect(err).toHaveBeenCalledTimes(2);
+      for (const c of err.mock.calls) {
+        expect(c[0]).toMatch(/onWarning threw/);
+        expect(c).toContain(boom);
+      }
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      err.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
+  it('dedupe key = code + family (case-insensitive) + weight + url: repeats and case variants collapse, weights and families do not', async () => {
+    const warnings: Warning[] = [];
+    await exportPdf({
+      schema: multi([
+        ['Cairo', false], ['Cairo', false], ['"cairo", sans-serif', false], ['CAIRO', false],
+        ['Cairo', true], ['cairo', true],
+        ['Tajawal', false], ['Tajawal', false],
+      ]),
+      rows: [], fontsBaseUrl: missing, onWarning: (w: Warning) => { warnings.push(w); },
+    } as Parameters<typeof exportPdf>[0]);
+    const key = (w: Warning) => `${w.code}|${w.family}|${w.weight}|${w.style}|${w.url}`;
+    expect(warnings.map(key).sort()).toEqual([
+      W('FONT_FILE_UNAVAILABLE', 'Cairo', 400, `${missing}/${ttfOf('Cairo', 400)}`),
+      W('FONT_FILE_UNAVAILABLE', 'Cairo', 700, `${missing}/${ttfOf('Cairo', 700)}`),
+      W('FONT_FILE_UNAVAILABLE', 'Tajawal', 400, `${missing}/${ttfOf('Tajawal', 400)}`),
+    ].map((w) => key(w as Warning)).sort());
+  });
+});
+
+describe.skipIf(!HAS_API)('BUG-25 /W widths: no negative advance in any face', () => {
+  /** Every number inside each CIDFontType2 /W array, per BaseFont. */
+  async function widths(bytes: Uint8Array): Promise<Map<string, number[]>> {
+    const doc = await PDFDocument.load(bytes);
+    const out = new Map<string, number[]>();
+    const flat = (o: unknown): number[] => {
+      const v = o && typeof o === 'object' && 'asArray' in o ? (o as { asArray(): unknown[] }).asArray() : null;
+      if (v) return v.flatMap((x) => flat(doc.context.lookup(x as never) ?? x));
+      const n = Number(String(o));
+      return Number.isFinite(n) ? [n] : [];
+    };
+    for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+      if (!(obj instanceof PDFDict) || obj.get(PDFName.of('Subtype'))?.toString() !== '/CIDFontType2') continue;
+      const w = obj.get(PDFName.of('W'));
+      out.set(fontName(obj.get(PDFName.of('BaseFont'))!.toString()), w ? flat(doc.context.lookup(w) ?? w) : []);
+    }
+    return out;
+  }
+  it('8 faces × dotted / tashkeel / mixed lines: every /W entry ≥ 0', async () => {
+    const text = [...Object.values(LINES), ...Object.values(DOTTED)];
+    const els = [...SELECTABLE, undefined].flatMap((f) => [false, true].flatMap((b) => text.map((t) => [f, b, t] as const)));
+    const w = await widths(await toBytes(await exportPdf({ schema: multi(els), rows: [] })));
+    expect([...w.keys()].map(psOf).sort()).toEqual(Object.values(PS).flat().sort((x, y) => x.localeCompare(y)));
+    for (const [font, nums] of w) {
+      expect(nums.length, font).toBeGreaterThan(10);
+      expect(nums.filter((x) => x < 0), font).toEqual([]);
+    }
+  });
 });

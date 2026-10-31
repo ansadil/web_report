@@ -162,6 +162,28 @@ describe('playground designer stays on the local origin', () => {
     await page.close();
   });
 
+  it('BUG-45: the samples drawer stays 280px and the designer keeps the rest', async () => {
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(ORIGIN);
+    for (const locale of ['ar', 'en'] as const) {
+      await page.click(locale === 'ar' ? '#btn-ar' : '#btn-en');
+      await page.click('#btn-samples');
+      const box = await page.evaluate(() => {
+        const drawer = document.querySelector('#sample-drawer')!.getBoundingClientRect();
+        const designer = document.querySelector('reports-builder')!.getBoundingClientRect();
+        return { drawerW: drawer.width, designerW: designer.width, vw: window.innerWidth, drawerLeft: drawer.left };
+      });
+      expect(box.drawerW, locale).toBeGreaterThan(260);
+      expect(box.drawerW, locale).toBeLessThan(300);
+      expect(box.designerW, locale).toBeGreaterThanOrEqual(box.vw - 300);
+      if (locale === 'ar') expect(box.drawerLeft, locale).toBeGreaterThan(box.vw / 2);
+      else expect(box.drawerLeft, locale).toBeLessThan(20);
+      await page.keyboard.press('Escape');
+    }
+    await page.close();
+  });
+
   it('renders the File and Layout tabs and the Font and Alignment groups', async () => {
     const page = await browser.newPage();
     await page.goto(ORIGIN);

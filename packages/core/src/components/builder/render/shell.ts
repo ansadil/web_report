@@ -1,4 +1,5 @@
 import { html, nothing } from 'lit';
+import type { FieldMeta } from '@reports-web/shared';
 import { icon, resolveLabel, t } from '../api.js';
 import { elementStatusName, formatLocalizedNumber } from '../status-bar.js';
 import { renderBands } from './canvas.js';
@@ -221,6 +222,41 @@ function adapterTag(state: BuilderViewState, adapter: string): string {
   return adapter;
 }
 
+function fieldGroupKey(field: FieldMeta): string {
+  if (field.group?.trim()) return field.group.trim();
+  const path = field.path ?? field.name;
+  const dot = path.lastIndexOf('.');
+  return dot > 0 ? path.slice(0, dot) : '';
+}
+
+function listGroup(name: string): boolean {
+  return /بنود|بند|line|item/i.test(name);
+}
+
+function renderFieldNode(state: BuilderViewState, field: FieldMeta, index: number) {
+  const relation = field.isList ? t(state.uiLocale, 'listTag') : field.children?.length ? t(state.uiLocale, 'relation') : '';
+  return html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.isList || field.children?.length ? 'relation' : field.type}">${fieldBadge(field.type)}</span><span>${resolveLabel(field.label, state.uiLocale, field.name)}</span><span class="tmeta">${relation || typeLabel(state, field.type)}</span></div>`;
+}
+
+function renderFieldTree(state: BuilderViewState, fields: readonly FieldMeta[]) {
+  const loose: FieldMeta[] = [];
+  const groups = new Map<string, FieldMeta[]>();
+  for (const field of fields) {
+    const key = fieldGroupKey(field);
+    if (!key) loose.push(field);
+    else groups.set(key, [...(groups.get(key) ?? []), field]);
+  }
+  return html`
+    ${loose.map((field, index) => renderFieldNode(state, field, index))}
+    ${[...groups.entries()].map(([name, members]) => html`
+      <details open class="dict-group">
+        <summary class="dict-node field"><span class="tic ${listGroup(name) ? 'tic-list' : 'tic-relation'}">${icon(listGroup(name) ? 'table' : 'folder')}</span><span>${name}</span><span class="tmeta">${t(state.uiLocale, listGroup(name) ? 'listTag' : 'relation')}</span></summary>
+        ${members.map((field, index) => renderFieldNode(state, field, index))}
+      </details>
+    `)}
+  `;
+}
+
 function renderDictionary(state: BuilderViewState) {
   const source = state.properties.schema.dataset.source;
   const adapter = state.properties.schema.dataset.adapter;
@@ -240,11 +276,7 @@ function renderDictionary(state: BuilderViewState) {
         <summary class="dict-node root">${icon('sectionDown')}${icon('folder')}<span>${t(state.uiLocale, 'dataSources')}</span></summary>
         <details open>
           <summary class="dict-node source">${icon('sectionDown')}<span class="tic tic-table">${icon('table')}</span><span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
-          ${fields.map((field, index) => {
-            const relation = field.isList ? t(state.uiLocale, 'listTag') : field.children?.length ? t(state.uiLocale, 'relation') : '';
-            return html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.isList || field.children?.length ? 'relation' : field.type}">${fieldBadge(field.type)}</span><span>${resolveLabel(field.label, state.uiLocale, field.name)}</span><span class="tmeta">${relation || typeLabel(state, field.type)}</span></div>`;
-          })}
-          ${state.properties.schema.groups.map((group) => html`<div class="dict-node field"><span class="tic tic-relation">${icon('folder')}</span><span>${group.key}</span><span class="tmeta">${t(state.uiLocale, 'relation')}</span></div>`)}
+          ${renderFieldTree(state, fields)}
         </details>
       </details>
       <details open>

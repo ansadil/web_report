@@ -65,33 +65,34 @@ export const chromeStyles = css`
   [data-testid='ribbon-btn-format-painter'] svg { width: 16px; height: 16px; flex: none; }
   .ribbon .row { display: flex; gap: 3px; align-items: center; }
   .titlebar {
-    height: 34px; max-height: 34px; overflow: hidden; background: #fff; color: #1b2433;
+    height: 34px; max-height: 34px; overflow: hidden; background: #15233a; color: #e8eef8;
     display: flex; align-items: center; gap: 12px; padding: 0 10px; min-width: 0; z-index: 3;
-    border-bottom: 1px solid #dfe4ec;
+    border-bottom: 1px solid #15233a;
   }
   .titlebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; white-space: nowrap; flex: none; }
-  .titlebar .brand .product { font-weight: 500; color: #4a5568; }
+  .titlebar .brand .product { font-weight: 500; color: #9fb0c8; }
   .titlebar .qa { display: flex; gap: 2px; flex: none; }
   .titlebar .qa-btn {
-    width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #334155;
+    width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #c6d2e4;
     display: grid; place-items: center; padding: 0; cursor: pointer;
   }
+  .titlebar .qa-btn:hover { background: rgba(255,255,255,.1); }
   .titlebar .qa-btn:disabled { opacity: 0.35; cursor: default; }
   .titlebar .doc-center { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
   .titlebar .doc-center input {
-    width: min(280px, 46%); border: 0; background: transparent; color: #1b2433; text-align: center; font: inherit; font-weight: 600;
+    width: min(280px, 46%); border: 0; background: transparent; color: #fff; text-align: center; font: inherit; font-weight: 600;
   }
-  .titlebar .saved { color: #7a8699; font-size: 12px; white-space: nowrap; }
-  .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #4a5568; font-size: 11.5px; white-space: nowrap; flex: none; }
+  .titlebar .saved { color: #b7c4d8; font-size: 12px; white-space: nowrap; }
+  .titlebar .tb-end { display: flex; align-items: center; gap: 8px; color: #b7c4d8; font-size: 11.5px; white-space: nowrap; flex: none; }
   .titlebar .locale-toggle { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
-  .titlebar .locale-toggle:hover { background: #e7f0fb; color: #1f5fa8; }
+  .titlebar .locale-toggle:hover { background: rgba(255,255,255,.1); color: #fff; }
   .titlebar .title-chip, .titlebar .lang-switch button {
-    border: 1px solid #dfe4ec; background: #fff; color: #1b2433; border-radius: 6px; height: 24px;
+    border: 1px solid #3d5270; background: transparent; color: #e8eef8; border-radius: 6px; height: 24px;
     padding: 0 8px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700;
   }
   .titlebar .lang-switch { display: flex; gap: 2px; }
   .titlebar .lang-switch button.active { background: #1f5fa8; color: #fff; border-color: #1f5fa8; }
-  .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #e7f0fb; color: #1f5fa8; display: grid; place-items: center; }
+  .titlebar .avatar { width: 24px; height: 24px; border-radius: 50%; background: #2d4466; color: #fff; display: grid; place-items: center; }
   .status-spacer { flex: 1; }
   .status-bar .toolbar { background: transparent; padding: 0; gap: 4px; flex: none; }
   .status-bar .zoom input[type='range'] { width: 110px; accent-color: #1f5fa8; }

@@ -20,12 +20,12 @@ const salesByRegion: SampleReport = {
     page: { size: 'A4', orientation: 'portrait', margins: { top: 15, right: 15, bottom: 15, left: 15 } },
     dataset: { adapter: 'rest-json', source: 'sales' },
     fields: [
-      { name: 'region', type: 'string', label: 'المنطقة' },
-      { name: 'product', type: 'string', label: 'الصنف' },
-      { name: 'qty', type: 'number', label: 'الكمية' },
-      { name: 'unitPrice', type: 'number', label: 'السعر' },
-      { name: 'amount', type: 'number', label: 'الإجمالي' },
-      { name: 'date', type: 'date', label: 'التاريخ' },
+      { name: 'region', type: 'string', label: 'المنطقة', group: 'العميل' },
+      { name: 'date', type: 'date', label: 'التاريخ', group: 'العميل' },
+      { name: 'product', type: 'string', label: 'الصنف', group: 'البنود' },
+      { name: 'qty', type: 'number', label: 'الكمية', group: 'البنود' },
+      { name: 'unitPrice', type: 'number', label: 'السعر', group: 'البنود' },
+      { name: 'amount', type: 'number', label: 'الإجمالي', group: 'البنود' },
     ],
     groups: [
       {

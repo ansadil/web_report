@@ -4,7 +4,7 @@ export type BuilderAction = 'save' | 'json' | 'preview';
 export const BUILDER_DEFAULT_ACTIONS: readonly BuilderAction[] = ['save', 'json'];
 
 export type BandKey = 'reportHeader' | 'pageHeader' | 'detail' | 'pageFooter' | 'reportFooter';
-export const BAND_KEYS: readonly BandKey[] = ['reportHeader', 'pageHeader', 'detail', 'pageFooter', 'reportFooter'];
+export const BAND_KEYS: readonly BandKey[] = ['reportHeader', 'pageHeader', 'detail', 'reportFooter', 'pageFooter'];
 
 export type ResizeHandleKind = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 export const RESIZE_HANDLE_KINDS: readonly ResizeHandleKind[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];

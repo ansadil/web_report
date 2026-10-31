@@ -7,7 +7,12 @@ import { clearSelection, replaceSchema } from './commands.js';
 
 export async function loadFields(session: BuilderSession): Promise<void> {
   if (session.schema.fields.length > 0) {
-    session.fields = session.schema.fields.map((f) => ({ name: f.name, type: f.type, label: f.label }));
+    session.fields = session.schema.fields.map((f) => ({
+      name: f.name,
+      type: f.type,
+      ...(f.label !== undefined ? { label: f.label } : {}),
+      ...(f.group ? { group: f.group } : {}),
+    }));
     return;
   }
   const adapter =

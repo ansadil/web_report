@@ -60,10 +60,15 @@ export const TextElement = ElementBase.extend({
   kind: z.literal('text'),
   value: z.string(),
 });
+/** Options for `format` (currently the date style for 'date' / 'date:hijri'; default 'medium'). */
+export const FormatOptions = z.object({
+  dateStyle: z.enum(['full', 'long', 'medium', 'short']).optional(),
+});
 export const FieldElement = ElementBase.extend({
   kind: z.literal('field'),
   field: z.string().min(1),
   format: z.string().optional(),
+  formatOptions: FormatOptions.optional(),
 });
 export const ImageElement = ElementBase.extend({
   kind: z.literal('image'),
@@ -78,6 +83,7 @@ export const AggregateElement = ElementBase.extend({
   scope: z.enum(['report', 'page', 'group']).default('report'),
   groupKey: z.string().optional(),
   format: z.string().optional(),
+  formatOptions: FormatOptions.optional(),
 });
 export const ChartElement = ElementBase.extend({
   kind: z.literal('chart'),
@@ -99,6 +105,7 @@ export const ExpressionElement = ElementBase.extend({
   kind: z.literal('expr'),
   expression: z.string().min(1),
   format: z.string().optional(),
+  formatOptions: FormatOptions.optional(),
 });
 
 export const QrElement = ElementBase.extend({
@@ -252,10 +259,11 @@ const ReportMetaSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   locale: Locale.default('en'),
-  dir: Direction.default('ltr'),
+  /** When omitted, inferred from locale: 'ar' means 'rtl'. */
+  dir: Direction.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-});
+}).transform((m) => ({ ...m, dir: m.dir ?? (m.locale === 'ar' ? 'rtl' : 'ltr') }));
 
 const BandsBlockSchema = z.object({
   reportHeader: BandSchema.optional(),

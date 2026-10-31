@@ -13,8 +13,8 @@ export const ReportViewer = defineComponent({
     rows: { type: Array as PropType<ReportViewerProps['rows']>, default: undefined },
     dataAdapter: { type: Object as PropType<ReportViewerProps['dataAdapter']>, default: undefined },
     chartAdapter: { type: Object as PropType<ReportViewerProps['chartAdapter']>, default: undefined },
-    locale: { type: String as PropType<'ar' | 'en'>, default: 'en' },
-    dir: { type: String as PropType<'rtl' | 'ltr'>, default: 'ltr' },
+    locale: { type: String as PropType<'ar' | 'en'>, default: undefined },
+    dir: { type: String as PropType<'rtl' | 'ltr'>, default: undefined },
     noToolbar: { type: Boolean, default: false },
     hideViewControls: { type: Boolean, default: false },
     hidePageBoundaries: { type: Boolean, default: false },
@@ -31,7 +31,7 @@ export const ReportViewer = defineComponent({
       el.dataAdapter = props.dataAdapter ?? null;
       el.chartAdapter = props.chartAdapter ?? null;
       el.locale = props.locale;
-      el.dir = props.dir;
+      el.dir = props.dir ?? '';
       el.noToolbar = props.noToolbar;
       el.hideViewControls = props.hideViewControls;
       el.hidePageBoundaries = props.hidePageBoundaries;

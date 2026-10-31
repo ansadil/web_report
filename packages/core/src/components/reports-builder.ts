@@ -3,6 +3,7 @@ import { property, state, query } from 'lit/decorators.js';
 import type { FieldMeta, Row } from '@reports-web/shared';
 import { MM_TO_PX } from '@reports-web/shared';
 import { resolveLabel } from '../engine/dictionary.js';
+import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 import type {
   Element as ReportElement,
   Band,
@@ -775,8 +776,39 @@ export class ReportsBuilderElement extends LitElement {
   @property({ attribute: false }) dataAdapter: DataAdapter | null = null;
   @property({ attribute: false }) storageAdapter: StorageAdapter | null = null;
   @property({ attribute: false }) sampleRows: readonly Row[] | null = null;
-  @property({ type: String }) locale: 'ar' | 'en' = 'en';
-  @property({ type: String, reflect: true }) override dir: 'rtl' | 'ltr' = 'ltr';
+  /** UI language override. When unset, follows the template's meta.locale. */
+  @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
+  /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
+  @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
+  private _syncingDir = false;
+
+  override attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    if (name === 'dir' && this._syncingDir) return;
+    super.attributeChangedCallback(name, old, value);
+  }
+
+  private _syncHostDir(effective: 'rtl' | 'ltr'): void {
+    if (this.getAttribute('dir') === effective) return;
+    this._syncingDir = true;
+    try {
+      this.setAttribute('dir', effective);
+    } finally {
+      this._syncingDir = false;
+    }
+  }
+
+  private get _uiLocale(): 'ar' | 'en' {
+    return resolveLocale(this.locale, this._schema.meta);
+  }
+
+  private get _uiDir(): 'rtl' | 'ltr' {
+    return resolveDir(this.dirOverride, this._schema.meta, this._uiLocale);
+  }
+
+  /** Direction of the report canvas: always the template's own. */
+  private get _canvasDir(): 'rtl' | 'ltr' {
+    return this._schema.meta.dir;
+  }
 
   @property({ attribute: false }) actions: readonly BuilderAction[] = BUILDER_DEFAULT_ACTIONS;
 
@@ -885,6 +917,7 @@ export class ReportsBuilderElement extends LitElement {
   }
 
   override updated(changed: Map<PropertyKey, unknown>): void {
+    this._syncHostDir(this._uiDir);
     let schemaChanged = false;
     if (changed.has('schema') && this.schema) {
       const v = validateReport(this.schema);
@@ -982,7 +1015,7 @@ export class ReportsBuilderElement extends LitElement {
       this._fields = fields;
       this._replaceSchema({
         ...this._schema,
-        fields: fields.map((f) => ({ name: f.name, type: f.type, label: f.label === undefined ? undefined : resolveLabel(f.label, this.locale) })),
+        fields: fields.map((f) => ({ name: f.name, type: f.type, label: f.label === undefined ? undefined : resolveLabel(f.label, this._uiLocale) })),
       });
     } catch (e) {
       logger.warn('reports-builder', 'introspect failed', { error: e instanceof Error ? e.message : String(e) });
@@ -1025,7 +1058,7 @@ export class ReportsBuilderElement extends LitElement {
 
   private _pointInBand(ev: PointerEvent | DragEvent, target: HTMLElement, band: BandKey): { x: number; y: number } {
     const rect = target.getBoundingClientRect();
-    const isRtl = this.dir === 'rtl';
+    const isRtl = this._canvasDir === 'rtl';
     const xPx = isRtl ? rect.right - ev.clientX : ev.clientX - rect.left;
     const yPx = ev.clientY - rect.top;
     const x = Math.min(this._pageContentWidthMm(), Math.max(0, this._scalePxToMm(xPx)));
@@ -1329,10 +1362,10 @@ export class ReportsBuilderElement extends LitElement {
         dy = 1;
         break;
       case 'ArrowLeft':
-        dx = this.dir === 'rtl' ? 1 : -1;
+        dx = this._canvasDir === 'rtl' ? 1 : -1;
         break;
       case 'ArrowRight':
-        dx = this.dir === 'rtl' ? -1 : 1;
+        dx = this._canvasDir === 'rtl' ? -1 : 1;
         break;
       default:
         return false;
@@ -1536,7 +1569,7 @@ export class ReportsBuilderElement extends LitElement {
   private _onElementPointerDown(ev: PointerEvent, band: BandKey, id: string, mode: 'move' | ResizeHandleKind): void {
     ev.stopPropagation();
     ev.preventDefault();
-    const isRtl = this.dir === 'rtl';
+    const isRtl = this._canvasDir === 'rtl';
 
     if (mode !== 'move') {
       if (this._selectedBand !== band || this._selectedIds.size !== 1 || !this._selectedIds.has(id)) {
@@ -1651,7 +1684,7 @@ export class ReportsBuilderElement extends LitElement {
     return html`
       <div class="tool-grid">
         ${TOOL_KINDS.map((tool) => {
-          const label = t(this.locale, tool.labelKey);
+          const label = t(this._uiLocale, tool.labelKey);
           return html`
             <div
               class="tool"
@@ -1665,7 +1698,7 @@ export class ReportsBuilderElement extends LitElement {
           `;
         })}
       </div>
-      <h3 class="panel-title" style="margin-top:8px">${t(this.locale, 'fields')}</h3>
+      <h3 class="panel-title" style="margin-top:8px">${t(this._uiLocale, 'fields')}</h3>
       ${this._fields.length === 0
         ? html`<div class="empty-hint">No fields</div>`
         : html`<div>
@@ -1673,7 +1706,7 @@ export class ReportsBuilderElement extends LitElement {
               (f) => html`
                 <div class="field-row" draggable="true"
                      @dragstart=${(e: DragEvent) => this._onFieldDragStart(e, f)}>
-                  <span>${resolveLabel(f.label, this.locale, f.name)}</span>
+                  <span>${resolveLabel(f.label, this._uiLocale, f.name)}</span>
                   <span class="type">${f.type}</span>
                 </div>
               `,
@@ -1694,7 +1727,7 @@ export class ReportsBuilderElement extends LitElement {
            @drop=${(e: DragEvent) => this._onBandDrop(e, name)}
            @contextmenu=${(e: MouseEvent) => this._onBandContextMenu(e, name)}
            @pointerdown=${(e: PointerEvent) => this._onBandPointerDown(e, name)}>
-        <span class="band-label">${t(this.locale, name as 'reportHeader')}</span>
+        <span class="band-label">${t(this._uiLocale, name as 'reportHeader')}</span>
         ${band.elements.map((el) => this._renderElement(name, el))}
         ${this._renderMarquee(name)}
       </div>
@@ -1839,9 +1872,9 @@ export class ReportsBuilderElement extends LitElement {
         <form class="props" @submit=${(e: Event) => e.preventDefault()}>
           <div class="group">
             <h4>${String(n)}</h4>
-            <p style="margin:0;font-size:12px;color:#64748b;line-height:1.45">${t(this.locale, 'multiSelectionHint')}</p>
+            <p style="margin:0;font-size:12px;color:#64748b;line-height:1.45">${t(this._uiLocale, 'multiSelectionHint')}</p>
           </div>
-          <button class="danger" type="button" @click=${() => this._deleteSelected()}>${t(this.locale, 'delete')}</button>
+          <button class="danger" type="button" @click=${() => this._deleteSelected()}>${t(this._uiLocale, 'delete')}</button>
         </form>
       `;
     }
@@ -1864,10 +1897,10 @@ export class ReportsBuilderElement extends LitElement {
               ? el.orientation === 'horizontal'
                 ? html`
                     <label>w (length)<input type="number" min="5" .value=${String(el.pos.w)} @input=${(e: Event) => update({ pos: { ...el.pos, w: Number((e.target as HTMLInputElement).value) } })} /></label>
-                    <label>h (${t(this.locale, 'thickness')})<input type="number" readonly disabled .value=${String(lineThicknessMm(el.thickness ?? 1))} /></label>
+                    <label>h (${t(this._uiLocale, 'thickness')})<input type="number" readonly disabled .value=${String(lineThicknessMm(el.thickness ?? 1))} /></label>
                   `
                 : html`
-                    <label>w (${t(this.locale, 'thickness')})<input type="number" readonly disabled .value=${String(lineThicknessMm(el.thickness ?? 1))} /></label>
+                    <label>w (${t(this._uiLocale, 'thickness')})<input type="number" readonly disabled .value=${String(lineThicknessMm(el.thickness ?? 1))} /></label>
                     <label>h (length)<input type="number" min="5" .value=${String(el.pos.h)} @input=${(e: Event) => update({ pos: { ...el.pos, h: Number((e.target as HTMLInputElement).value) } })} /></label>
                   `
               : html`
@@ -1875,15 +1908,15 @@ export class ReportsBuilderElement extends LitElement {
                   <label>h<input type="number" .value=${String(el.pos.h)} @input=${(e: Event) => update({ pos: { ...el.pos, h: Number((e.target as HTMLInputElement).value) } })} /></label>
                 `}
           </div>
-          <label>${t(this.locale, 'visibleWhen')}<input .value=${el.visibleWhen ?? ''} placeholder="amount > 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
+          <label>${t(this._uiLocale, 'visibleWhen')}<input .value=${el.visibleWhen ?? ''} placeholder="amount > 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
         </div>
 
         <div class="group">
-          <h4>${t(this.locale, 'style')}</h4>
-          <label>${t(this.locale, 'fontFamily')}<input .value=${el.style?.font ?? ''} placeholder="inherit" @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} /></label>
+          <h4>${t(this._uiLocale, 'style')}</h4>
+          <label>${t(this._uiLocale, 'fontFamily')}<input .value=${el.style?.font ?? ''} placeholder="inherit" @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} /></label>
           <div class="grid2">
-            <label>${t(this.locale, 'fontSize')}<input type="number" min="4" max="96" .value=${String(el.style?.fontSize ?? 10)} @input=${(e: Event) => updateStyle({ fontSize: Number((e.target as HTMLInputElement).value) })} /></label>
-            <label>${t(this.locale, 'align')}
+            <label>${t(this._uiLocale, 'fontSize')}<input type="number" min="4" max="96" .value=${String(el.style?.fontSize ?? 10)} @input=${(e: Event) => updateStyle({ fontSize: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'align')}
               <select @change=${(e: Event) => updateStyle({ align: ((e.target as HTMLSelectElement).value || undefined) as Style['align'] })}>
                 <option value="">-</option>
                 <option value="start" ?selected=${el.style?.align === 'start'}>start</option>
@@ -1894,37 +1927,37 @@ export class ReportsBuilderElement extends LitElement {
             </label>
           </div>
           <div class="grid2">
-            <label>${t(this.locale, 'color')}<input type="color" .value=${el.style?.color ?? '#111111'} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></label>
-            <label>${t(this.locale, 'background')}<input type="color" .value=${el.style?.background ?? '#ffffff'} @input=${(e: Event) => updateStyle({ background: (e.target as HTMLInputElement).value })} /></label>
+            <label>${t(this._uiLocale, 'color')}<input type="color" .value=${el.style?.color ?? '#111111'} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></label>
+            <label>${t(this._uiLocale, 'background')}<input type="color" .value=${el.style?.background ?? '#ffffff'} @input=${(e: Event) => updateStyle({ background: (e.target as HTMLInputElement).value })} /></label>
           </div>
           <div class="grid4">
-            <label><input type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} /> ${t(this.locale, 'bold')}</label>
-            <label><input type="checkbox" .checked=${!!el.style?.italic} @change=${(e: Event) => updateStyle({ italic: (e.target as HTMLInputElement).checked })} /> ${t(this.locale, 'italic')}</label>
-            <label><input type="checkbox" .checked=${!!el.style?.underline} @change=${(e: Event) => updateStyle({ underline: (e.target as HTMLInputElement).checked })} /> ${t(this.locale, 'underline')}</label>
-            <label>${t(this.locale, 'padding')}<input type="number" min="0" max="40" .value=${String(el.style?.padding ?? 0)} @input=${(e: Event) => updateStyle({ padding: Number((e.target as HTMLInputElement).value) || undefined })} /></label>
+            <label><input type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} /> ${t(this._uiLocale, 'bold')}</label>
+            <label><input type="checkbox" .checked=${!!el.style?.italic} @change=${(e: Event) => updateStyle({ italic: (e.target as HTMLInputElement).checked })} /> ${t(this._uiLocale, 'italic')}</label>
+            <label><input type="checkbox" .checked=${!!el.style?.underline} @change=${(e: Event) => updateStyle({ underline: (e.target as HTMLInputElement).checked })} /> ${t(this._uiLocale, 'underline')}</label>
+            <label>${t(this._uiLocale, 'padding')}<input type="number" min="0" max="40" .value=${String(el.style?.padding ?? 0)} @input=${(e: Event) => updateStyle({ padding: Number((e.target as HTMLInputElement).value) || undefined })} /></label>
           </div>
         </div>
 
         <div class="group">
-          <h4>${t(this.locale, 'border')}</h4>
+          <h4>${t(this._uiLocale, 'border')}</h4>
           <div class="grid4">
-            <label>${t(this.locale, 'top')}<input type="number" min="0" .value=${String(border.top ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, top: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
-            <label>${t(this.locale, 'right')}<input type="number" min="0" .value=${String(border.right ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, right: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
-            <label>${t(this.locale, 'bottom')}<input type="number" min="0" .value=${String(border.bottom ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, bottom: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
-            <label>${t(this.locale, 'left')}<input type="number" min="0" .value=${String(border.left ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, left: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
+            <label>${t(this._uiLocale, 'top')}<input type="number" min="0" .value=${String(border.top ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, top: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
+            <label>${t(this._uiLocale, 'right')}<input type="number" min="0" .value=${String(border.right ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, right: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
+            <label>${t(this._uiLocale, 'bottom')}<input type="number" min="0" .value=${String(border.bottom ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, bottom: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
+            <label>${t(this._uiLocale, 'left')}<input type="number" min="0" .value=${String(border.left ?? 0)} @input=${(e: Event) => updateStyle({ border: { ...border, left: Number((e.target as HTMLInputElement).value) || undefined } })} /></label>
           </div>
-          <label>${t(this.locale, 'color')}<input type="color" .value=${border.color ?? '#000000'} @input=${(e: Event) => updateStyle({ border: { ...border, color: (e.target as HTMLInputElement).value } })} /></label>
+          <label>${t(this._uiLocale, 'color')}<input type="color" .value=${border.color ?? '#000000'} @input=${(e: Event) => updateStyle({ border: { ...border, color: (e.target as HTMLInputElement).value } })} /></label>
         </div>
 
         <div class="group">
-          <h4>${t(this.locale, 'conditional')}</h4>
+          <h4>${t(this._uiLocale, 'conditional')}</h4>
           ${(el.cond ?? []).map((rule, idx) => this._renderCondRule(rule, idx, el))}
-          <button class="secondary" type="button" @click=${() => this._addCondRule(el)}>+ ${t(this.locale, 'addRule')}</button>
+          <button class="secondary" type="button" @click=${() => this._addCondRule(el)}>+ ${t(this._uiLocale, 'addRule')}</button>
         </div>
 
         ${this._renderKindSpecific(el, update)}
 
-        <button class="danger" type="button" @click=${() => this._deleteSelected()}>${t(this.locale, 'delete')}</button>
+        <button class="danger" type="button" @click=${() => this._deleteSelected()}>${t(this._uiLocale, 'delete')}</button>
       </form>
     `;
   }
@@ -1942,16 +1975,16 @@ export class ReportsBuilderElement extends LitElement {
     return html`
       <div class="cond-rule">
         <div class="row">
-          <input placeholder=${t(this.locale, 'when')} .value=${rule.when} @input=${(e: Event) => updateRule({ when: (e.target as HTMLInputElement).value })} />
-          <button class="danger" type="button" @click=${removeRule} title=${t(this.locale, 'delete')}>×</button>
+          <input placeholder=${t(this._uiLocale, 'when')} .value=${rule.when} @input=${(e: Event) => updateRule({ when: (e.target as HTMLInputElement).value })} />
+          <button class="danger" type="button" @click=${removeRule} title=${t(this._uiLocale, 'delete')}>×</button>
         </div>
         <div class="row">
-          <label style="flex:1">${t(this.locale, 'color')}<input type="color" .value=${rule.style.color ?? '#111111'} @input=${(e: Event) => updateRule({ style: { color: (e.target as HTMLInputElement).value } })} /></label>
-          <label style="flex:1">${t(this.locale, 'background')}<input type="color" .value=${rule.style.background ?? '#ffffff'} @input=${(e: Event) => updateRule({ style: { background: (e.target as HTMLInputElement).value } })} /></label>
+          <label style="flex:1">${t(this._uiLocale, 'color')}<input type="color" .value=${rule.style.color ?? '#111111'} @input=${(e: Event) => updateRule({ style: { color: (e.target as HTMLInputElement).value } })} /></label>
+          <label style="flex:1">${t(this._uiLocale, 'background')}<input type="color" .value=${rule.style.background ?? '#ffffff'} @input=${(e: Event) => updateRule({ style: { background: (e.target as HTMLInputElement).value } })} /></label>
         </div>
         <div class="row">
-          <label><input type="checkbox" .checked=${!!rule.style.bold} @change=${(e: Event) => updateRule({ style: { bold: (e.target as HTMLInputElement).checked } })} /> ${t(this.locale, 'bold')}</label>
-          <label><input type="checkbox" .checked=${!!rule.style.italic} @change=${(e: Event) => updateRule({ style: { italic: (e.target as HTMLInputElement).checked } })} /> ${t(this.locale, 'italic')}</label>
+          <label><input type="checkbox" .checked=${!!rule.style.bold} @change=${(e: Event) => updateRule({ style: { bold: (e.target as HTMLInputElement).checked } })} /> ${t(this._uiLocale, 'bold')}</label>
+          <label><input type="checkbox" .checked=${!!rule.style.italic} @change=${(e: Event) => updateRule({ style: { italic: (e.target as HTMLInputElement).checked } })} /> ${t(this._uiLocale, 'italic')}</label>
         </div>
       </div>
     `;
@@ -2021,27 +2054,27 @@ export class ReportsBuilderElement extends LitElement {
       return html`
         <div class="nested-band">
           <h6>${title}</h6>
-          <button type="button" class="secondary" @click=${ops.onEnable}>${t(this.locale, 'enable')}</button>
+          <button type="button" class="secondary" @click=${ops.onEnable}>${t(this._uiLocale, 'enable')}</button>
         </div>
       `;
     }
     return html`
       <div class="nested-band">
         <h6>${title}</h6>
-        <label>${t(this.locale, 'heightMm')}
+        <label>${t(this._uiLocale, 'heightMm')}
           <input type="number" min="0" step="0.5" .value=${String(band.height)}
                  @input=${(e: Event) => ops.onPatch({ height: Number((e.target as HTMLInputElement).value) })} />
         </label>
         <label><input type="checkbox" .checked=${!!band.pageBreakBefore}
                @change=${(e: Event) =>
                  ops.onPatch({ pageBreakBefore: (e.target as HTMLInputElement).checked ? true : undefined })} />
-          ${t(this.locale, 'pageBreakBefore')}</label>
+          ${t(this._uiLocale, 'pageBreakBefore')}</label>
         <label><input type="checkbox" .checked=${!!band.pageBreakAfter}
                @change=${(e: Event) =>
                  ops.onPatch({ pageBreakAfter: (e.target as HTMLInputElement).checked ? true : undefined })} />
-          ${t(this.locale, 'pageBreakAfter')}</label>
+          ${t(this._uiLocale, 'pageBreakAfter')}</label>
         <div class="band-actions">
-          <button type="button" class="danger" @click=${ops.onRemove}>${t(this.locale, 'removeSection')}</button>
+          <button type="button" class="danger" @click=${ops.onRemove}>${t(this._uiLocale, 'removeSection')}</button>
         </div>
       </div>
     `;
@@ -2049,12 +2082,12 @@ export class ReportsBuilderElement extends LitElement {
 
   private _renderRootBandBlock(key: BandKey) {
     const band = this._schema.bands[key];
-    const title = t(this.locale, key as 'reportHeader');
+    const title = t(this._uiLocale, key as 'reportHeader');
     if (key !== 'detail' && !band) {
       return html`
         <div class="sub-panel" data-root-band=${key}>
           <h5>${title}</h5>
-          <button type="button" class="secondary" @click=${() => this._enableRootBand(key)}>${t(this.locale, 'enable')}</button>
+          <button type="button" class="secondary" @click=${() => this._enableRootBand(key)}>${t(this._uiLocale, 'enable')}</button>
         </div>
       `;
     }
@@ -2062,7 +2095,7 @@ export class ReportsBuilderElement extends LitElement {
     return html`
       <div class="sub-panel" data-root-band=${key}>
         <h5>${title}</h5>
-        <label>${t(this.locale, 'heightMm')}
+        <label>${t(this._uiLocale, 'heightMm')}
           <input type="number" min="0" step="0.5" .value=${String(b.height)}
                  @input=${(e: Event) => this._patchRootBand(key, { height: Number((e.target as HTMLInputElement).value) })} />
         </label>
@@ -2071,16 +2104,16 @@ export class ReportsBuilderElement extends LitElement {
                  this._patchRootBand(key, {
                    pageBreakBefore: (e.target as HTMLInputElement).checked ? true : undefined,
                  })} />
-          ${t(this.locale, 'pageBreakBefore')}</label>
+          ${t(this._uiLocale, 'pageBreakBefore')}</label>
         <label><input type="checkbox" .checked=${!!b.pageBreakAfter}
                @change=${(e: Event) =>
                  this._patchRootBand(key, { pageBreakAfter: (e.target as HTMLInputElement).checked ? true : undefined })} />
-          ${t(this.locale, 'pageBreakAfter')}</label>
+          ${t(this._uiLocale, 'pageBreakAfter')}</label>
         ${key !== 'detail'
           ? html`
               <div class="band-actions">
                 <button type="button" class="danger" @click=${() => this._disableRootBand(key)}>
-                  ${t(this.locale, 'removeSection')}
+                  ${t(this._uiLocale, 'removeSection')}
                 </button>
               </div>
             `
@@ -2092,7 +2125,7 @@ export class ReportsBuilderElement extends LitElement {
   private _renderReportBandsEditor() {
     return html`
       <div class="group">
-        <h4>${t(this.locale, 'reportBands')}</h4>
+        <h4>${t(this._uiLocale, 'reportBands')}</h4>
         ${BAND_KEYS.map((key) => this._renderRootBandBlock(key))}
       </div>
     `;
@@ -2101,8 +2134,8 @@ export class ReportsBuilderElement extends LitElement {
   private _renderGroupBlock(g: Group, idx: number) {
     return html`
       <div class="sub-panel" data-group-index=${String(idx)}>
-        <h5>${t(this.locale, 'reportGroups')} #${idx + 1}</h5>
-        <label>${t(this.locale, 'groupByField')}
+        <h5>${t(this._uiLocale, 'reportGroups')} #${idx + 1}</h5>
+        <label>${t(this._uiLocale, 'groupByField')}
           <input .value=${g.key}
                  @input=${(e: Event) => this._patchGroupAt(idx, { key: (e.target as HTMLInputElement).value })} />
         </label>
@@ -2111,13 +2144,13 @@ export class ReportsBuilderElement extends LitElement {
                  this._patchGroupAt(idx, {
                    resetPageNumber: (e.target as HTMLInputElement).checked ? true : undefined,
                  })} />
-          ${t(this.locale, 'resetPageNumber')}</label>
-        ${this._renderNestedBandSection(t(this.locale, 'groupHeader'), g.header, {
+          ${t(this._uiLocale, 'resetPageNumber')}</label>
+        ${this._renderNestedBandSection(t(this._uiLocale, 'groupHeader'), g.header, {
           onPatch: (p) => this._patchGroupBandAt(idx, 'header', p),
           onEnable: () => this._setGroupBandAt(idx, 'header', { height: 8, elements: [] }),
           onRemove: () => this._setGroupBandAt(idx, 'header', undefined),
         })}
-        ${this._renderNestedBandSection(t(this.locale, 'groupFooter'), g.footer, {
+        ${this._renderNestedBandSection(t(this._uiLocale, 'groupFooter'), g.footer, {
           onPatch: (p) => this._patchGroupBandAt(idx, 'footer', p),
           onEnable: () => this._setGroupBandAt(idx, 'footer', { height: 8, elements: [] }),
           onRemove: () => this._setGroupBandAt(idx, 'footer', undefined),
@@ -2131,14 +2164,14 @@ export class ReportsBuilderElement extends LitElement {
     if (groups.length === 0) {
       return html`
         <div class="group">
-          <h4>${t(this.locale, 'reportGroups')}</h4>
-          <div class="empty-hint" style="padding:8px">${t(this.locale, 'none')}</div>
+          <h4>${t(this._uiLocale, 'reportGroups')}</h4>
+          <div class="empty-hint" style="padding:8px">${t(this._uiLocale, 'none')}</div>
         </div>
       `;
     }
     return html`
       <div class="group">
-        <h4>${t(this.locale, 'reportGroups')}</h4>
+        <h4>${t(this._uiLocale, 'reportGroups')}</h4>
         ${groups.map((g, idx) => this._renderGroupBlock(g, idx))}
       </div>
     `;
@@ -2165,16 +2198,16 @@ export class ReportsBuilderElement extends LitElement {
     return html`
       <form class="props" @submit=${(e: Event) => e.preventDefault()}>
         <div class="group">
-          <h4>${t(this.locale, 'document')}</h4>
-          <label>${t(this.locale, 'description')}<input .value=${meta.description ?? ''} @input=${(e: Event) => updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></label>
+          <h4>${t(this._uiLocale, 'document')}</h4>
+          <label>${t(this._uiLocale, 'description')}<input .value=${meta.description ?? ''} @input=${(e: Event) => updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></label>
           <div class="grid2">
-            <label>${t(this.locale, 'locale')}
+            <label>${t(this._uiLocale, 'locale')}
               <select @change=${(e: Event) => updateMeta({ locale: (e.target as HTMLSelectElement).value as 'ar' | 'en' })}>
                 <option value="en" ?selected=${meta.locale === 'en'}>en</option>
                 <option value="ar" ?selected=${meta.locale === 'ar'}>ar</option>
               </select>
             </label>
-            <label>${t(this.locale, 'direction')}
+            <label>${t(this._uiLocale, 'direction')}
               <select @change=${(e: Event) => updateMeta({ dir: (e.target as HTMLSelectElement).value as 'rtl' | 'ltr' })}>
                 <option value="ltr" ?selected=${meta.dir === 'ltr'}>ltr</option>
                 <option value="rtl" ?selected=${meta.dir === 'rtl'}>rtl</option>
@@ -2184,27 +2217,27 @@ export class ReportsBuilderElement extends LitElement {
         </div>
 
         <div class="group">
-          <h4>${t(this.locale, 'page')}</h4>
+          <h4>${t(this._uiLocale, 'page')}</h4>
           <div class="grid2">
-            <label>${t(this.locale, 'paperSize')}
+            <label>${t(this._uiLocale, 'paperSize')}
               <select @change=${(e: Event) => updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>
                 <option value="A4" ?selected=${page.size === 'A4'}>A4</option>
                 <option value="A5" ?selected=${page.size === 'A5'}>A5</option>
                 <option value="Letter" ?selected=${page.size === 'Letter'}>Letter</option>
               </select>
             </label>
-            <label>${t(this.locale, 'orientation')}
+            <label>${t(this._uiLocale, 'orientation')}
               <select @change=${(e: Event) => updatePage({ orientation: (e.target as HTMLSelectElement).value as 'portrait' | 'landscape' })}>
-                <option value="portrait" ?selected=${page.orientation === 'portrait'}>${t(this.locale, 'portrait')}</option>
-                <option value="landscape" ?selected=${page.orientation === 'landscape'}>${t(this.locale, 'landscape')}</option>
+                <option value="portrait" ?selected=${page.orientation === 'portrait'}>${t(this._uiLocale, 'portrait')}</option>
+                <option value="landscape" ?selected=${page.orientation === 'landscape'}>${t(this._uiLocale, 'landscape')}</option>
               </select>
             </label>
           </div>
           <div class="grid4">
-            <label>${t(this.locale, 'top')}<input type="number" min="0" .value=${String(page.margins.top)} @input=${(e: Event) => updateMargins({ top: Number((e.target as HTMLInputElement).value) })} /></label>
-            <label>${t(this.locale, 'right')}<input type="number" min="0" .value=${String(page.margins.right)} @input=${(e: Event) => updateMargins({ right: Number((e.target as HTMLInputElement).value) })} /></label>
-            <label>${t(this.locale, 'bottom')}<input type="number" min="0" .value=${String(page.margins.bottom)} @input=${(e: Event) => updateMargins({ bottom: Number((e.target as HTMLInputElement).value) })} /></label>
-            <label>${t(this.locale, 'left')}<input type="number" min="0" .value=${String(page.margins.left)} @input=${(e: Event) => updateMargins({ left: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'top')}<input type="number" min="0" .value=${String(page.margins.top)} @input=${(e: Event) => updateMargins({ top: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'right')}<input type="number" min="0" .value=${String(page.margins.right)} @input=${(e: Event) => updateMargins({ right: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'bottom')}<input type="number" min="0" .value=${String(page.margins.bottom)} @input=${(e: Event) => updateMargins({ bottom: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'left')}<input type="number" min="0" .value=${String(page.margins.left)} @input=${(e: Event) => updateMargins({ left: Number((e.target as HTMLInputElement).value) })} /></label>
           </div>
         </div>
 
@@ -2224,10 +2257,10 @@ export class ReportsBuilderElement extends LitElement {
     if (!wm) {
       return html`
         <div class="group">
-          <h4>${t(this.locale, 'watermark')}</h4>
+          <h4>${t(this._uiLocale, 'watermark')}</h4>
           <div class="grid2">
-            <button class="secondary" type="button" @click=${() => setWatermark({ kind: 'text', text: 'CONFIDENTIAL', fontSize: 72, color: '#cccccc', opacity: 0.2, rotation: -30 })}>+ ${t(this.locale, 'text')}</button>
-            <button class="secondary" type="button" @click=${() => setWatermark({ kind: 'image', src: '', opacity: 0.15, rotation: 0, width: 120 })}>+ ${t(this.locale, 'image')}</button>
+            <button class="secondary" type="button" @click=${() => setWatermark({ kind: 'text', text: 'CONFIDENTIAL', fontSize: 72, color: '#cccccc', opacity: 0.2, rotation: -30 })}>+ ${t(this._uiLocale, 'text')}</button>
+            <button class="secondary" type="button" @click=${() => setWatermark({ kind: 'image', src: '', opacity: 0.15, rotation: 0, width: 120 })}>+ ${t(this._uiLocale, 'image')}</button>
           </div>
         </div>
       `;
@@ -2243,31 +2276,31 @@ export class ReportsBuilderElement extends LitElement {
     if (wm.kind === 'text') {
       return html`
         <div class="group">
-          <h4>${t(this.locale, 'watermark')} — ${t(this.locale, 'text')}</h4>
-          <label>${t(this.locale, 'text')}<input .value=${wm.text} @input=${(e: Event) => updateText({ text: (e.target as HTMLInputElement).value })} /></label>
-          <label>${t(this.locale, 'expression')}<input placeholder='"DRAFT — " + meta.name' .value=${wm.expression ?? ''} @input=${(e: Event) => updateText({ expression: (e.target as HTMLInputElement).value || undefined })} /></label>
+          <h4>${t(this._uiLocale, 'watermark')} — ${t(this._uiLocale, 'text')}</h4>
+          <label>${t(this._uiLocale, 'text')}<input .value=${wm.text} @input=${(e: Event) => updateText({ text: (e.target as HTMLInputElement).value })} /></label>
+          <label>${t(this._uiLocale, 'expression')}<input placeholder='"DRAFT — " + meta.name' .value=${wm.expression ?? ''} @input=${(e: Event) => updateText({ expression: (e.target as HTMLInputElement).value || undefined })} /></label>
           <div class="grid2">
-            <label>${t(this.locale, 'fontSize')}<input type="number" min="8" max="300" .value=${String(wm.fontSize)} @input=${(e: Event) => updateText({ fontSize: Number((e.target as HTMLInputElement).value) })} /></label>
-            <label>${t(this.locale, 'color')}<input type="color" .value=${wm.color} @input=${(e: Event) => updateText({ color: (e.target as HTMLInputElement).value })} /></label>
+            <label>${t(this._uiLocale, 'fontSize')}<input type="number" min="8" max="300" .value=${String(wm.fontSize)} @input=${(e: Event) => updateText({ fontSize: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'color')}<input type="color" .value=${wm.color} @input=${(e: Event) => updateText({ color: (e.target as HTMLInputElement).value })} /></label>
           </div>
           <div class="grid2">
-            <label>${t(this.locale, 'opacity')}<input type="number" min="0" max="1" step="0.05" .value=${String(wm.opacity)} @input=${(e: Event) => updateText({ opacity: Number((e.target as HTMLInputElement).value) })} /></label>
-            <label>${t(this.locale, 'rotation')}<input type="number" min="-180" max="180" .value=${String(wm.rotation)} @input=${(e: Event) => updateText({ rotation: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'opacity')}<input type="number" min="0" max="1" step="0.05" .value=${String(wm.opacity)} @input=${(e: Event) => updateText({ opacity: Number((e.target as HTMLInputElement).value) })} /></label>
+            <label>${t(this._uiLocale, 'rotation')}<input type="number" min="-180" max="180" .value=${String(wm.rotation)} @input=${(e: Event) => updateText({ rotation: Number((e.target as HTMLInputElement).value) })} /></label>
           </div>
-          <button class="danger" type="button" @click=${() => setWatermark(undefined)}>${t(this.locale, 'delete')}</button>
+          <button class="danger" type="button" @click=${() => setWatermark(undefined)}>${t(this._uiLocale, 'delete')}</button>
         </div>
       `;
     }
     return html`
       <div class="group">
-        <h4>${t(this.locale, 'watermark')} — ${t(this.locale, 'image')}</h4>
-        <label>${t(this.locale, 'src')}<input placeholder="https://..." .value=${wm.src} @input=${(e: Event) => updateImage({ src: (e.target as HTMLInputElement).value })} /></label>
+        <h4>${t(this._uiLocale, 'watermark')} — ${t(this._uiLocale, 'image')}</h4>
+        <label>${t(this._uiLocale, 'src')}<input placeholder="https://..." .value=${wm.src} @input=${(e: Event) => updateImage({ src: (e.target as HTMLInputElement).value })} /></label>
         <div class="grid2">
-          <label>${t(this.locale, 'opacity')}<input type="number" min="0" max="1" step="0.05" .value=${String(wm.opacity)} @input=${(e: Event) => updateImage({ opacity: Number((e.target as HTMLInputElement).value) })} /></label>
-          <label>${t(this.locale, 'rotation')}<input type="number" min="-180" max="180" .value=${String(wm.rotation)} @input=${(e: Event) => updateImage({ rotation: Number((e.target as HTMLInputElement).value) })} /></label>
+          <label>${t(this._uiLocale, 'opacity')}<input type="number" min="0" max="1" step="0.05" .value=${String(wm.opacity)} @input=${(e: Event) => updateImage({ opacity: Number((e.target as HTMLInputElement).value) })} /></label>
+          <label>${t(this._uiLocale, 'rotation')}<input type="number" min="-180" max="180" .value=${String(wm.rotation)} @input=${(e: Event) => updateImage({ rotation: Number((e.target as HTMLInputElement).value) })} /></label>
         </div>
         <label>w (mm)<input type="number" min="10" max="400" .value=${String(wm.width)} @input=${(e: Event) => updateImage({ width: Number((e.target as HTMLInputElement).value) })} /></label>
-        <button class="danger" type="button" @click=${() => setWatermark(undefined)}>${t(this.locale, 'delete')}</button>
+        <button class="danger" type="button" @click=${() => setWatermark(undefined)}>${t(this._uiLocale, 'delete')}</button>
       </div>
     `;
   }
@@ -2342,9 +2375,9 @@ export class ReportsBuilderElement extends LitElement {
       return html`
         <div class="group">
           <h4>${el.kind}</h4>
-          <label>${t(this.locale, 'src')}<input .value=${el.src} placeholder="https://..." @input=${(e: Event) => update({ src: (e.target as HTMLInputElement).value } as Partial<ReportElement>)} /></label>
-          <label>${t(this.locale, 'alt')}<input .value=${el.alt ?? ''} @input=${(e: Event) => update({ alt: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
-          <label>${t(this.locale, 'fit')}
+          <label>${t(this._uiLocale, 'src')}<input .value=${el.src} placeholder="https://..." @input=${(e: Event) => update({ src: (e.target as HTMLInputElement).value } as Partial<ReportElement>)} /></label>
+          <label>${t(this._uiLocale, 'alt')}<input .value=${el.alt ?? ''} @input=${(e: Event) => update({ alt: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
+          <label>${t(this._uiLocale, 'fit')}
             <select @change=${(e: Event) => update({ fit: ((e.target as HTMLSelectElement).value || undefined) as 'contain' } as Partial<ReportElement>)}>
               <option value="">-</option>
               <option value="contain" ?selected=${el.fit === 'contain'}>contain</option>
@@ -2360,9 +2393,9 @@ export class ReportsBuilderElement extends LitElement {
       const titleKey = el.mode === 'markdown' ? 'markdown' : 'html';
       return html`
         <div class="group">
-          <h4>${t(this.locale, titleKey)}</h4>
-          <p class="hint">${t(this.locale, 'fieldPlaceholderHint')}</p>
-          <label>${t(this.locale, 'content')}
+          <h4>${t(this._uiLocale, titleKey)}</h4>
+          <p class="hint">${t(this._uiLocale, 'fieldPlaceholderHint')}</p>
+          <label>${t(this._uiLocale, 'content')}
             <textarea rows="8" .value=${el.content} @input=${(e: Event) => update({ content: (e.target as HTMLTextAreaElement).value } as Partial<ReportElement>)}></textarea>
           </label>
           <label>format<input .value=${el.format ?? ''} placeholder="decimal2, date" @input=${(e: Event) => update({ format: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
@@ -2376,29 +2409,29 @@ export class ReportsBuilderElement extends LitElement {
       const symbologies = ['CODE128', 'CODE39', 'EAN13', 'EAN8', 'UPC', 'ITF14'] as const;
       return html`
         <div class="group">
-          <h4>${t(this.locale, el.kind)}</h4>
-          <label>${t(this.locale, 'value')}<input .value=${el.value ?? ''} placeholder="static text" @input=${(e: Event) => update({ value: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
-          <label>${t(this.locale, 'field')}
+          <h4>${t(this._uiLocale, el.kind)}</h4>
+          <label>${t(this._uiLocale, 'value')}<input .value=${el.value ?? ''} placeholder="static text" @input=${(e: Event) => update({ value: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
+          <label>${t(this._uiLocale, 'field')}
             <select @change=${(e: Event) => update({ field: (e.target as HTMLSelectElement).value || undefined } as Partial<ReportElement>)}>
               <option value="">-</option>
               ${this._fields.map((f) => html`<option value=${f.name} ?selected=${el.field === f.name}>${f.name}</option>`)}
             </select>
           </label>
-          <label>${t(this.locale, 'expression')}<input .value=${el.expression ?? ''} placeholder="orderId" @input=${(e: Event) => update({ expression: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
+          <label>${t(this._uiLocale, 'expression')}<input .value=${el.expression ?? ''} placeholder="orderId" @input=${(e: Event) => update({ expression: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
           <label>format<input .value=${el.format ?? ''} placeholder="decimal2" @input=${(e: Event) => update({ format: (e.target as HTMLInputElement).value || undefined } as Partial<ReportElement>)} /></label>
           ${el.kind === 'qr'
-            ? html`<label>${t(this.locale, 'errorCorrection')}
+            ? html`<label>${t(this._uiLocale, 'errorCorrection')}
                 <select @change=${(e: Event) => update({ errorCorrectionLevel: (e.target as HTMLSelectElement).value as 'M' } as Partial<ReportElement>)}>
                   ${['L', 'M', 'Q', 'H'].map((lvl) => html`<option value=${lvl} ?selected=${el.errorCorrectionLevel === lvl}>${lvl}</option>`)}
                 </select>
               </label>`
             : html`
-                <label>${t(this.locale, 'symbology')}
+                <label>${t(this._uiLocale, 'symbology')}
                   <select @change=${(e: Event) => update({ symbology: (e.target as HTMLSelectElement).value as 'CODE128' } as Partial<ReportElement>)}>
                     ${symbologies.map((s) => html`<option value=${s} ?selected=${el.symbology === s}>${s}</option>`)}
                   </select>
                 </label>
-                <label><input type="checkbox" .checked=${el.displayValue !== false} @change=${(e: Event) => update({ displayValue: (e.target as HTMLInputElement).checked } as Partial<ReportElement>)} /> ${t(this.locale, 'displayValue')}</label>
+                <label><input type="checkbox" .checked=${el.displayValue !== false} @change=${(e: Event) => update({ displayValue: (e.target as HTMLInputElement).checked } as Partial<ReportElement>)} /> ${t(this._uiLocale, 'displayValue')}</label>
               `}
         </div>
       `;
@@ -2408,15 +2441,15 @@ export class ReportsBuilderElement extends LitElement {
         <div class="group">
           <h4>${el.kind}</h4>
           <div class="grid2">
-            <label>${t(this.locale, 'orientation')}
+            <label>${t(this._uiLocale, 'orientation')}
               <select @change=${(e: Event) => update({ orientation: (e.target as HTMLSelectElement).value as 'horizontal' } as Partial<ReportElement>)}>
                 <option value="horizontal" ?selected=${el.orientation === 'horizontal'}>horizontal</option>
                 <option value="vertical" ?selected=${el.orientation === 'vertical'}>vertical</option>
               </select>
             </label>
-            <label>${t(this.locale, 'thickness')}<input type="number" min="0.25" max="10" step="0.25" .value=${String(el.thickness)} @input=${(e: Event) => update({ thickness: Number((e.target as HTMLInputElement).value) } as Partial<ReportElement>)} /></label>
+            <label>${t(this._uiLocale, 'thickness')}<input type="number" min="0.25" max="10" step="0.25" .value=${String(el.thickness)} @input=${(e: Event) => update({ thickness: Number((e.target as HTMLInputElement).value) } as Partial<ReportElement>)} /></label>
           </div>
-          <label>${t(this.locale, 'color')}<input type="color" .value=${el.color ?? '#000000'} @input=${(e: Event) => update({ color: (e.target as HTMLInputElement).value } as Partial<ReportElement>)} /></label>
+          <label>${t(this._uiLocale, 'color')}<input type="color" .value=${el.color ?? '#000000'} @input=${(e: Event) => update({ color: (e.target as HTMLInputElement).value } as Partial<ReportElement>)} /></label>
         </div>
       `;
     }
@@ -2506,11 +2539,11 @@ export class ReportsBuilderElement extends LitElement {
     const zoomLabel = `${Math.round(this._zoom * 100)}%`;
     return html`
       <div class="doc-name">
-        <label for="report-name">${t(this.locale, 'document')}</label>
+        <label for="report-name">${t(this._uiLocale, 'document')}</label>
         <input
           id="report-name"
           class="name"
-          aria-label=${t(this.locale, 'document')}
+          aria-label=${t(this._uiLocale, 'document')}
           .value=${this._schema.meta.name}
           @input=${(e: Event) => { this._setSchema({ ...this._schema, meta: { ...this._schema.meta, name: (e.target as HTMLInputElement).value } }); }}
         />
@@ -2518,32 +2551,32 @@ export class ReportsBuilderElement extends LitElement {
       <div class="toolbar" role="toolbar">
         <button
           type="button" class="icon-only" data-control="undo"
-          aria-label=${t(this.locale, 'undo')} title=${`${t(this.locale, 'undo')} (Ctrl+Z)`}
+          aria-label=${t(this._uiLocale, 'undo')} title=${`${t(this._uiLocale, 'undo')} (Ctrl+Z)`}
           ?disabled=${!canUndo}
           @click=${() => this._undo()}
         >${icon('undo')}</button>
         <button
           type="button" class="icon-only" data-control="redo"
-          aria-label=${t(this.locale, 'redo')} title=${`${t(this.locale, 'redo')} (Ctrl+Y)`}
+          aria-label=${t(this._uiLocale, 'redo')} title=${`${t(this._uiLocale, 'redo')} (Ctrl+Y)`}
           ?disabled=${!canRedo}
           @click=${() => this._redo()}
         >${icon('redo')}</button>
         <span class="sep"></span>
-        <div class="zoom-tools" aria-label=${t(this.locale, 'zoomReset')}>
+        <div class="zoom-tools" aria-label=${t(this._uiLocale, 'zoomReset')}>
           <button
             type="button" class="icon-only" data-control="zoom-out"
-            aria-label=${t(this.locale, 'zoomOut')} title=${t(this.locale, 'zoomOut')}
+            aria-label=${t(this._uiLocale, 'zoomOut')} title=${t(this._uiLocale, 'zoomOut')}
             ?disabled=${this._zoom <= MIN_BUILDER_ZOOM}
             @click=${() => this._zoomOut()}
           >${icon('zoomOut')}</button>
           <button
             type="button" class="zoom-value" data-control="zoom-reset"
-            aria-label=${t(this.locale, 'zoomReset')} title=${t(this.locale, 'zoomReset')}
+            aria-label=${t(this._uiLocale, 'zoomReset')} title=${t(this._uiLocale, 'zoomReset')}
             @click=${() => this._zoomReset()}
           >${zoomLabel}</button>
           <button
             type="button" class="icon-only" data-control="zoom-in"
-            aria-label=${t(this.locale, 'zoomIn')} title=${t(this.locale, 'zoomIn')}
+            aria-label=${t(this._uiLocale, 'zoomIn')} title=${t(this._uiLocale, 'zoomIn')}
             ?disabled=${this._zoom >= MAX_BUILDER_ZOOM}
             @click=${() => this._zoomIn()}
           >${icon('zoomIn')}</button>
@@ -2553,7 +2586,7 @@ export class ReportsBuilderElement extends LitElement {
         <div class="customize">
           <button
             type="button" class="icon-only" data-control="customize"
-            aria-label=${t(this.locale, 'customize')} title=${t(this.locale, 'customize')}
+            aria-label=${t(this._uiLocale, 'customize')} title=${t(this._uiLocale, 'customize')}
             aria-expanded=${this._menuOpen ? 'true' : 'false'}
             @click=${() => this._toggleMenu()}
           >${icon('cog')}</button>
@@ -2562,7 +2595,7 @@ export class ReportsBuilderElement extends LitElement {
                 ${(['save', 'json', 'preview'] as readonly BuilderAction[]).map(
                   (a) => html`<label>
                     <input type="checkbox" .checked=${this.actions.includes(a)} @change=${() => this._toggleAction(a)} />
-                    ${a === 'json' ? html`JSON` : t(this.locale, a === 'save' ? 'save' : 'preview')}
+                    ${a === 'json' ? html`JSON` : t(this._uiLocale, a === 'save' ? 'save' : 'preview')}
                   </label>`,
                 )}
               </div>`
@@ -2597,7 +2630,7 @@ export class ReportsBuilderElement extends LitElement {
           data-ctx=${key}
           ?disabled=${disabled}
           @click=${run(action)}
-        >${icon(iconName)}<span>${t(this.locale, key)}</span></button>
+        >${icon(iconName)}<span>${t(this._uiLocale, key)}</span></button>
       </li>
     `;
     return html`
@@ -2620,7 +2653,7 @@ export class ReportsBuilderElement extends LitElement {
                   role="menuitem"
                   data-ctx="removeSection"
                   @click=${run(() => this._disableRootBand(menuBand as Exclude<BandKey, 'detail'>))}
-                >${icon('trash')}<span>${t(this.locale, 'removeSection')}</span></button>
+                >${icon('trash')}<span>${t(this._uiLocale, 'removeSection')}</span></button>
               </li>
             `
           : nothing}
@@ -2637,9 +2670,9 @@ export class ReportsBuilderElement extends LitElement {
     if (a === 'save') {
       return html`<button
         type="button" data-action="save" class="primary"
-        aria-label=${t(this.locale, 'save')} title=${t(this.locale, 'save')}
+        aria-label=${t(this._uiLocale, 'save')} title=${t(this._uiLocale, 'save')}
         @click=${() => { void this._save(); }}
-      >${icon('save')}<span class="label">${t(this.locale, 'save')}</span></button>`;
+      >${icon('save')}<span class="label">${t(this._uiLocale, 'save')}</span></button>`;
     }
     if (a === 'json') {
       return html`<button
@@ -2651,7 +2684,7 @@ export class ReportsBuilderElement extends LitElement {
     if (a === 'preview') {
       return html`<button
         type="button" data-action="preview" class="icon-only"
-        aria-label=${t(this.locale, 'preview')} title=${t(this.locale, 'preview')}
+        aria-label=${t(this._uiLocale, 'preview')} title=${t(this._uiLocale, 'preview')}
         @click=${() => this.dispatchEvent(new CustomEvent('request-preview'))}
       >${icon('eye')}</button>`;
     }
@@ -2662,28 +2695,28 @@ export class ReportsBuilderElement extends LitElement {
     const contentWidthMm = this._pageContentWidthMm();
     const widthPx = contentWidthMm * MM_TO_PX;
     const heightPx = this._canvasHeightPx();
-    const zoomOrigin = this.dir === 'rtl' ? 'top right' : 'top left';
-    const startIcon = this.dir === 'rtl' ? 'chevronRight' : 'chevronLeft';
+    const zoomOrigin = this._canvasDir === 'rtl' ? 'top right' : 'top left';
+    const startIcon = this._uiDir === 'rtl' ? 'chevronRight' : 'chevronLeft';
     return html`
       <aside class="left ${this._leftCollapsed ? 'collapsed' : ''}">
         <div class="panel-head">
           <span class="title">${this._schema.meta.name}</span>
-          <button type="button" class="collapse" data-control="toggle-left" aria-label=${t(this.locale, this._leftCollapsed ? 'show' : 'hide')} @click=${() => this._toggleLeft()}>
+          <button type="button" class="collapse" data-control="toggle-left" aria-label=${t(this._uiLocale, this._leftCollapsed ? 'show' : 'hide')} @click=${() => this._toggleLeft()}>
             ${icon(this._leftCollapsed ? 'panelLeft' : startIcon)}
           </button>
         </div>
         ${this._leftCollapsed
           ? nothing
           : html`<div class="side-body">
-              ${this._renderSideSection('actions', t(this.locale, 'actions'), this._renderActionsSection())}
-              ${this._renderSideSection('tools', t(this.locale, 'toolbox'), this._renderToolboxContent())}
-              ${this._renderSideSection('properties', t(this.locale, 'properties'), this._renderProperties())}
+              ${this._renderSideSection('actions', t(this._uiLocale, 'actions'), this._renderActionsSection())}
+              ${this._renderSideSection('tools', t(this._uiLocale, 'toolbox'), this._renderToolboxContent())}
+              ${this._renderSideSection('properties', t(this._uiLocale, 'properties'), this._renderProperties())}
             </div>`}
       </aside>
 
       <main class="center" @contextmenu=${this._onHostContextMenu}>
         <div class="canvas-zoom" style="width:${widthPx * this._zoom}px;height:${heightPx * this._zoom}px">
-          <div class="canvas" style="width:${widthPx}px;transform:scale(${this._zoom});transform-origin:${zoomOrigin}" dir=${this.dir}>
+          <div class="canvas" style="width:${widthPx}px;transform:scale(${this._zoom});transform-origin:${zoomOrigin}" dir=${this._canvasDir}>
             ${BAND_KEYS.map((k) => this._renderBand(k))}
           </div>
         </div>
@@ -2702,6 +2735,8 @@ export class ReportsBuilderElement extends LitElement {
     this._replaceSchema(v.value, { resetHistory: true });
   }
 }
+
+installDirOverride(ReportsBuilderElement.prototype);
 
 if (typeof customElements !== 'undefined' && !customElements.get('reports-builder')) {
   customElements.define('reports-builder', ReportsBuilderElement);

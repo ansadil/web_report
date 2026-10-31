@@ -17,8 +17,8 @@ export function ReportViewer(props: ReportViewerProps) {
     el.rows = (rows ?? null) as readonly import('@reports-web/shared').Row[] | null;
     el.dataAdapter = dataAdapter ?? null;
     el.chartAdapter = chartAdapter ?? null;
-    el.locale = locale ?? 'en';
-    el.dir = dir ?? 'ltr';
+    el.locale = locale;
+    el.dir = dir ?? '';
     el.noToolbar = !!noToolbar;
     el.hideViewControls = !!hideViewControls;
     el.hidePageBoundaries = !!hidePageBoundaries;

@@ -151,7 +151,7 @@ function renderElement(
       return { ...base, text: el.value };
     case 'field': {
       const v = ctx.row?.[el.field];
-      return { ...base, text: applyPattern(v, el.format, ctx.locale) };
+      return { ...base, text: applyPattern(v, el.format, ctx.locale, el.formatOptions) };
     }
     case 'image':
       return { ...base, src: el.src };
@@ -164,7 +164,7 @@ function renderElement(
       } else {
         value = 0;
       }
-      return { ...base, text: applyPattern(value, el.format, ctx.locale) };
+      return { ...base, text: applyPattern(value, el.format, ctx.locale, el.formatOptions) };
     }
     case 'chart': {
       const data = (ctx.groupRows ?? (ctx.vars?.['__rows__'] as readonly Row[] | undefined) ?? []) as readonly Row[];
@@ -192,7 +192,7 @@ function renderElement(
       const r = tryEvaluate(el.expression, ctx);
       const v = r.ok ? r.value : '';
       if (!r.ok) logger.warn('interpreter', 'expr eval failed', { expr: el.expression, error: r.error });
-      return { ...base, text: applyPattern(v, el.format, ctx.locale) };
+      return { ...base, text: applyPattern(v, el.format, ctx.locale, el.formatOptions) };
     }
     case 'qr': {
       const payload = resolveCodePayload(el, ctx);

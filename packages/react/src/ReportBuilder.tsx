@@ -18,8 +18,8 @@ export function ReportBuilder(props: ReportBuilderProps) {
     el.dataAdapter = dataAdapter ?? null;
     el.storageAdapter = storageAdapter ?? null;
     el.sampleRows = (sampleRows ?? null) as readonly import('@reports-web/shared').Row[] | null;
-    el.locale = locale ?? 'en';
-    el.dir = dir ?? 'ltr';
+    el.locale = locale;
+    el.dir = dir ?? '';
   }, [schema, dataAdapter, storageAdapter, sampleRows, locale, dir]);
 
   useEffect(() => {

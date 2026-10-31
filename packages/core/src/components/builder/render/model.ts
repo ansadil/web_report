@@ -3,10 +3,11 @@ import type { CanvasCallbacks, CanvasState } from './canvas.js';
 import type { ActionsCallbacks, ActionsState } from './toolbar.js';
 import type { ToolboxCallbacks, ToolboxState } from './toolbox.js';
 import type { PropertiesCallbacks, PropertiesState } from './properties/panel.js';
+import type { LocaleTag } from '@reports-web/shared';
 import type { SideSectionKey } from '../types.js';
 
 export interface BuilderViewState {
-  uiLocale: 'ar' | 'en';
+  uiLocale: LocaleTag;
   uiDir: 'rtl' | 'ltr';
   canvasDir: 'rtl' | 'ltr';
   leftCollapsed: boolean;

@@ -146,3 +146,58 @@ describe('Adapter describe() pass-through', () => {
     expect(createCustomAdapter({ fetch: async () => [] }).describe).toBeUndefined();
   });
 });
+
+describe('Report parameters reach adapters via DataQuery.params', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => { originalFetch = globalThis.fetch; });
+  afterEach(() => { globalThis.fetch = originalFetch; });
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  const params = { year: 2026, active: true, period: { from: '2026-01-01', to: '2026-01-31' }, at: new Date(Date.UTC(2026, 0, 1)), none: null };
+
+  it('REST GET serializes scalars, dates and dateRange objects (bracket notation) into the query string', async () => {
+    const spy = vi.fn(async (_url: string) => json([]));
+    globalThis.fetch = spy as unknown as typeof globalThis.fetch;
+    await createRestAdapter({ baseUrl: 'http://api/' }).fetch({ source: 'sales', params });
+    const url = new URL(spy.mock.calls[0]![0]);
+    expect(url.searchParams.get('year')).toBe('2026');
+    expect(url.searchParams.get('active')).toBe('true');
+    expect(url.searchParams.get('period[from]')).toBe('2026-01-01');
+    expect(url.searchParams.get('period[to]')).toBe('2026-01-31');
+    expect(url.searchParams.get('at')).toBe('2026-01-01T00:00:00.000Z');
+    expect(url.searchParams.has('none')).toBe(false);
+  });
+
+  it('REST POST sends params in the JSON body', async () => {
+    const spy = vi.fn(async (_url: string, _init?: RequestInit) => json([]));
+    globalThis.fetch = spy as unknown as typeof globalThis.fetch;
+    await createRestAdapter({ baseUrl: 'http://api/q', method: 'POST' }).fetch({ source: 'sales', params });
+    const body = JSON.parse(spy.mock.calls[0]![1]!.body as string) as { source: string; params: Record<string, unknown> };
+    expect(body.source).toBe('sales');
+    expect(body.params).toEqual({ year: 2026, active: true, period: { from: '2026-01-01', to: '2026-01-31' }, at: '2026-01-01T00:00:00.000Z', none: null });
+  });
+
+  it('GraphQL hands params to buildQuery so they can become variables', async () => {
+    const spy = vi.fn(async (_url: string, _init?: RequestInit) => json({ data: { sales: [] } }));
+    globalThis.fetch = spy as unknown as typeof globalThis.fetch;
+    const buildQuery = vi.fn((s: string, p: Readonly<Record<string, unknown>>) => ({ query: `query($year:Int){ ${s}(year:$year){a} }`, variables: { year: p.year, period: p.period } }));
+    await createGraphQLAdapter({ endpoint: 'http://gql', buildQuery }).fetch({ source: 'sales', params });
+    expect(buildQuery).toHaveBeenCalledWith('sales', params);
+    const body = JSON.parse(spy.mock.calls[0]![1]!.body as string) as { variables: Record<string, unknown> };
+    expect(body.variables).toEqual({ year: 2026, period: { from: '2026-01-01', to: '2026-01-31' } });
+  });
+
+  it('SQL-proxy sends params as bindings', async () => {
+    const spy = vi.fn(async (_url: string, _init?: RequestInit) => json({ rows: [] }));
+    globalThis.fetch = spy as unknown as typeof globalThis.fetch;
+    await createSqlProxyAdapter({ endpoint: 'http://proxy' }).fetch({ source: 'SELECT 1', params: { year: 2026, period: params.period } });
+    const body = JSON.parse(spy.mock.calls[0]![1]!.body as string) as { bindings: Record<string, unknown> };
+    expect(body.bindings).toEqual({ year: 2026, period: { from: '2026-01-01', to: '2026-01-31' } });
+  });
+
+  it('custom adapter receives the full DataQuery', async () => {
+    const fetchFn = vi.fn(async (_q: unknown, _s?: AbortSignal) => []);
+    const ctl = new AbortController();
+    await createCustomAdapter({ fetch: fetchFn }).fetch({ source: 's', params }, ctl.signal);
+    expect(fetchFn).toHaveBeenCalledWith({ source: 's', params }, ctl.signal);
+  });
+});

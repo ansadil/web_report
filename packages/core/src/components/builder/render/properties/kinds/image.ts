@@ -1,3 +1,4 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { html } from 'lit';
 import { t } from '../../../api.js';
 import type { ReportElement } from '../../../api.js';
@@ -5,7 +6,7 @@ import type { ReportElement } from '../../../api.js';
 type ImageEl = Extract<ReportElement, { kind: 'image' }>;
 type Patch = Partial<ReportElement>;
 
-export function renderImageKind(el: ImageEl, locale: 'ar' | 'en', update: (patch: Patch) => void) {
+export function renderImageKind(el: ImageEl, locale: LocaleTag, update: (patch: Patch) => void) {
   return html`
     <div class="group">
       <h4>${el.kind}</h4>

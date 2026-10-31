@@ -1,10 +1,10 @@
 import { html } from 'lit';
-import type { FieldMeta } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag } from '@reports-web/shared';
 import { resolveLabel, t, toolIconForKind } from '../api.js';
 import { TOOL_KINDS, type ToolKind } from '../types.js';
 
 export interface ToolboxState {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   fields: readonly FieldMeta[];
 }
 

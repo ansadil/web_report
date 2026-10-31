@@ -1,12 +1,12 @@
 import { html } from 'lit';
-import type { FieldMeta } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag } from '@reports-web/shared';
 import { t } from '../../../api.js';
 import type { ReportElement } from '../../../api.js';
 
 type CodeEl = Extract<ReportElement, { kind: 'qr' | 'barcode' }>;
 type Patch = Partial<ReportElement>;
 
-export function renderCodeKind(el: CodeEl, fields: readonly FieldMeta[], locale: 'ar' | 'en', update: (patch: Patch) => void) {
+export function renderCodeKind(el: CodeEl, fields: readonly FieldMeta[], locale: LocaleTag, update: (patch: Patch) => void) {
   const symbologies = ['CODE128', 'CODE39', 'EAN13', 'EAN8', 'UPC', 'ITF14'] as const;
   return html`
     <div class="group">

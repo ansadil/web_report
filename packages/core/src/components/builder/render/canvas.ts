@@ -1,3 +1,4 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { MM_TO_PX } from '@reports-web/shared';
 import { t } from '../api.js';
@@ -14,7 +15,7 @@ import {
 } from '../types.js';
 
 export interface CanvasState {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   bands: ReportSchemaV1['bands'];
   hoverBand: BandKey | null;
   marquee: MarqueeState | null;
@@ -69,7 +70,7 @@ function renderMarquee(state: CanvasState, band: BandKey) {
     width:${r.w * MM_TO_PX}px;
     height:${r.h * MM_TO_PX}px;
   `;
-  return html`<div class="marquee" style="${style}"></div>`;
+  return html`<div class="marquee" data-testid="marquee" style="${style}"></div>`;
 }
 
 function elementLabel(state: CanvasState, cb: CanvasCallbacks, el: Exclude<ReportElement, { kind: 'line' }>): string {
@@ -129,6 +130,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     return html`
       <div
         class="element line ${isSel ? 'selected' : ''}"
+        data-testid=${`element-${el.id}`}
         data-orientation=${el.orientation}
         style=${boxStyle}
         @click=${(e: MouseEvent) => e.stopPropagation()}
@@ -172,6 +174,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
   return html`
     <div
       class="element ${isSel ? 'selected' : ''} ${el.kind === 'richtext' ? 'richtext' : ''}"
+      data-testid=${`element-${el.id}`}
       style="${style}"
       @click=${(e: MouseEvent) => e.stopPropagation()}
       @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}

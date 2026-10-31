@@ -1,4 +1,4 @@
-import type { FieldMeta, Row } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag, Row } from '@reports-web/shared';
 import type { DataAdapter, ReportSchemaV1, StorageAdapter } from './api.js';
 import type { ElementClipboard } from './ops/clipboard.js';
 import type { HistoryStore } from './state/history.js';
@@ -21,7 +21,7 @@ export interface BuilderSession {
   actions: readonly BuilderAction[];
   clipboard: ElementClipboard | null;
 
-  readonly uiLocale: 'ar' | 'en';
+  readonly uiLocale: LocaleTag;
   readonly uiDir: 'rtl' | 'ltr';
   readonly canvasDir: 'rtl' | 'ltr';
   readonly dataAdapter: DataAdapter | null;

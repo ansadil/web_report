@@ -1,12 +1,12 @@
 import { html, nothing } from 'lit';
-import type { FieldMeta } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag } from '@reports-web/shared';
 import { t } from '../../../api.js';
 import type { ReportElement } from '../../../api.js';
 
 type RichEl = Extract<ReportElement, { kind: 'richtext' }>;
 type Patch = Partial<ReportElement>;
 
-export function renderRichTextKind(el: RichEl, fields: readonly FieldMeta[], locale: 'ar' | 'en', update: (patch: Patch) => void) {
+export function renderRichTextKind(el: RichEl, fields: readonly FieldMeta[], locale: LocaleTag, update: (patch: Patch) => void) {
   const appendField = (name: string) => update({ content: `${el.content}<${name}>` } as Patch);
   const titleKey = el.mode === 'markdown' ? 'markdown' : 'html';
   return html`

@@ -1,5 +1,5 @@
 import type { Row } from '@reports-web/shared';
-import { applyPattern, escapeHtml } from '@reports-web/shared';
+import { applyPattern, escapeHtml, type LocaleTag } from '@reports-web/shared';
 
 /** Matches `<fieldName>` or `<parent.child>` field placeholders (not HTML tags with attributes). */
 export const FIELD_PLACEHOLDER_RE = /<([A-Za-z_][\w.]*)>/g;
@@ -18,7 +18,7 @@ export function getRowFieldValue(row: Row | undefined, fieldPath: string): unkno
 export function substituteFieldPlaceholders(
   template: string,
   row: Row | undefined,
-  locale: 'ar' | 'en',
+  locale: LocaleTag,
   format?: string,
 ): string {
   if (!row) return template;

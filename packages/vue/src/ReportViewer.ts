@@ -1,3 +1,4 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue';
 import { ReportsViewerElement } from '@reports-web/core';
 import type { ReportViewerProps } from './types.js';
@@ -13,13 +14,14 @@ export const ReportViewer = defineComponent({
     rows: { type: Array as PropType<ReportViewerProps['rows']>, default: undefined },
     dataAdapter: { type: Object as PropType<ReportViewerProps['dataAdapter']>, default: undefined },
     chartAdapter: { type: Object as PropType<ReportViewerProps['chartAdapter']>, default: undefined },
-    locale: { type: String as PropType<'ar' | 'en'>, default: undefined },
+    locale: { type: String as PropType<LocaleTag>, default: undefined },
     dir: { type: String as PropType<'rtl' | 'ltr'>, default: undefined },
     noToolbar: { type: Boolean, default: false },
     hideViewControls: { type: Boolean, default: false },
     hidePageBoundaries: { type: Boolean, default: false },
+    params: { type: Object as PropType<ReportViewerProps['params']>, default: undefined },
   },
-  emits: ['rendered', 'export', 'export-error'],
+  emits: ['rendered', 'export', 'export-error', 'parameters-error'],
   setup(props, { emit }) {
     const elRef = ref<ReportsViewerElement | null>(null);
 
@@ -35,11 +37,13 @@ export const ReportViewer = defineComponent({
       el.noToolbar = props.noToolbar;
       el.hideViewControls = props.hideViewControls;
       el.hidePageBoundaries = props.hidePageBoundaries;
+      el.params = props.params ?? null;
     };
 
     const onRendered = (e: Event) => emit('rendered', (e as CustomEvent).detail);
     const onExport = (e: Event) => emit('export', (e as CustomEvent).detail);
     const onErr = (e: Event) => emit('export-error', (e as CustomEvent).detail);
+    const onParamsErr = (e: Event) => emit('parameters-error', (e as CustomEvent).detail);
 
     onMounted(() => {
       apply();
@@ -47,16 +51,18 @@ export const ReportViewer = defineComponent({
       el?.addEventListener('report-rendered', onRendered);
       el?.addEventListener('export', onExport);
       el?.addEventListener('export-error', onErr);
+      el?.addEventListener('parameters-error', onParamsErr);
     });
     onBeforeUnmount(() => {
       const el = elRef.value;
       el?.removeEventListener('report-rendered', onRendered);
       el?.removeEventListener('export', onExport);
       el?.removeEventListener('export-error', onErr);
+      el?.removeEventListener('parameters-error', onParamsErr);
     });
 
     watch(
-      () => [props.schema, props.rows, props.dataAdapter, props.chartAdapter, props.locale, props.dir, props.noToolbar, props.hideViewControls, props.hidePageBoundaries],
+      () => [props.schema, props.rows, props.dataAdapter, props.chartAdapter, props.locale, props.dir, props.noToolbar, props.hideViewControls, props.hidePageBoundaries, props.params],
       () => apply(),
       { deep: true },
     );

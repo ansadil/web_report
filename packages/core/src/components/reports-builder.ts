@@ -1,29 +1,34 @@
 import { LitElement } from 'lit';
 import { property, state } from 'lit/decorators.js';
-import type { FieldMeta, Row } from '@reports-web/shared';
-import { logger, validateReport } from './builder/api.js';
-import type { DataAdapter, ReportSchemaV1, StorageAdapter } from './builder/api.js';
-import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
-import { emptySchema } from './builder/factory.js';
-import { DndController } from './builder/interactions/dnd.js';
-import { KeyboardController } from './builder/interactions/keyboard.js';
-import { PointerController } from './builder/interactions/pointer.js';
-import { loadFields } from './builder/ops/io.js';
-import { replaceSchema } from './builder/ops/commands.js';
-import type { ElementClipboard } from './builder/ops/clipboard.js';
-import { renderBuilder } from './builder/render/shell.js';
-import type { BuilderSession } from './builder/session.js';
-import { HistoryStore } from './builder/state/history.js';
-import { builderStyles } from './builder/styles/index.js';
+import type { FieldMeta, LocaleTag, Row } from '@reports-web/shared';
 import {
   BUILDER_DEFAULT_ACTIONS,
-  type BandKey,
-  type BuilderAction,
-  type ContextMenuState,
-  type MarqueeState,
-  type SideSectionKey,
-} from './builder/types.js';
-import { buildViewModel } from './builder/view-model.js';
+  DndController,
+  HistoryStore,
+  KeyboardController,
+  PointerController,
+  builderStyles,
+  buildViewModel,
+  emptySchema,
+  loadFields,
+  logger,
+  renderBuilder,
+  replaceSchema,
+  validateReport,
+} from './builder/index.js';
+import type {
+  BandKey,
+  BuilderAction,
+  BuilderSession,
+  ContextMenuState,
+  DataAdapter,
+  ElementClipboard,
+  MarqueeState,
+  ReportSchemaV1,
+  SideSectionKey,
+  StorageAdapter,
+} from './builder/index.js';
+import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 
 export class ReportsBuilderElement extends LitElement {
   static override styles = builderStyles;
@@ -32,8 +37,8 @@ export class ReportsBuilderElement extends LitElement {
   @property({ attribute: false }) dataAdapter: DataAdapter | null = null;
   @property({ attribute: false }) storageAdapter: StorageAdapter | null = null;
   @property({ attribute: false }) sampleRows: readonly Row[] | null = null;
-  /** UI language override. When unset, follows the template's meta.locale. */
-  @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
+  /** UI language override (BCP 47 tag). When unset, follows the template's meta.locale. */
+  @property({ type: String }) locale: LocaleTag | undefined = undefined;
   /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
   @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
   @property({ attribute: false }) actions: readonly BuilderAction[] = BUILDER_DEFAULT_ACTIONS;
@@ -82,7 +87,7 @@ export class ReportsBuilderElement extends LitElement {
     }
   }
 
-  private get _uiLocale(): 'ar' | 'en' {
+  private get _uiLocale(): LocaleTag {
     return resolveLocale(this.locale, this._schema.meta);
   }
 
@@ -138,125 +143,189 @@ export class ReportsBuilderElement extends LitElement {
   }
 
   private createSession(): BuilderSession {
-    const el = this;
+    const schema = () => this._schema;
+    const setSchemaValue = (v: ReportSchemaV1) => {
+      this._schema = v;
+    };
+    const selectedIds = () => this._selectedIds;
+    const setSelectedIds = (v: ReadonlySet<string>) => {
+      this._selectedIds = v;
+    };
+    const selectedBand = () => this._selectedBand;
+    const setSelectedBand = (v: BandKey | null) => {
+      this._selectedBand = v;
+    };
+    const selectionAnchorId = () => this._selectionAnchorId;
+    const setSelectionAnchorId = (v: string | null) => {
+      this._selectionAnchorId = v;
+    };
+    const fields = () => this._fields;
+    const setFields = (v: readonly FieldMeta[]) => {
+      this._fields = v;
+    };
+    const hoverBand = () => this._hoverBand;
+    const setHoverBand = (v: BandKey | null) => {
+      this._hoverBand = v;
+    };
+    const marquee = () => this._marquee;
+    const setMarquee = (v: MarqueeState | null) => {
+      this._marquee = v;
+    };
+    const leftCollapsed = () => this._leftCollapsed;
+    const setLeftCollapsed = (v: boolean) => {
+      this._leftCollapsed = v;
+    };
+    const menuOpen = () => this._menuOpen;
+    const setMenuOpen = (v: boolean) => {
+      this._menuOpen = v;
+    };
+    const zoom = () => this._zoom;
+    const setZoomValue = (v: number) => {
+      this._zoom = v;
+    };
+    const collapsedSections = () => this._collapsedSections;
+    const setCollapsedSections = (v: Record<SideSectionKey, boolean>) => {
+      this._collapsedSections = v;
+    };
+    const contextMenu = () => this._contextMenu;
+    const setContextMenu = (v: ContextMenuState | null) => {
+      this._contextMenu = v;
+    };
+    const actions = () => this.actions;
+    const setActions = (v: readonly BuilderAction[]) => {
+      this.actions = v;
+    };
+    const clipboard = () => this._clipboard;
+    const setClipboard = (v: ElementClipboard | null) => {
+      this._clipboard = v;
+    };
+    const uiLocale = () => this._uiLocale;
+    const uiDir = () => this._uiDir;
+    const canvasDir = () => this._canvasDir;
+    const dataAdapter = () => this.dataAdapter;
+    const storageAdapter = () => this.storageAdapter;
+    const sampleRows = () => this.sampleRows;
+    const history = () => this._history;
+    const shadowRoot = () => this.shadowRoot;
+    const touchHistory = () => {
+      this._historyVersion++;
+    };
+    const focus = () => {
+      this.focus();
+    };
+    const dispatchEvent = (event: Event) => this.dispatchEvent(event);
     return {
       get schema() {
-        return el._schema;
+        return schema();
       },
       set schema(v) {
-        el._schema = v;
+        setSchemaValue(v);
       },
       get selectedIds() {
-        return el._selectedIds;
+        return selectedIds();
       },
       set selectedIds(v) {
-        el._selectedIds = v;
+        setSelectedIds(v);
       },
       get selectedBand() {
-        return el._selectedBand;
+        return selectedBand();
       },
       set selectedBand(v) {
-        el._selectedBand = v;
+        setSelectedBand(v);
       },
       get selectionAnchorId() {
-        return el._selectionAnchorId;
+        return selectionAnchorId();
       },
       set selectionAnchorId(v) {
-        el._selectionAnchorId = v;
+        setSelectionAnchorId(v);
       },
       get fields() {
-        return el._fields;
+        return fields();
       },
       set fields(v) {
-        el._fields = v;
+        setFields(v);
       },
       get hoverBand() {
-        return el._hoverBand;
+        return hoverBand();
       },
       set hoverBand(v) {
-        el._hoverBand = v;
+        setHoverBand(v);
       },
       get marquee() {
-        return el._marquee;
+        return marquee();
       },
       set marquee(v) {
-        el._marquee = v;
+        setMarquee(v);
       },
       get leftCollapsed() {
-        return el._leftCollapsed;
+        return leftCollapsed();
       },
       set leftCollapsed(v) {
-        el._leftCollapsed = v;
+        setLeftCollapsed(v);
       },
       get menuOpen() {
-        return el._menuOpen;
+        return menuOpen();
       },
       set menuOpen(v) {
-        el._menuOpen = v;
+        setMenuOpen(v);
       },
       get zoom() {
-        return el._zoom;
+        return zoom();
       },
       set zoom(v) {
-        el._zoom = v;
+        setZoomValue(v);
       },
       get collapsedSections() {
-        return el._collapsedSections;
+        return collapsedSections();
       },
       set collapsedSections(v) {
-        el._collapsedSections = v;
+        setCollapsedSections(v);
       },
       get contextMenu() {
-        return el._contextMenu;
+        return contextMenu();
       },
       set contextMenu(v) {
-        el._contextMenu = v;
+        setContextMenu(v);
       },
       get actions() {
-        return el.actions;
+        return actions();
       },
       set actions(v) {
-        el.actions = v;
+        setActions(v);
       },
       get clipboard() {
-        return el._clipboard;
+        return clipboard();
       },
       set clipboard(v) {
-        el._clipboard = v;
+        setClipboard(v);
       },
       get uiLocale() {
-        return el._uiLocale;
+        return uiLocale();
       },
       get uiDir() {
-        return el._uiDir;
+        return uiDir();
       },
       get canvasDir() {
-        return el._canvasDir;
+        return canvasDir();
       },
       get dataAdapter() {
-        return el.dataAdapter;
+        return dataAdapter();
       },
       get storageAdapter() {
-        return el.storageAdapter;
+        return storageAdapter();
       },
       get sampleRows() {
-        return el.sampleRows;
+        return sampleRows();
       },
       get history() {
-        return el._history;
+        return history();
       },
       get shadowRoot() {
-        return el.shadowRoot;
+        return shadowRoot();
       },
-      touchHistory() {
-        el._historyVersion++;
-      },
-      focus() {
-        el.focus();
-      },
-      dispatchEvent(event: Event) {
-        return el.dispatchEvent(event);
-      },
+      touchHistory,
+      focus,
+      dispatchEvent,
     };
   }
 }

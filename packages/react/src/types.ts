@@ -1,5 +1,5 @@
-import type { Row } from '@reports-web/shared';
-import type { ReportSchemaV1, DataAdapter, StorageAdapter, ChartAdapter } from '@reports-web/core';
+import type { LocaleTag, Row } from '@reports-web/shared';
+import type { ReportSchemaV1, DataAdapter, StorageAdapter, ChartAdapter, ParameterValues, ParameterIssue } from '@reports-web/core';
 
 export type ExportKind = 'pdf' | 'excel' | 'csv' | 'png' | 'print';
 
@@ -14,18 +14,23 @@ export interface ReportViewerProps {
   rows?: readonly Row[];
   dataAdapter?: DataAdapter;
   chartAdapter?: ChartAdapter;
-  locale?: 'ar' | 'en';
+  /** BCP 47 tag ('ar', 'ar-SA', 'en-GB', ...). UI strings: ar / ar-* -> Arabic, else English. */
+  locale?: LocaleTag;
   dir?: 'rtl' | 'ltr';
   noToolbar?: boolean;
   /** Hide zoom / section navigation (export toolbar stays visible unless `noToolbar`). */
   hideViewControls?: boolean;
   /** Continuous scroll without stacked page sheets (matches attribute `hide-page-boundaries`). */
   hidePageBoundaries?: boolean;
+  /** Report parameter values (by `ParameterDef.name`), merged into `DataQuery.params`; changes trigger a refetch. */
+  params?: ParameterValues;
   className?: string;
   style?: React.CSSProperties;
   onRendered?: (info: { sections: number; rows: number }) => void;
   onExport?: (payload: ExportPayload) => void;
   onExportError?: (error: { kind: ExportKind; error: string }) => void;
+  /** Required/invalid parameter values; no fetch is made. */
+  onParametersError?: (detail: { error: string; issues: readonly ParameterIssue[] }) => void;
 }
 
 export interface ReportBuilderProps {
@@ -33,7 +38,8 @@ export interface ReportBuilderProps {
   dataAdapter?: DataAdapter;
   storageAdapter?: StorageAdapter;
   sampleRows?: readonly Row[];
-  locale?: 'ar' | 'en';
+  /** BCP 47 tag ('ar', 'ar-SA', 'en-GB', ...). UI strings: ar / ar-* -> Arabic, else English. */
+  locale?: LocaleTag;
   dir?: 'rtl' | 'ltr';
   className?: string;
   style?: React.CSSProperties;

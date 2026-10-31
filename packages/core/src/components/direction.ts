@@ -1,4 +1,7 @@
-export type ReportLocale = 'ar' | 'en';
+import { isRtlLocale, type LocaleTag } from '@reports-web/shared';
+
+/** BCP 47 locale tag ('ar', 'en', 'ar-SA', 'fa-IR', ...). */
+export type ReportLocale = LocaleTag;
 export type ReportDir = 'rtl' | 'ltr';
 
 interface MetaLike {
@@ -13,12 +16,12 @@ export function resolveLocale(host: ReportLocale | undefined | null, meta?: Meta
 
 /**
  * Host override wins, then the template's saved dir, then infer from locale
- * (Arabic means RTL). An empty string from the native `dir` property counts as unset.
+ * (isRtlLocale via Intl.Locale(tag).language: ar-*, fa, he, ur, ... mean RTL; invalid tags are LTR). An empty string from the native `dir` property counts as unset.
  */
 export function resolveDir(host: string | undefined | null, meta?: MetaLike | null, locale?: ReportLocale): ReportDir {
   if (host === 'rtl' || host === 'ltr') return host;
   if (meta?.dir) return meta.dir;
-  return (locale ?? meta?.locale) === 'ar' ? 'rtl' : 'ltr';
+  return isRtlLocale(locale ?? meta?.locale) ? 'rtl' : 'ltr';
 }
 
 /**

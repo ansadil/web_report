@@ -1,9 +1,10 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { html } from 'lit';
 import { t } from '../../api.js';
 import type { Watermark } from '../../api.js';
 
 export interface WatermarkState {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   watermark: Watermark | undefined;
 }
 

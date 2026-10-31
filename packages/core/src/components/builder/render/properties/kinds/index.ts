@@ -1,5 +1,5 @@
 import { nothing } from 'lit';
-import type { FieldMeta } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag } from '@reports-web/shared';
 import type { ReportElement } from '../../../api.js';
 import { renderAggregateKind } from './aggregate.js';
 import { renderChartKind } from './chart.js';
@@ -14,7 +14,7 @@ import { renderTextKind } from './text.js';
 export interface KindEditorState {
   el: ReportElement;
   fields: readonly FieldMeta[];
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
 }
 
 export interface KindEditorCallbacks {

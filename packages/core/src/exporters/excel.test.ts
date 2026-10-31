@@ -94,6 +94,29 @@ describe('Excel exporter (Arabic report)', () => {
     expect((ws.views[0] as { rightToLeft?: boolean }).rightToLeft).toBe(true);
   });
 
+  describe('BUG-21: explicit dir wins over the locale', () => {
+    const rtlView = (ws: ExcelJS.Worksheet) => (ws.views[0] as { rightToLeft?: boolean }).rightToLeft;
+    const headerAlign = (ws: ExcelJS.Worksheet) => findRow(ws, 'الصنف').alignment?.horizontal;
+
+    it('Arabic locale + dir ltr → LTR sheet and left-aligned headers', async () => {
+      const ws = await sheet(schema({ name: 'تقرير', locale: 'ar', dir: 'ltr' }));
+      expect(rtlView(ws)).toBe(false);
+      expect(headerAlign(ws)).toBe('left');
+    });
+
+    it('Arabic locale + no dir → RTL sheet (locale default)', async () => {
+      const ws = await sheet(schema({ name: 'تقرير', locale: 'ar' }));
+      expect(rtlView(ws)).toBe(true);
+      expect(headerAlign(ws)).toBe('right');
+    });
+
+    it('English locale + dir rtl → RTL sheet', async () => {
+      const ws = await sheet(schema({ name: 'Sales', locale: 'en', dir: 'rtl' }));
+      expect(rtlView(ws)).toBe(true);
+      expect(headerAlign(ws)).toBe('right');
+    });
+  });
+
   it('group totals sit under their field column', async () => {
     const s = schema(undefined, {
       groups: [{ key: 'item', footer: { height: 6, elements: [{ id: 'g', kind: 'aggregate', fn: 'sum', field: 'price', scope: 'group', format: 'decimal2', pos: { x: 100, y: 0, w: 35, h: 6 } }] } }],

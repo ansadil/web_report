@@ -1,10 +1,11 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { t } from '../../api.js';
 import type { Band, Group, ReportSchemaV1 } from '../../api.js';
 import { BAND_KEYS, type BandKey } from '../../types.js';
 
 export interface BandsState {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   schema: ReportSchemaV1;
 }
 
@@ -111,7 +112,7 @@ function renderGroupBlock(state: BandsState, cb: BandsCallbacks, g: Group, idx: 
 }
 
 function renderNestedBandSection(
-  locale: 'ar' | 'en',
+  locale: LocaleTag,
   title: string,
   band: Band | undefined,
   testKey: string,

@@ -1,11 +1,12 @@
-import { html } from 'lit';
+import type { LocaleTag } from '@reports-web/shared';
+import { html, nothing } from 'lit';
 import { t } from '../../api.js';
 import type { ReportSchemaV1 } from '../../api.js';
 import { renderGroupsBandsEditor, renderReportBandsEditor, type BandsCallbacks } from './bands.js';
 import { renderWatermarkEditor, type WatermarkCallbacks } from './watermark.js';
 
 export interface DocumentState {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   schema: ReportSchemaV1;
 }
 
@@ -25,9 +26,12 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
         <label>${t(state.locale, 'description')}<input data-testid="prop-description" .value=${meta.description ?? ''} @input=${(e: Event) => cb.updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></label>
         <div class="grid2">
           <label>${t(state.locale, 'locale')}
-            <select data-testid="prop-locale" @change=${(e: Event) => cb.updateMeta({ locale: (e.target as HTMLSelectElement).value as 'ar' | 'en' })}>
+            <select data-testid="prop-locale" @change=${(e: Event) => cb.updateMeta({ locale: (e.target as HTMLSelectElement).value })}>
               <option value="en" ?selected=${meta.locale === 'en'}>en</option>
               <option value="ar" ?selected=${meta.locale === 'ar'}>ar</option>
+              ${meta.locale !== 'en' && meta.locale !== 'ar'
+                ? html`<option value=${meta.locale} selected>${meta.locale}</option>`
+                : nothing}
             </select>
           </label>
           <label>${t(state.locale, 'direction')}

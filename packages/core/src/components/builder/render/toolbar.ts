@@ -1,3 +1,4 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { icon, t } from '../api.js';
 import {
@@ -8,7 +9,7 @@ import {
 } from '../types.js';
 
 export interface ActionsState {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   name: string;
   canUndo: boolean;
   canRedo: boolean;

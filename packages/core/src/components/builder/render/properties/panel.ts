@@ -65,7 +65,7 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
                 <label>h<input data-testid="prop-height" type="number" .value=${String(el.pos.h)} @input=${(e: Event) => update({ pos: { ...el.pos, h: Number((e.target as HTMLInputElement).value) } })} /></label>
               `}
         </div>
-        <label>${t(state.locale, 'visibleWhen')}<input data-testid="prop-visible-when" .value=${el.visibleWhen ?? ''} placeholder="amount > 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
+        <label>${t(state.locale, 'visibleWhen')}<input data-testid="prop-visible-when" .value=${el.visibleWhen ?? ''} placeholder="amount &gt; 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
       </div>
 
       <div class="group">

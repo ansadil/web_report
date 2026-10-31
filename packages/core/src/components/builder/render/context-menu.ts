@@ -1,8 +1,9 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { icon, t } from '../api.js';
 
 export interface ContextMenuView {
-  locale: 'ar' | 'en';
+  locale: LocaleTag;
   x: number;
   y: number;
   hasSelection: boolean;
@@ -35,9 +36,7 @@ export function renderContextMenu(state: ContextMenuView | null, cb: ContextMenu
     action: () => void,
   ) => html`
     <li role="none">
-      <button type="button" role="menuitem" data-ctx=${key} ?disabled=${disabled} @click=${action}>
-        ${icon(iconName)}<span>${t(state.locale, key)}</span>
-      </button>
+      <button type="button" role="menuitem" data-ctx=${key} ?disabled=${disabled} @click=${action}>${icon(iconName)}<span>${t(state.locale, key)}</span></button>
     </li>
   `;
   return html`
@@ -56,9 +55,7 @@ export function renderContextMenu(state: ContextMenuView | null, cb: ContextMenu
         ? html`
             <li class="ctx-sep" role="separator"></li>
             <li role="none">
-              <button type="button" role="menuitem" data-ctx="removeSection" @click=${cb.onRemoveSection}>
-                ${icon('trash')}<span>${t(state.locale, 'removeSection')}</span>
-              </button>
+              <button type="button" role="menuitem" data-ctx="removeSection" @click=${cb.onRemoveSection}>${icon('trash')}<span>${t(state.locale, 'removeSection')}</span></button>
             </li>
           `
         : nothing}

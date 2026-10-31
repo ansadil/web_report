@@ -29,7 +29,9 @@ import { logger } from '../logging/logger.js';
 import { hasPageTokens, replacePageTokens } from '../engine/page-tokens.js';
 import { stripHtmlToPlainText } from '../engine/template-fields.js';
 import { TextLayouter, wrapText, type FaceChain, type LaidOutLine } from './pdf-text-layout.js';
-import { loadFace, type LoadedFace } from './pdf-fonts.js';
+import { FontSession, fontLibrary, type LoadedFace } from './pdf-fonts.js';
+import { defaultPdfWarning } from './pdf-warnings.js';
+import { FALLBACK_ARABIC_FAMILY, FALLBACK_LATIN_FAMILY, resolveFontFamily, type FontManifestEntry } from './fonts-manifest.js';
 import { CidFontWriter, cidHex } from './pdf-cid-font.js';
 import type { PdfExportInput } from './pdf.js';
 import { drawBarcodeBars, drawImageContain, drawQr, embedRaster, encodeBarcode, loadImageBytes } from './pdf-graphics.js';
@@ -136,6 +138,8 @@ interface EngineLine {
 
 interface LayoutOptions {
   readonly bold: boolean;
+  /** CSS family / stack from `style.font`; unknown families use the Noto fallback. */
+  readonly family?: string | undefined;
   readonly size: number;
   /** Available width in points (Infinity = no wrapping). */
   readonly maxWidth: number;
@@ -200,6 +204,20 @@ class StandardFontEngine implements TextEngine {
 
 interface UnicodeLine extends EngineLine {
   readonly laid: LaidOutLine;
+  /** Where each face of the line is written (its chain's merged PDF font). */
+  readonly slots: ReadonlyMap<LoadedFace, FontSlot>;
+}
+
+interface FontSlot {
+  readonly writer: CidFontWriter;
+  /** Source index of the face inside the writer. */
+  readonly src: number;
+  readonly name: string;
+}
+
+interface ChainSet {
+  readonly layouter: TextLayouter;
+  readonly slots: ReadonlyMap<LoadedFace, FontSlot>;
 }
 
 /**
@@ -208,49 +226,65 @@ interface UnicodeLine extends EngineLine {
  * logical-text ToUnicode), so pdf-lib/fontkit never re-shape or re-order anything.
  */
 class HarfBuzzEngine implements TextEngine {
-  private readonly layouters: { regular: TextLayouter; bold: TextLayouter };
-  /** One merged PDF font per weight; each face is a source of exactly one of them. */
-  private readonly writers = new Map<LoadedFace, { writer: CidFontWriter; src: number; name: string }>();
+  /** Chains per (family, weight), created on first use; key `family|bold`. */
+  private readonly chains = new Map<string, Promise<ChainSet>>();
   private readonly allWriters: CidFontWriter[] = [];
   private readonly fontKeys = new WeakMap<PDFPage, Map<CidFontWriter, PDFName>>();
   private readonly gsKeys = new WeakMap<PDFPage, Map<number, PDFName>>();
 
   private constructor(
     private readonly pdf: PDFDocument,
-    chains: { regular: FaceChain; bold: FaceChain },
+    private readonly fonts: FontSession,
+    private readonly manifest: readonly FontManifestEntry[],
     private readonly rtl: boolean,
-  ) {
-    this.layouters = { regular: new TextLayouter(chains.regular), bold: new TextLayouter(chains.bold) };
-    for (const chain of [chains.regular, chains.bold]) {
-      const arabic = chain.arabic as LoadedFace;
-      const latin = chain.latin as LoadedFace;
-      // Arabic face first (metrics + hinting); the Latin fallback always keeps Basic Latin and
-      // common punctuation so the embedded program stays usable beyond the drawn glyphs.
-      const writer = new CidFontWriter(pdf, [
-        { font: fontkit.create(arabic.bytes) },
-        { font: fontkit.create(latin.bytes), keep: LATIN_KEEP },
-      ]);
-      this.allWriters.push(writer);
-      const name = arabic.file.replace(/\.ttf$/, '');
-      this.writers.set(arabic, { writer, src: 0, name });
-      this.writers.set(latin, { writer, src: 1, name });
-    }
+  ) {}
+
+  static async create(pdf: PDFDocument, rtl: boolean, fonts: FontSession): Promise<HarfBuzzEngine> {
+    return new HarfBuzzEngine(pdf, fonts, await fonts.manifest(), rtl);
   }
 
-  static async create(pdf: PDFDocument, rtl: boolean): Promise<HarfBuzzEngine> {
-    const [ar, arB, lat, latB] = await Promise.all([
-      loadFace('NotoSansArabic-Regular.ttf'),
-      loadFace('NotoSansArabic-Bold.ttf'),
-      loadFace('NotoSans-Regular.ttf'),
-      loadFace('NotoSans-Bold.ttf'),
+  /**
+   * Chain for a requested family: the family's face first (its own Latin, digits and
+   * punctuation included), then Noto Sans Arabic and Noto Sans for whatever it lacks. Unknown
+   * families — and the fallback families themselves — get the default Noto chain. Fonts are
+   * loaded the first time a chain is needed, so a report only fetches the faces it uses.
+   */
+  private chainFor(family: string | undefined, bold: boolean): Promise<ChainSet> {
+    const resolved = resolveFontFamily(family, this.manifest);
+    const fam = resolved === FALLBACK_ARABIC_FAMILY || resolved === FALLBACK_LATIN_FAMILY ? null : resolved;
+    const key = `${fam ?? ''}|${bold ? 1 : 0}`;
+    let p = this.chains.get(key);
+    if (!p) {
+      p = this.buildChain(fam, bold);
+      this.chains.set(key, p);
+    }
+    return p;
+  }
+
+  private async buildChain(family: string | null, bold: boolean): Promise<ChainSet> {
+    const [primary, arabic, latin] = await Promise.all([
+      family ? this.fonts.loadFamily(family, bold) : Promise.resolve(null),
+      this.fonts.loadFallback(FALLBACK_ARABIC_FAMILY, bold),
+      this.fonts.loadFallback(FALLBACK_LATIN_FAMILY, bold),
     ]);
-    return new HarfBuzzEngine(pdf, { regular: { arabic: ar, latin: lat }, bold: { arabic: arB, latin: latB } }, rtl);
+    const faces: LoadedFace[] = primary ? [primary, arabic, latin] : [arabic, latin];
+    // First face = metrics + hinting of the merged font; the Latin fallback always keeps Basic
+    // Latin and common punctuation so the embedded program stays usable beyond drawn glyphs.
+    const writer = new CidFontWriter(
+      this.pdf,
+      faces.map((f) => (f === latin ? { font: fontkit.create(f.bytes), keep: LATIN_KEEP } : { font: fontkit.create(f.bytes) })),
+    );
+    this.allWriters.push(writer);
+    const name = faces[0]!.file.replace(/\.ttf$/, '');
+    const slots = new Map<LoadedFace, FontSlot>(faces.map((f, src) => [f, { writer, src, name }]));
+    const chain: FaceChain = primary ? { primary, arabic, latin } : { arabic, latin };
+    return { layouter: new TextLayouter(chain), slots };
   }
 
   async layout(text: string, o: LayoutOptions): Promise<EngineLine[]> {
-    const layouter = o.bold ? this.layouters.bold : this.layouters.regular;
+    const { layouter, slots } = await this.chainFor(o.family, o.bold);
     const lines = layouter.wrap(text, this.rtl, o.size, o.maxWidth, o.maxLines);
-    return lines.map((laid): UnicodeLine => ({ text: laid.text, width: laid.width * o.size, laid }));
+    return lines.map((laid): UnicodeLine => ({ text: laid.text, width: laid.width * o.size, laid, slots }));
   }
 
   private fontKey(page: PDFPage, w: CidFontWriter, name: string): PDFName {
@@ -284,7 +318,7 @@ class HarfBuzzEngine implements TextEngine {
    * object, so extractors still see one continuous string.
    */
   draw(page: PDFPage, line: EngineLine, o: DrawOptions): void {
-    const laid = (line as UnicodeLine).laid;
+    const { laid, slots } = line as UnicodeLine;
     if (!laid || laid.glyphs.length === 0) return;
     const rad = ((o.rotateDeg ?? 0) * Math.PI) / 180;
     const cos = Math.cos(rad);
@@ -298,7 +332,7 @@ class HarfBuzzEngine implements TextEngine {
     // Integer positions in 1/1000 em, so run widths add up exactly.
     const q = (n: number): number => Math.round(n * 1000);
     const glyphs = laid.glyphs;
-    const slot = (k: number) => this.writers.get(glyphs[k]!.face as LoadedFace)!;
+    const slot = (k: number): FontSlot => slots.get(glyphs[k]!.face as LoadedFace)!;
     let currentWriter: CidFontWriter | null = null;
     let rise = 0;
     let i = 0;
@@ -416,7 +450,7 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
     // First baseline sits `size + 2` below the box top; further lines every `lineHeight`.
     // Lines whose baseline would fall below the box bottom are clipped (at least one is drawn).
     const maxLines = Math.max(1, Math.floor((h - size - 2) / lineHeight) + 1);
-    const lines = await ctx.text.layout(text, { bold, size, maxWidth: Math.max(1, w - 4), maxLines });
+    const lines = await ctx.text.layout(text, { bold, family: el.style?.font, size, maxWidth: Math.max(1, w - 4), maxLines });
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
       const lineY = ptYTop - size - i * lineHeight - 2;
@@ -488,7 +522,7 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
     const textSize = Math.min(8, h * 0.25);
     drawBarcodeBars(ctx.page, enc.bars, box, showText ? textSize + 2 : 0, dark, light);
     if (showText) {
-      const [line] = await ctx.text.layout(enc.text, { bold: false, size: textSize, maxWidth: Math.max(1, w - 4), maxLines: 1 });
+      const [line] = await ctx.text.layout(enc.text, { bold: false, family: el.style?.font, size: textSize, maxWidth: Math.max(1, w - 4), maxLines: 1 });
       if (line) {
         ctx.text.draw(ctx.page, line, {
           x: alignedX('center', 'ltr', ptX, w, line.width),
@@ -517,7 +551,7 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
         ctx.page.drawRectangle({ x: ptX + 4 + i * barW + 1, y: baseY, width: Math.max(0, barW - 2), height: Math.max(0, bh), color: rgb(0.15, 0.39, 0.92) });
       }
       if (chart.title) {
-        await drawLabel(ctx, chart.title, ptX + 2, ptYTop - 10, w - 4, 8, true, rgb(0.2, 0.2, 0.2));
+        await drawLabel(ctx, chart.title, ptX + 2, ptYTop - 10, w - 4, 8, true, rgb(0.2, 0.2, 0.2), el.style?.font);
       }
     }
     return;
@@ -525,8 +559,8 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
 }
 
 /** Single-line label (no wrap beyond the box; extra text is clipped to one line). */
-async function drawLabel(ctx: DrawCtx, text: string, boxX: number, y: number, boxW: number, size: number, bold: boolean, color: RGB): Promise<void> {
-  const [line] = await ctx.text.layout(text, { bold, size, maxWidth: Math.max(1, boxW - 4), maxLines: 1 });
+async function drawLabel(ctx: DrawCtx, text: string, boxX: number, y: number, boxW: number, size: number, bold: boolean, color: RGB, family?: string): Promise<void> {
+  const [line] = await ctx.text.layout(text, { bold, family, size, maxWidth: Math.max(1, boxW - 4), maxLines: 1 });
   if (!line) return;
   ctx.text.draw(ctx.page, line, { x: alignedX(undefined, ctx.dir, boxX, boxW, line.width), y, size, bold, color });
 }
@@ -563,10 +597,35 @@ function needsUnicodePdfFont(tree: RenderTree, schema: ReportSchemaV1): boolean 
   return false;
 }
 
-export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob> {
+/** `style.font` values of the text-bearing elements. */
+function requestedFamilies(tree: RenderTree): string[] {
+  const out = new Set<string>();
+  for (const s of tree.sections) for (const el of s.elements) if (el.style?.font?.trim()) out.add(el.style.font);
+  return [...out];
+}
+
+/**
+ * A Latin-only report that names a family from fonts.json must still embed that family (not
+ * Helvetica). The manifest is only read when some element sets `style.font`; if it cannot be
+ * read the report keeps Helvetica.
+ */
+async function usesBundledFamily(tree: RenderTree, fonts: FontSession): Promise<boolean> {
+  const families = requestedFamilies(tree);
+  if (families.length === 0) return false;
+  try {
+    const manifest = await fonts.manifest();
+    return families.some((f) => resolveFontFamily(f, manifest) !== null);
+  } catch (e) {
+    logger.warn('pdf', 'fonts.json unavailable; using the standard PDF font', { error: e instanceof Error ? e.message : String(e) });
+    return false;
+  }
+}
+
+export async function renderPdf({ schema, rows, fontsBaseUrl, onWarning }: PdfExportInput): Promise<Blob> {
   const pdf = await PDFDocument.create();
   const tree = interpret({ schema, rows });
-  const useUnicode = needsUnicodePdfFont(tree, schema);
+  const fonts = new FontSession(fontLibrary(fontsBaseUrl), onWarning ?? defaultPdfWarning);
+  const useUnicode = needsUnicodePdfFont(tree, schema) || (await usesBundledFamily(tree, fonts));
   /**
    * Paragraph base direction for bidi and layout. An explicit template/host `dir` always wins (BUG-21: Arabic +
    * `dir: 'ltr'` must stay LTR). Validated schemas always carry `meta.dir` (the schema defaults it from the locale);
@@ -575,7 +634,7 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
   const paragraphBaseDir: 'ltr' | 'rtl' =
     tree.dir ?? (isRtlLocale(schema.meta.locale) ? 'rtl' : 'ltr');
   const text: TextEngine = useUnicode
-    ? await HarfBuzzEngine.create(pdf, paragraphBaseDir === 'rtl')
+    ? await HarfBuzzEngine.create(pdf, paragraphBaseDir === 'rtl', fonts)
     : await StandardFontEngine.create(pdf);
   const space = spaceFromSchema(schema);
   const queued: QueuedSection[] = tree.sections.map((s) => ({ section: s, heightPt: s.height * MM_TO_PT }));

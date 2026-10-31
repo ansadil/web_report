@@ -73,11 +73,12 @@
   },
   "files": [
     "dist",
+    "assets/fonts",
     "LICENSE",
     "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/bundle-render-code.mjs && node scripts/copy-pdf-fonts.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/bundle-render-code.mjs",
     "typecheck": "tsc -p tsconfig.json --emitDeclarationOnly",
     "lint": "pnpm --dir ../.. exec eslint packages/core/src",
     "test": "vitest",

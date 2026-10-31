@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import type { Row } from '@reports-web/shared';
+import { directionForLocale, isArabicLocale, type Row } from '@reports-web/shared';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { computeAggregates, groupRows } from '../engine/aggregator.js';
 import type { AggregateRequest } from '../engine/aggregator.js';
@@ -97,8 +97,8 @@ export async function exportExcel({ schema, rows }: ExcelExportInput): Promise<B
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Reports Web';
   wb.created = new Date();
-  const isAr = schema.meta.locale === 'ar';
-  const dir = schema.meta.dir ?? (isAr ? 'rtl' : 'ltr');
+  const isAr = isArabicLocale(schema.meta.locale);
+  const dir = schema.meta.dir ?? directionForLocale(schema.meta.locale);
   const ws = wb.addWorksheet(schema.meta.name.slice(0, 31) || 'Report', {
     views: [{ rightToLeft: dir === 'rtl' }],
   });

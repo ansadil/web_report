@@ -1,4 +1,7 @@
-export type ReportLocale = 'ar' | 'en';
+import type { LocaleTag } from '@reports-web/shared';
+
+/** BCP 47 locale tag ('ar', 'en', 'ar-SA', 'fa-IR', ...). */
+export type ReportLocale = LocaleTag;
 export type ReportDir = 'rtl' | 'ltr';
 
 interface MetaLike {

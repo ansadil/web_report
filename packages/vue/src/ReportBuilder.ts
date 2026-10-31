@@ -1,3 +1,4 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue';
 import { ReportsBuilderElement } from '@reports-web/core';
 import type { ReportBuilderProps } from './types.js';
@@ -13,7 +14,7 @@ export const ReportBuilder = defineComponent({
     dataAdapter: { type: Object as PropType<ReportBuilderProps['dataAdapter']>, default: undefined },
     storageAdapter: { type: Object as PropType<ReportBuilderProps['storageAdapter']>, default: undefined },
     sampleRows: { type: Array as PropType<ReportBuilderProps['sampleRows']>, default: undefined },
-    locale: { type: String as PropType<'ar' | 'en'>, default: undefined },
+    locale: { type: String as PropType<LocaleTag>, default: undefined },
     dir: { type: String as PropType<'rtl' | 'ltr'>, default: undefined },
   },
   emits: ['save', 'save-error', 'export-json'],

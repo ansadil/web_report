@@ -23,7 +23,7 @@ import {
   type RGB,
 } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { MM_TO_PT } from '@reports-web/shared';
+import { MM_TO_PT, isRtlLocale } from '@reports-web/shared';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { interpret } from '../engine/interpreter.js';
 import type { RenderElement, RenderSection, RenderTree, RenderWatermark } from '../engine/interpreter.js';
@@ -547,7 +547,7 @@ const NON_WINANSI_RE =
   /[^\u0009\u000A\u000D\u0020-\u007E\u00A0-\u00FF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC\u2013\u2014\u2018-\u201A\u201C-\u201E\u2020-\u2022\u2026\u2030\u2039\u203A\u20AC\u2122]/;
 
 function needsUnicodePdfFont(tree: RenderTree, schema: ReportSchemaV1): boolean {
-  if (schema.meta.locale === 'ar' || tree.dir === 'rtl') return true;
+  if (isRtlLocale(schema.meta.locale) || tree.dir === 'rtl') return true;
   const scan = (s: string | undefined): boolean => !!(s && (ARABIC_SCRIPT_RE.test(s) || NON_WINANSI_RE.test(s)));
   if (tree.watermark?.kind === 'text' && scan(tree.watermark.text)) return true;
   for (const s of tree.sections) {
@@ -570,7 +570,7 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
   const useUnicode = needsUnicodePdfFont(tree, schema);
   /** Paragraph base direction for bidi. Arabic reports default to RTL. */
   const paragraphBaseDir: 'ltr' | 'rtl' =
-    tree.dir === 'rtl' || schema.meta.locale === 'ar' ? 'rtl' : 'ltr';
+    tree.dir === 'rtl' || isRtlLocale(schema.meta.locale) ? 'rtl' : 'ltr';
   const text: TextEngine = useUnicode
     ? await HarfBuzzEngine.create(pdf, paragraphBaseDir === 'rtl')
     : await StandardFontEngine.create(pdf);

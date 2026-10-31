@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import type { Row } from '@reports-web/shared';
+import type { LocaleTag, Row } from '@reports-web/shared';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { validateReport } from '../schema/report-schema.js';
 import type { DataAdapter } from '../adapters/data/index.js';
@@ -193,8 +193,11 @@ export class ReportsViewerElement extends LitElement {
   @property({ attribute: false }) rows: readonly Row[] | null = null;
   @property({ attribute: false }) dataAdapter: DataAdapter | null = null;
   @property({ attribute: false }) chartAdapter: ChartAdapter | null = null;
-  /** Optional host override. When unset, the template's meta.locale is used. */
-  @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
+  /**
+   * Optional host override (BCP 47 tag). When unset, the template's meta.locale is used.
+   * UI strings use Arabic for ar / ar-*, else English.
+   */
+  @property({ type: String }) locale: LocaleTag | undefined = undefined;
   /** Optional host override, set via the `dir` attribute or property. Empty means "follow the template". */
   @property({ type: String, attribute: 'dir' }) dirOverride: '' | 'rtl' | 'ltr' = '';
   private _syncingDir = false;
@@ -214,7 +217,7 @@ export class ReportsViewerElement extends LitElement {
     }
   }
 
-  private get _locale(): 'ar' | 'en' {
+  private get _locale(): LocaleTag {
     return resolveLocale(this.locale, this.schema?.meta);
   }
 

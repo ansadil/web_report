@@ -1,8 +1,11 @@
 import type { FieldMeta, FieldType, Row } from '@reports-web/shared';
 import type { DataAdapter, DataQuery } from './types.js';
+import { toDescribeFn, type DescribeOption } from './describe.js';
 
 export interface StaticDataAdapterOptions {
   readonly tables: Readonly<Record<string, readonly Row[]>>;
+  /** Optional data dictionary description (static object or async function) exposed as `describe()`. */
+  readonly describe?: DescribeOption;
 }
 
 function inferType(value: unknown): FieldType {
@@ -28,5 +31,6 @@ export function createStaticAdapter(opts: StaticDataAdapterOptions): DataAdapter
       const first = rows[0]!;
       return Object.keys(first).map((name) => ({ name, type: inferType(first[name]) }));
     },
+    ...(opts.describe ? { describe: toDescribeFn(opts.describe) } : {}),
   };
 }

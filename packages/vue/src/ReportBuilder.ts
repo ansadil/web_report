@@ -13,8 +13,8 @@ export const ReportBuilder = defineComponent({
     dataAdapter: { type: Object as PropType<ReportBuilderProps['dataAdapter']>, default: undefined },
     storageAdapter: { type: Object as PropType<ReportBuilderProps['storageAdapter']>, default: undefined },
     sampleRows: { type: Array as PropType<ReportBuilderProps['sampleRows']>, default: undefined },
-    locale: { type: String as PropType<'ar' | 'en'>, default: 'en' },
-    dir: { type: String as PropType<'rtl' | 'ltr'>, default: 'ltr' },
+    locale: { type: String as PropType<'ar' | 'en'>, default: undefined },
+    dir: { type: String as PropType<'rtl' | 'ltr'>, default: undefined },
   },
   emits: ['save', 'save-error', 'export-json'],
   setup(props, { emit }) {
@@ -28,7 +28,7 @@ export const ReportBuilder = defineComponent({
       el.storageAdapter = props.storageAdapter ?? null;
       el.sampleRows = (props.sampleRows ?? null) as readonly import('@reports-web/shared').Row[] | null;
       el.locale = props.locale;
-      el.dir = props.dir;
+      el.dir = props.dir ?? '';
     };
 
     const onSave = (e: Event) => emit('save', (e as CustomEvent).detail.schema);

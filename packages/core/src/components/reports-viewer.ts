@@ -13,6 +13,7 @@ import { renderHtml } from '../engine/renderer-html.js';
 import { t } from '../i18n/strings.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
+import { resolveDir, resolveLocale } from './direction.js';
 
 type ViewerAction = 'print' | 'pdf' | 'excel' | 'csv' | 'image';
 const VIEWER_ACTION_KIND: Record<ViewerAction, 'print' | 'pdf' | 'excel' | 'csv' | 'png'> = {
@@ -192,8 +193,18 @@ export class ReportsViewerElement extends LitElement {
   @property({ attribute: false }) rows: readonly Row[] | null = null;
   @property({ attribute: false }) dataAdapter: DataAdapter | null = null;
   @property({ attribute: false }) chartAdapter: ChartAdapter | null = null;
-  @property({ type: String }) locale: 'ar' | 'en' = 'en';
-  @property({ type: String, reflect: true }) override dir: 'rtl' | 'ltr' = 'ltr';
+  /** Optional host override. When unset, the template's meta.locale is used. */
+  @property({ type: String }) locale: 'ar' | 'en' | undefined = undefined;
+  /** Optional host override. When unset, the template's meta.dir (or its locale) decides. */
+  @property({ type: String, reflect: true }) override dir: 'rtl' | 'ltr' | '' = '';
+
+  private get _locale(): 'ar' | 'en' {
+    return resolveLocale(this.locale, this.schema?.meta);
+  }
+
+  private get _dir(): 'rtl' | 'ltr' {
+    return resolveDir(this.dir, this.schema?.meta, this._locale);
+  }
   @property({ type: Boolean, attribute: 'no-toolbar' }) noToolbar = false;
   @property({ type: Boolean, attribute: 'hide-view-controls' }) hideViewControls = false;
   /** When set, render as one continuous scroll (no stacked page sheets). */
@@ -289,7 +300,7 @@ export class ReportsViewerElement extends LitElement {
 
     const finalSchema: ReportSchemaV1 = {
       ...validation.value,
-      meta: { ...validation.value.meta, locale: this.locale, dir: this.dir },
+      meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dir, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) },
     };
 
     this._phase = 'loading';
@@ -414,16 +425,16 @@ export class ReportsViewerElement extends LitElement {
         type="button"
         class="view-tool"
         data-control="zoom-out"
-        aria-label=${t(this.locale, 'zoomOut')}
-        title=${t(this.locale, 'zoomOut')}
+        aria-label=${t(this._locale, 'zoomOut')}
+        title=${t(this._locale, 'zoomOut')}
         ?disabled=${disabled || this._zoom <= ZOOM_MIN - 1e-6}
         @click=${() => this._zoomOut()}
-      >${icon('zoomOut')}<span class="label">${t(this.locale, 'zoomOut')}</span></button>
+      >${icon('zoomOut')}<span class="label">${t(this._locale, 'zoomOut')}</span></button>
       <button
         type="button"
         data-control="zoom-reset"
-        aria-label=${t(this.locale, 'zoomReset')}
-        title=${t(this.locale, 'zoomReset')}
+        aria-label=${t(this._locale, 'zoomReset')}
+        title=${t(this._locale, 'zoomReset')}
         ?disabled=${disabled || this._zoom === 1}
         @click=${() => this._zoomReset()}
       ><span class="label">${zLabel}</span></button>
@@ -431,40 +442,40 @@ export class ReportsViewerElement extends LitElement {
         type="button"
         class="view-tool"
         data-control="zoom-in"
-        aria-label=${t(this.locale, 'zoomIn')}
-        title=${t(this.locale, 'zoomIn')}
+        aria-label=${t(this._locale, 'zoomIn')}
+        title=${t(this._locale, 'zoomIn')}
         ?disabled=${disabled || this._zoom >= ZOOM_MAX - 1e-6}
         @click=${() => this._zoomIn()}
-      >${icon('zoomIn')}<span class="label">${t(this.locale, 'zoomIn')}</span></button>
+      >${icon('zoomIn')}<span class="label">${t(this._locale, 'zoomIn')}</span></button>
       <button
         type="button"
         class="view-tool"
         data-control="fit-width"
-        aria-label=${t(this.locale, 'fitWidth')}
-        title=${t(this.locale, 'fitWidth')}
+        aria-label=${t(this._locale, 'fitWidth')}
+        title=${t(this._locale, 'fitWidth')}
         ?disabled=${disabled}
         @click=${() => this._fitWidth()}
-      >${icon('fitWidth')}<span class="label">${t(this.locale, 'fitWidth')}</span></button>
+      >${icon('fitWidth')}<span class="label">${t(this._locale, 'fitWidth')}</span></button>
       <span class="toolbar-sep" role="separator" aria-hidden="true"></span>
       <button
         type="button"
         class="view-tool"
         data-control="page-prev"
-        aria-label=${t(this.locale, 'prevPage')}
-        title=${t(this.locale, 'prevPage')}
+        aria-label=${t(this._locale, 'prevPage')}
+        title=${t(this._locale, 'prevPage')}
         ?disabled=${pageDisabled || this._pageIndex <= 0}
         @click=${() => this._goPage(-1)}
-      >${icon('sectionUp')}<span class="label">${t(this.locale, 'prevPage')}</span></button>
+      >${icon('sectionUp')}<span class="label">${t(this._locale, 'prevPage')}</span></button>
       <span class="zoom-label" aria-live="polite">${pageLabel}</span>
       <button
         type="button"
         class="view-tool"
         data-control="page-next"
-        aria-label=${t(this.locale, 'nextPage')}
-        title=${t(this.locale, 'nextPage')}
+        aria-label=${t(this._locale, 'nextPage')}
+        title=${t(this._locale, 'nextPage')}
         ?disabled=${pageDisabled || this._pageIndex >= n - 1}
         @click=${() => this._goPage(1)}
-      >${icon('sectionDown')}<span class="label">${t(this.locale, 'nextPage')}</span></button>
+      >${icon('sectionDown')}<span class="label">${t(this._locale, 'nextPage')}</span></button>
     `;
   }
 
@@ -494,7 +505,7 @@ export class ReportsViewerElement extends LitElement {
           labels: spec.labels,
           values: spec.values,
           title: spec.title,
-          dir: this.dir,
+          dir: this._dir,
         });
         this._chartHandles.push(handle);
       } catch (e) {
@@ -558,7 +569,7 @@ export class ReportsViewerElement extends LitElement {
       }
       const validation = validateReport(this.schema);
       if (!validation.ok) throw new Error(validation.error);
-      const finalSchema: ReportSchemaV1 = { ...validation.value, meta: { ...validation.value.meta, locale: this.locale, dir: this.dir } };
+      const finalSchema: ReportSchemaV1 = { ...validation.value, meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dir, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) } };
       let rows = this.rows;
       if (!rows) {
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
@@ -590,7 +601,7 @@ export class ReportsViewerElement extends LitElement {
 
   override render(): unknown {
     if (this.noToolbar) {
-      return html`<div class="surface" dir=${this.dir}>${this._renderZoomWrap()}</div>`;
+      return html`<div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>`;
     }
     const disabled = this._phase !== 'ready';
     const items = (this.actions ?? VIEWER_DEFAULT_ACTIONS).filter((a) => a in VIEWER_ACTION_KIND);
@@ -599,7 +610,7 @@ export class ReportsViewerElement extends LitElement {
         ${this._renderViewToolbarControls(disabled)}
         ${this.hideViewControls ? nothing : html`<span class="toolbar-sep" role="separator" aria-hidden="true"></span>`}
         ${items.map((a) => {
-          const label = t(this.locale, a === 'csv' ? 'excel' : a);
+          const label = t(this._locale, a === 'csv' ? 'excel' : a);
           return html`<button
             type="button"
             data-action=${a}
@@ -611,11 +622,11 @@ export class ReportsViewerElement extends LitElement {
         })}
         <span class="toolbar-spacer" aria-hidden="true"></span>
         <span class="status ${this._phase === 'error' ? 'error' : ''}">
-          ${this._phase === 'loading' ? t(this.locale, 'loading') : ''}
-          ${this._phase === 'error' ? `${t(this.locale, 'error')}: ${this._error}` : ''}
+          ${this._phase === 'loading' ? t(this._locale, 'loading') : ''}
+          ${this._phase === 'error' ? `${t(this._locale, 'error')}: ${this._error}` : ''}
         </span>
       </div>
-      <div class="surface" dir=${this.dir}>${this._renderZoomWrap()}</div>
+      <div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>
     `;
   }
 }

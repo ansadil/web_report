@@ -80,18 +80,24 @@ describe('reports-viewer', () => {
     await done; await flush(v);
     expect(reportArticle(v)?.getAttribute('data-dir')).toBe('ltr');
   });
+  const withFooter = (value: string) => mustValidate({
+    ...arabicSchema(),
+    bands: {
+      ...arabicSchema().bands,
+      pageFooter: { height: 8, elements: [{ id: 'pn', kind: 'text', value, pos: { x: 0, y: 0, w: 120, h: 6 } }] },
+    },
+  });
+  const viewerHtml = (v: HTMLElement) => (v.shadowRoot?.innerHTML ?? '') + v.innerHTML;
   it('BUG-15 viewer replaces the "{page}" token in pageFooter (no literal "{page}")', async () => {
-    const s = mustValidate({
-      ...arabicSchema(),
-      bands: {
-        ...arabicSchema().bands,
-        pageFooter: { height: 8, elements: [{ id: 'pn', kind: 'text', value: '{page}', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
-      },
-    });
-    const v = await mountViewer(s);
-    const html = (v.shadowRoot?.innerHTML ?? '') + v.innerHTML;
+    const html = viewerHtml(await mountViewer(withFooter('{page}')));
     expect(html).toContain('rw-report');
     expect(html).not.toContain('{page}');
+  });
+  it('BUG-15 viewer renders user template «صفحة {page} من {pages}» as «صفحة 1 من N»', async () => {
+    const v = await mountViewer(withFooter('صفحة {page} من {pages}'));
+    const text = (v.shadowRoot?.textContent ?? '') + (v.textContent ?? '');
+    expect(text).not.toMatch(/\{pages?\}/);
+    expect(text).toMatch(/صفحة [1١] من [0-9٠-٩]+/);
   });
 });
 

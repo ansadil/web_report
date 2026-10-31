@@ -111,23 +111,46 @@ describe('PDF layout', () => {
     expect(Math.round(p1[0]!.size), 'top-most item on page 1 should be the 16pt title').toBe(16);
   });
 
-  it('BUG-15 page numbers support "{page} من {pages}" (X من Y)', async () => {
-    const schema = mustValidate({
-      version: '1', id: 'qa-pn', meta: { name: 'QA', locale: 'ar', dir: 'rtl' },
-      dataset: { adapter: 'static', source: 't' }, fields: [],
-      bands: {
-        reportHeader: { height: 10, pageBreakAfter: true, elements: [{ id: 't', kind: 'text', value: '777', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
-        detail: { height: 0, elements: [] },
-        reportFooter: { height: 10, elements: [{ id: 'f', kind: 'text', value: '888', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
-        pageFooter: { height: 8, elements: [{ id: 'pn', kind: 'text', value: '{page} من {pages}', pos: { x: 0, y: 0, w: 180, h: 6 } }] },
-      },
-    });
-    const t = await extractPdfText(await toBytes(await exportPdf({ schema, rows: [] })));
+  // Approved tokens: {page} (current page) and {pages} (total pages) are separate tokens that may appear
+  // anywhere inside user text. Existing engine syntax: exact-match '{page}' (alias '{صفحة}') in pageFooter text only.
+  const pnSchema = (value: string) => mustValidate({
+    version: '1', id: 'qa-pn', meta: { name: 'QA', locale: 'ar', dir: 'rtl' },
+    dataset: { adapter: 'static', source: 't' }, fields: [],
+    bands: {
+      reportHeader: { height: 10, pageBreakAfter: true, elements: [{ id: 't', kind: 'text', value: '777', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
+      detail: { height: 0, elements: [] },
+      reportFooter: { height: 10, elements: [{ id: 'f', kind: 'text', value: '888', pos: { x: 0, y: 0, w: 50, h: 6 } }] },
+      pageFooter: { height: 8, elements: [{ id: 'pn', kind: 'text', value, pos: { x: 0, y: 0, w: 180, h: 6 } }] },
+    },
+  });
+  const footerTexts = async (value: string) => {
+    const t = await extractPdfText(await toBytes(await exportPdf({ schema: pnSchema(value), rows: [] })));
     expect(t.numPages).toBe(2);
-    const all = t.lines.map((l) => l.text).join('\n');
-    expect(all).not.toContain('{page');
-    expect(all).toMatch(/[1١] من [2٢]/);
-    expect(all).toMatch(/[2٢] من [2٢]/);
+    return [1, 2].map((p) => t.lines.filter((l) => l.page === p).map((l) => l.text).join('\n'));
+  };
+
+  it('BUG-15 (guard) existing exact "{page}" token renders 1 and 2', async () => {
+    const [p1, p2] = await footerTexts('{page}');
+    expect(p1).toMatch(/(^|\n)[1١]($|\n)/);
+    expect(p2).toMatch(/(^|\n)[2٢]($|\n)/);
+  });
+  it('BUG-15 "{page}" is replaced inside user text «صفحة {page}»', async () => {
+    const [p1, p2] = await footerTexts('صفحة {page}');
+    expect(p1 + p2).not.toContain('{page}');
+    expect(p1).toMatch(/صفحة [1١]/);
+    expect(p2).toMatch(/صفحة [2٢]/);
+  });
+  it('BUG-15 "{pages}" (total pages) token renders the page count «{pages}»', async () => {
+    const [p1, p2] = await footerTexts('{pages}');
+    expect(p1 + p2).not.toContain('{pages}');
+    expect(p1).toMatch(/(^|\n)[2٢]($|\n)/);
+    expect(p2).toMatch(/(^|\n)[2٢]($|\n)/);
+  });
+  it('BUG-15 user template «صفحة {page} من {pages}» renders «صفحة 1 من 2» / «صفحة 2 من 2»', async () => {
+    const [p1, p2] = await footerTexts('صفحة {page} من {pages}');
+    expect(p1 + p2).not.toMatch(/\{pages?\}/);
+    expect(p1).toMatch(/صفحة [1١] من [2٢]/);
+    expect(p2).toMatch(/صفحة [2٢] من [2٢]/);
   });
 });
 

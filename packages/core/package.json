@@ -1,6 +1,21 @@
 {
   "name": "@reports-web/core",
   "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "sideEffects": [
+    "./src/index.ts",
+    "./src/components/reports-viewer.ts",
+    "./src/components/reports-builder.ts",
+    "./dist/index.js",
+    "./dist/components/reports-viewer.js",
+    "./dist/components/reports-builder.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ansadil/web_report.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -57,11 +72,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "!dist/**/*.tsbuildinfo"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/bundle-render-code.mjs && node scripts/copy-pdf-fonts.mjs",
     "typecheck": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "lint": "pnpm --dir ../.. exec eslint packages/core/src",
     "test": "vitest",
     "test:run": "vitest run",
     "test:qa": "vitest run --config vitest.qa.config.ts"

@@ -147,7 +147,7 @@ function assertFont(bytes: Uint8Array, url: string): void {
 /**
  * The faces one PDF export uses: its {@link FontLibrary} plus the fallback to the bundled
  * fonts folder when a custom `fontsBaseUrl` cannot provide a face. Each fallback is reported
- * once per face (family + weight) through `onWarning`.
+ * once per code, family, weight and url through `onWarning`.
  */
 export class FontSession {
   private readonly warned = new Set<string>();
@@ -174,11 +174,20 @@ export class FontSession {
     return this.customPromise;
   }
 
-  private warn(w: PdfWarning, bold: boolean): void {
-    const key = `${w.code}|${(w.family ?? '').toLowerCase()}|${bold ? 700 : 400}`;
+  /**
+   * Reports `w` (with the weight/style of the requested face) once per code, family
+   * (case-insensitive), weight and url. A throwing `onWarning` is logged, never fatal.
+   */
+  private warn(warning: Omit<PdfWarning, 'weight' | 'style'>, bold: boolean): void {
+    const w: PdfWarning = { ...warning, weight: bold ? 700 : 400, style: 'normal' };
+    const key = `${w.code}|${(w.family ?? '').toLowerCase()}|${w.weight}|${w.url ?? ''}`;
     if (this.warned.has(key)) return;
     this.warned.add(key);
-    this.onWarning(w);
+    try {
+      this.onWarning(w);
+    } catch (err) {
+      console.error('[reports-web pdf] onWarning threw; the export continues:', err);
+    }
   }
 
   /**

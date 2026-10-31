@@ -54,7 +54,8 @@ const url = await resolveFontUrl({ family: '"Cairo", sans-serif', weight: 700 },
 
 With a custom `fontsBaseUrl`, two problems no longer fail the PDF export; the bundled faces
 (`DEFAULT_FONTS_BASE_URL`, read from disk in Node) are embedded instead and `onWarning` is called
-**once per face (family + weight) per export**:
+**once per export for the same `code` + `family` (case-insensitive) + `weight` + `url`**. Every
+warning carries the `weight` (400 / 700) and `style` (`normal`) of the face the PDF asked for:
 
 | `code` (`PdfWarningCode`) | when | `family` | `url` |
 | --- | --- | --- | --- |
@@ -69,7 +70,12 @@ await exportPdf({ schema, rows, fontsBaseUrl: '/fonts/', onWarning: (w: PdfWarni
 } });
 ```
 
-- Default `onWarning`: `console.warn`.
+- Default `onWarning`: `console.warn`. If a custom `onWarning` throws, the error is logged with
+  `console.error` and the export continues.
+- A TTF is validated before use (sfnt header, table directory and bounds, required TrueType
+  tables, `loca`/`glyf` consistency, `cmap`): a truncated or corrupt file is a
+  `FONT_FILE_UNAVAILABLE` fallback, never a crash. CFF-flavoured OpenType (`OTTO`) is not
+  supported for PDF embedding and is treated the same way.
 - The export still rejects when the bundled fonts cannot be loaded either, when the bundled
   folder itself is the one that is broken (no fallback from the bundled folder), and when the
   custom folder's `fonts.json` cannot be read or parsed (a folder-level error, not a face).

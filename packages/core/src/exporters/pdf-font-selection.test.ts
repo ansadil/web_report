@@ -4,8 +4,8 @@
  * match of a CSS stack), bold picks its 700 face, unknown families fall back to Noto, and
  * `fontsBaseUrl` decides where fonts.json and the TTFs come from.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { copyFile, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -22,6 +22,15 @@ import {
 } from './fonts-manifest.js';
 import * as core from '../index.js';
 import { validateReport, type ReportSchemaV1 } from '../schema/report-schema.js';
+
+/** Temp folders of this file, removed after its tests. */
+const tempDirs: string[] = [];
+afterAll(() => Promise.all(tempDirs.splice(0).map((d) => rm(d, { recursive: true, force: true }))));
+async function tempDir(prefix: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
 
 const FONTS_DIR = fileURLToPath(new URL('../../assets/fonts/', import.meta.url));
 
@@ -104,7 +113,7 @@ describe('fontsBaseUrl', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('reads fonts.json and the TTFs from the given folder (file: URL)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'wr-fonts-'));
+    const dir = await tempDir('wr-fonts-');
     const manifest: FontManifestEntry[] = [
       { family: 'Brand', weight: 400, style: 'normal', ttf: 'Brand-Regular.ttf', woff2: 'Brand-Regular.woff2' },
       ...parseFontManifest(JSON.parse(await readFile(join(FONTS_DIR, 'fonts.json'), 'utf8'))).filter((e) =>
@@ -138,7 +147,7 @@ describe('fontsBaseUrl', () => {
   });
 
   it('rejects when the folder has no fonts.json', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'wr-fonts-empty-'));
+    const dir = await tempDir('wr-fonts-empty-');
     await expect(exportPdf({ schema: schema([text(0, AR)]), rows: [], fontsBaseUrl: pathToFileURL(dir).href })).rejects.toThrow();
   });
 });
@@ -240,7 +249,7 @@ describe('fontsBaseUrl: file:// (Node, offline) vs http(s)', () => {
 
   /** A copy of the bundled folder in a fresh tmp dir (a fresh cache key per test). */
   async function folderCopy(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), 'wr-fonts-file-'));
+    const dir = await tempDir('wr-fonts-file-');
     const manifest = parseFontManifest(JSON.parse(await readFile(join(FONTS_DIR, 'fonts.json'), 'utf8')));
     await copyFile(join(FONTS_DIR, 'fonts.json'), join(dir, 'fonts.json'));
     for (const e of manifest) await copyFile(join(FONTS_DIR, e.ttf), join(dir, e.ttf));

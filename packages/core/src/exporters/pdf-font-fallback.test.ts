@@ -5,8 +5,8 @@
  * Sans, still exports — the bundled faces are embedded and `onWarning` (default
  * `console.warn`) is called once per face. Only a failing bundled folder rejects.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { copyFile, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -15,6 +15,15 @@ import { exportPdf, PdfWarningCode, type PdfWarning } from './pdf.js';
 import { FontLibrary, FontSession } from './pdf-fonts.js';
 import * as core from '../index.js';
 import { validateReport, type ReportSchemaV1 } from '../schema/report-schema.js';
+
+/** Temp folders of this file, removed after its tests. */
+const tempDirs: string[] = [];
+afterAll(() => Promise.all(tempDirs.splice(0).map((d) => rm(d, { recursive: true, force: true }))));
+async function tempDir(prefix: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
 
 const FONTS_DIR = fileURLToPath(new URL('../../assets/fonts/', import.meta.url));
 const AR = 'تقرير المبيعات';
@@ -49,7 +58,7 @@ const manifest = async (): Promise<Entry[]> => JSON.parse(await readFile(join(FO
 
 /** Copy of the bundled folder: `entries` filter fonts.json, `drop` TTFs are not copied, `corrupt` TTFs are garbage. */
 async function folder(o: { entries?: (e: Entry) => boolean; drop?: string[]; corrupt?: string[] } = {}): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'wr-fonts-fb-'));
+  const dir = await tempDir('wr-fonts-fb-');
   const all = await manifest();
   const kept = all.filter(o.entries ?? (() => true));
   await writeFile(join(dir, 'fonts.json'), JSON.stringify(kept));
@@ -202,7 +211,64 @@ describe('defaults and limits', () => {
   });
 
   it('a folder without fonts.json still rejects (not a per-face problem)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'wr-fonts-none-'));
+    const dir = await tempDir('wr-fonts-none-');
     await expect(run(pathToFileURL(dir).href)).rejects.toThrow(/ENOENT/);
+  });
+});
+
+describe('warning fields, de-duplication, a throwing onWarning', () => {
+  it('carries the weight and style of the face the PDF asked for', async () => {
+    const base = await folder({ drop: ['Cairo-Bold.ttf'] });
+    expect((await run(base)).warnings).toEqual([
+      { code: 'FONT_FILE_UNAVAILABLE', family: 'Cairo', weight: 700, style: 'normal', url: `${base}/Cairo-Bold.ttf`, message: expect.any(String) },
+    ]);
+    const fb = await folder({ entries: (e) => e.family === 'Cairo' });
+    const { warnings } = await run(fb, schema([text(0, AR, { font: 'Cairo' }), text(1, AR, { font: 'Cairo', bold: true })]));
+    expect(warnings.map((w) => `${w.family} ${w.weight} ${w.style}`).sort()).toEqual([
+      'Noto Sans 400 normal',
+      'Noto Sans 700 normal',
+      'Noto Sans Arabic 400 normal',
+      'Noto Sans Arabic 700 normal',
+    ]);
+  });
+
+  it('once per code + family (any case) + weight + url', async () => {
+    const base = await folder({ drop: ['Cairo-Bold.ttf'] });
+    const s = schema([text(0, AR, { font: 'Cairo', bold: true }), text(1, AR, { font: 'cairo', bold: true }), text(2, AR, { font: '"CAIRO", sans-serif', bold: true })]);
+    expect((await run(base, s)).warnings).toHaveLength(1);
+
+    const got: PdfWarning[] = [];
+    const session = new FontSession(new FontLibrary(base), (w) => got.push(w));
+    const warn = (session as unknown as { warn(w: Omit<PdfWarning, 'weight' | 'style'>, bold: boolean): void }).warn.bind(session);
+    const w = (family: string, url: string) => ({ code: PdfWarningCode.FONT_FILE_UNAVAILABLE, message: 'm', family, url });
+    warn(w('Cairo', 'a.ttf'), true);
+    warn(w('cairo', 'a.ttf'), true); // same family, other case
+    warn(w('Cairo', 'b.ttf'), true); // other url
+    warn(w('Cairo', 'a.ttf'), false); // other weight
+    warn({ ...w('Cairo', 'a.ttf'), code: PdfWarningCode.FONT_FALLBACK_MISSING }, true); // other code
+    expect(got.map((x) => `${x.code} ${x.family} ${x.weight} ${x.url}`)).toEqual([
+      'FONT_FILE_UNAVAILABLE Cairo 700 a.ttf',
+      'FONT_FILE_UNAVAILABLE Cairo 700 b.ttf',
+      'FONT_FILE_UNAVAILABLE Cairo 400 a.ttf',
+      'FONT_FALLBACK_MISSING Cairo 700 a.ttf',
+    ]);
+  });
+
+  it('an onWarning that throws is logged with console.error; the export still resolves', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const boom = new Error('listener bug');
+    const base = await folder({ drop: ['Cairo-Bold.ttf', 'Cairo-Regular.ttf'] });
+    const blob = await exportPdf({
+      schema: REPORT,
+      rows: [],
+      fontsBaseUrl: base,
+      onWarning: () => {
+        throw boom;
+      },
+    });
+    const doc = await PDFDocument.load(new Uint8Array(await blob.arrayBuffer()));
+    expect(doc.getPageCount()).toBe(1);
+    expect(error).toHaveBeenCalledTimes(2); // one per warning, each still reported once
+    expect(error.mock.calls.every((c) => c.includes(boom))).toBe(true);
   });
 });

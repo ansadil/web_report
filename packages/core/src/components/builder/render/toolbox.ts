@@ -22,6 +22,7 @@ export function renderToolbox(state: ToolboxState, cb: ToolboxCallbacks) {
           <div
             class="tool"
             draggable="true"
+            data-testid=${`tool-${tool.kind}`}
             title=${label}
             aria-label=${label}
             @dragstart=${(e: DragEvent) => cb.onToolDragStart(e, tool.kind)}

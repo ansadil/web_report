@@ -31,6 +31,7 @@
     "@types/node": "^22.10.0",
     "eslint": "^9.39.5",
     "eslint-plugin-lit": "^2.3.1",
+    "lucide": "0.545.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.46.2",

@@ -1908,7 +1908,7 @@ export class ReportsBuilderElement extends LitElement {
                   <label>h<input type="number" .value=${String(el.pos.h)} @input=${(e: Event) => update({ pos: { ...el.pos, h: Number((e.target as HTMLInputElement).value) } })} /></label>
                 `}
           </div>
-          <label>${t(this._uiLocale, 'visibleWhen')}<input .value=${el.visibleWhen ?? ''} placeholder="amount > 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
+          <label>${t(this._uiLocale, 'visibleWhen')}<input .value=${el.visibleWhen ?? ''} placeholder="amount &gt; 0" @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
         </div>
 
         <div class="group">

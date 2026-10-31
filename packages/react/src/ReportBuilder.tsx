@@ -42,6 +42,7 @@ export function ReportBuilder(props: ReportBuilderProps) {
 }
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- augment React JSX intrinsic elements
   namespace JSX {
     interface IntrinsicElements {
       'reports-builder': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;

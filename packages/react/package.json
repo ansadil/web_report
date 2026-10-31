@@ -1,6 +1,19 @@
 {
   "name": "@reports-web/react",
   "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "sideEffects": [
+    "./src/ReportViewer.tsx",
+    "./src/ReportBuilder.tsx",
+    "./dist/ReportViewer.js",
+    "./dist/ReportBuilder.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ansadil/web_report.git",
+    "directory": "packages/react"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -20,10 +33,11 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "LICENSE", "!dist/**/*.tsbuildinfo"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "pnpm --dir ../.. exec eslint packages/react/src",
     "test": "vitest",
     "test:run": "vitest run"
   },

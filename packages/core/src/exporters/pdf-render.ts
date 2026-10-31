@@ -1,9 +1,7 @@
 import {
   PDFDocument,
-  PDFHexString,
   PDFName,
   PDFOperator,
-  PDFOperatorNames,
   StandardFonts,
   beginText,
   degrees,
@@ -542,8 +540,9 @@ interface QueuedSection {
 const ARABIC_SCRIPT_RE =
   /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
-/** Characters Helvetica/WinAnsi can encode (Latin-1 + the CP1252 extras). */
+/** Characters Helvetica/WinAnsi can encode (Latin-1 + the CP1252 extras). Tab, LF, and CR are in that set. */
 const NON_WINANSI_RE =
+  // eslint-disable-next-line no-control-regex -- WinAnsi allows U+0009, U+000A, and U+000D
   /[^\u0009\u000A\u000D\u0020-\u007E\u00A0-\u00FF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC\u2013\u2014\u2018-\u201A\u201C-\u201E\u2020-\u2022\u2026\u2030\u2039\u203A\u20AC\u2122]/;
 
 function needsUnicodePdfFont(tree: RenderTree, schema: ReportSchemaV1): boolean {

@@ -15,6 +15,7 @@ import {
   setFontAndSize,
   setGraphicsState,
   setTextMatrix,
+  setTextRise,
   showText,
   type PDFFont,
   type PDFPage,
@@ -26,7 +27,7 @@ import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { interpret } from '../engine/interpreter.js';
 import type { RenderElement, RenderSection, RenderTree, RenderWatermark } from '../engine/interpreter.js';
 import { logger } from '../logging/logger.js';
-import { tryEvaluate } from '../engine/expression.js';
+import { hasPageTokens, replacePageTokens } from '../engine/page-tokens.js';
 import { stripHtmlToPlainText } from '../engine/template-fields.js';
 import { TextLayouter, wrapText, type FaceChain, type LaidOutLine } from './pdf-text-layout.js';
 import { loadFace, type LoadedFace } from './pdf-fonts.js';
@@ -92,6 +93,12 @@ interface DrawCtx {
   readonly originYTop: number;
   readonly dir: 'rtl' | 'ltr';
   readonly text: TextEngine;
+  /** 1-based number of `page`. */
+  readonly pageNo: number;
+  /** Final page count once known; static texts with page tokens wait for it. */
+  readonly pages: number | null;
+  /** Draw calls postponed until the page count is known. */
+  readonly deferred: ((pages: number) => Promise<void>)[];
 }
 
 /* ------------------------------------------------------------------------------------------ */
@@ -175,23 +182,37 @@ interface UnicodeLine extends EngineLine {
 
 /**
  * HarfBuzz engine: bidi + shaping happen once in {@link TextLayouter}; this class only
- * writes positioned glyph ids (Identity-H CIDs == glyph ids since fonts are not subset),
- * so pdf-lib/fontkit never re-shape or re-order anything. Each line is wrapped in a
- * `/Span <</ActualText …>> BDC … EMC` so copy/paste and text extraction yield the logical text.
+ * writes the shaped glyphs through {@link CidFontWriter} (subset fonts, exact widths,
+ * logical-text ToUnicode), so pdf-lib/fontkit never re-shape or re-order anything.
  */
 class HarfBuzzEngine implements TextEngine {
   private readonly layouters: { regular: TextLayouter; bold: TextLayouter };
-  private readonly writers = new Map<LoadedFace, CidFontWriter>();
+  /** One merged PDF font per weight; each face is a source of exactly one of them. */
+  private readonly writers = new Map<LoadedFace, { writer: CidFontWriter; src: number; name: string }>();
+  private readonly allWriters: CidFontWriter[] = [];
   private readonly fontKeys = new WeakMap<PDFPage, Map<CidFontWriter, PDFName>>();
   private readonly gsKeys = new WeakMap<PDFPage, Map<number, PDFName>>();
 
   private constructor(
     private readonly pdf: PDFDocument,
     chains: { regular: FaceChain; bold: FaceChain },
-    private readonly latinFaces: ReadonlySet<LoadedFace>,
     private readonly rtl: boolean,
   ) {
     this.layouters = { regular: new TextLayouter(chains.regular), bold: new TextLayouter(chains.bold) };
+    for (const chain of [chains.regular, chains.bold]) {
+      const arabic = chain.arabic as LoadedFace;
+      const latin = chain.latin as LoadedFace;
+      // Arabic face first (metrics + hinting); the Latin fallback always keeps Basic Latin and
+      // common punctuation so the embedded program stays usable beyond the drawn glyphs.
+      const writer = new CidFontWriter(pdf, [
+        { font: fontkit.create(arabic.bytes) },
+        { font: fontkit.create(latin.bytes), keep: LATIN_KEEP },
+      ]);
+      this.allWriters.push(writer);
+      const name = arabic.file.replace(/\.ttf$/, '');
+      this.writers.set(arabic, { writer, src: 0, name });
+      this.writers.set(latin, { writer, src: 1, name });
+    }
   }
 
   static async create(pdf: PDFDocument, rtl: boolean): Promise<HarfBuzzEngine> {
@@ -201,24 +222,7 @@ class HarfBuzzEngine implements TextEngine {
       loadFace('NotoSans-Regular.ttf'),
       loadFace('NotoSans-Bold.ttf'),
     ]);
-    return new HarfBuzzEngine(
-      pdf,
-      { regular: { arabic: ar, latin: lat }, bold: { arabic: arB, latin: latB } },
-      new Set([lat, latB]),
-      rtl,
-    );
-  }
-
-  private writer(face: LoadedFace): CidFontWriter {
-    let w = this.writers.get(face);
-    if (!w) {
-      // The Latin fallback always keeps Basic Latin + common punctuation so the embedded
-      // program remains usable (e.g. by form fields / editors) beyond the drawn glyphs.
-      const keep = this.latinFaces.has(face) ? LATIN_KEEP : [];
-      w = new CidFontWriter(this.pdf, fontkit.create(face.bytes), face.bytes, keep);
-      this.writers.set(face, w);
-    }
-    return w;
+    return new HarfBuzzEngine(pdf, { regular: { arabic: ar, latin: lat }, bold: { arabic: arB, latin: latB } }, rtl);
   }
 
   async layout(text: string, o: LayoutOptions): Promise<EngineLine[]> {
@@ -227,12 +231,12 @@ class HarfBuzzEngine implements TextEngine {
     return lines.map((laid): UnicodeLine => ({ text: laid.text, width: laid.width * o.size, laid }));
   }
 
-  private fontKey(page: PDFPage, w: CidFontWriter, face: LoadedFace): PDFName {
+  private fontKey(page: PDFPage, w: CidFontWriter, name: string): PDFName {
     let m = this.fontKeys.get(page);
     if (!m) this.fontKeys.set(page, (m = new Map()));
     let key = m.get(w);
     if (!key) {
-      key = page.node.newFontDictionary(face.file.replace(/\.ttf$/, ''), w.ref);
+      key = page.node.newFontDictionary(name, w.ref);
       m.set(w, key);
     }
     return key;
@@ -250,11 +254,12 @@ class HarfBuzzEngine implements TextEngine {
   }
 
   /**
-   * Glyphs are written in visual order as few `Tj` strings as possible: a run continues while
-   * the face stays the same and glyphs sit on the baseline. Each glyph gets a CID whose width
-   * equals the distance to the next glyph, so the PDF viewer reproduces HarfBuzz' positions
-   * exactly and never re-orders or re-shapes anything. Marks with a vertical offset start a
-   * new positioned string.
+   * A line is written in visual order as one positioned string: the Arabic face and the Latin
+   * fallback are glyph sources of the same merged PDF font, so a mixed line never switches
+   * fonts. Each glyph gets a CID whose width equals the distance to the next glyph, so the PDF
+   * viewer reproduces HarfBuzz' positions exactly and never re-orders or re-shapes anything.
+   * Marks with a vertical offset are raised/lowered with `Ts` (text rise) inside the same text
+   * object, so extractors still see one continuous string.
    */
   draw(page: PDFPage, line: EngineLine, o: DrawOptions): void {
     const laid = (line as UnicodeLine).laid;
@@ -271,43 +276,48 @@ class HarfBuzzEngine implements TextEngine {
     // Integer positions in 1/1000 em, so run widths add up exactly.
     const q = (n: number): number => Math.round(n * 1000);
     const glyphs = laid.glyphs;
+    const slot = (k: number) => this.writers.get(glyphs[k]!.face as LoadedFace)!;
     let currentWriter: CidFontWriter | null = null;
+    let rise = 0;
     let i = 0;
     while (i < glyphs.length) {
       const first = glyphs[i]!;
-      const face = first.face as LoadedFace;
-      const writer = this.writer(face);
-      const onBaseline = q(first.y) === 0;
+      const { writer, name } = slot(i);
+      const y = q(first.y);
+      // A run: same PDF font and same vertical offset.
       let j = i + 1;
-      if (onBaseline) {
-        while (j < glyphs.length && glyphs[j]!.face === face && q(glyphs[j]!.y) === 0) j++;
-      }
+      while (j < glyphs.length && slot(j).writer === writer && q(glyphs[j]!.y) === y) j++;
       const cids: number[] = [];
       for (let k = i; k < j; k++) {
         const g = glyphs[k]!;
-        // Last glyph of a run: its own advance (the next run is positioned explicitly).
-        const width = k + 1 < j ? q(glyphs[k + 1]!.x) - q(g.x) : q(g.advance);
-        cids.push(writer.cid(g.gid, width, g.text));
+        // Width = distance to the next glyph of the line; the last glyph keeps its advance.
+        const width = k + 1 < glyphs.length ? q(glyphs[k + 1]!.x) - q(g.x) : q(g.advance);
+        cids.push(writer.cid(slot(k).src, g.gid, width, g.text));
       }
       if (writer !== currentWriter) {
-        ops.push(setFontAndSize(this.fontKey(page, writer, face), o.size));
+        ops.push(setFontAndSize(this.fontKey(page, writer, name), o.size));
+        if (currentWriter === null) {
+          const gx = (q(first.x) / 1000) * o.size;
+          ops.push(setTextMatrix(r(cos), r(sin), r(-sin), r(cos), r(o.x + gx * cos), r(o.y + gx * sin)));
+        }
         currentWriter = writer;
       }
-      const gx = (q(first.x) / 1000) * o.size;
-      const gy = (q(first.y) / 1000) * o.size;
-      ops.push(
-        setTextMatrix(r(cos), r(sin), r(-sin), r(cos), r(o.x + gx * cos - gy * sin), r(o.y + gx * sin + gy * cos)),
-        showText(cidHex(cids)),
-      );
+      const wantRise = r((y / 1000) * o.size);
+      if (wantRise !== rise) {
+        ops.push(setTextRise(wantRise));
+        rise = wantRise;
+      }
+      ops.push(showText(cidHex(cids)));
       i = j;
     }
+    if (rise !== 0) ops.push(setTextRise(0));
     ops.push(endText());
     if (useGs) ops.push(popGraphicsState());
     page.pushOperators(...ops);
   }
 
   async finalize(): Promise<void> {
-    for (const w of this.writers.values()) await w.finalize();
+    for (const w of this.allWriters) await w.finalize();
   }
 }
 
@@ -332,6 +342,14 @@ export function alignedX(
 }
 
 async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number, sectionHeightMm: number): Promise<void> {
+  // Static template text may use {page}/{pages}; data values (field/aggregate/expr) never are.
+  if (ctx.pages === null && (el.kind === 'text' || el.kind === 'richtext')) {
+    const raw = el.kind === 'richtext' ? el.html : el.text;
+    if (hasPageTokens(raw)) {
+      ctx.deferred.push((pages) => drawElement({ ...ctx, pages }, el, sectionTopMm, sectionHeightMm));
+      return;
+    }
+  }
   const x = el.pos.x * MM_TO_PT;
   const y = el.pos.y * MM_TO_PT;
   const w = el.pos.w * MM_TO_PT;
@@ -359,7 +377,10 @@ async function drawElement(ctx: DrawCtx, el: RenderElement, sectionTopMm: number
   }
 
   if (el.kind === 'text' || el.kind === 'field' || el.kind === 'aggregate' || el.kind === 'expr' || el.kind === 'richtext') {
-    const text = el.kind === 'richtext' ? stripHtmlToPlainText(el.html ?? '') : (el.text ?? '');
+    let text = el.kind === 'richtext' ? stripHtmlToPlainText(el.html ?? '') : (el.text ?? '');
+    if (ctx.pages !== null && (el.kind === 'text' || el.kind === 'richtext')) {
+      text = replacePageTokens(text, { page: ctx.pageNo, pages: ctx.pages });
+    }
     if (!text) return;
     const bold = !!el.style?.bold;
     const size = el.style?.fontSize ?? 10;
@@ -518,79 +539,76 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
   let page = pdf.addPage([space.width, space.height]);
   let yTop = space.height - space.marginTop;
   let pageNumber = 1;
+  /** Whether the page header has been placed on the current page. */
+  let headerDrawn = false;
+  const deferred: ((pages: number) => Promise<void>)[] = [];
+  const ctxAt = (originYTop: number): DrawCtx => ({
+    page,
+    space,
+    originYTop,
+    dir: tree.dir,
+    text,
+    pageNo: pageNumber,
+    pages: null,
+    deferred,
+  });
   if (tree.watermark) await drawWatermark(page, tree.watermark);
 
   const pageHeader = queued.find((q) => q.section.band === 'pageHeader');
   const pageFooter = queued.find((q) => q.section.band === 'pageFooter');
-
-  const drawHeaderFooter = async (): Promise<void> => {
-    if (pageHeader) {
-      const ctx: DrawCtx = {
-        page,
-        space,
-        originYTop: space.height - space.marginTop,
-        dir: tree.dir,
-        text,
-      };
-      for (const el of pageHeader.section.elements) await drawElement(ctx, el, 0, pageHeader.section.height);
-    }
-    if (pageFooter) {
-      const ctx: DrawCtx = {
-        page,
-        space,
-        originYTop: space.marginBottom + pageFooter.heightPt,
-        dir: tree.dir,
-        text,
-      };
-      const footerCopy: RenderSection = {
-        ...pageFooter.section,
-        elements: pageFooter.section.elements.map((e) => {
-          if (e.kind === 'expr') {
-            const compiled = tryEvaluate(`"${pageNumber}"`, {});
-            void compiled;
-          }
-          if (e.kind === 'text' && (e.text === '{page}' || e.text === '{صفحة}')) {
-            return { ...e, text: String(pageNumber) };
-          }
-          return e;
-        }),
-      };
-      for (const el of footerCopy.elements) await drawElement(ctx, el, 0, pageFooter.section.height);
-    }
-  };
-
   const headerHeight = pageHeader?.heightPt ?? 0;
   const footerHeight = pageFooter?.heightPt ?? 0;
 
+  /** Page header goes at the current position: top of the page, or below the report header on page 1. */
+  const placeHeader = async (): Promise<void> => {
+    if (headerDrawn) return;
+    headerDrawn = true;
+    if (!pageHeader) return;
+    const ctx = ctxAt(yTop);
+    for (const el of pageHeader.section.elements) await drawElement(ctx, el, 0, pageHeader.section.height);
+    yTop -= headerHeight;
+  };
+
+  const finishPage = async (): Promise<void> => {
+    await placeHeader();
+    if (pageFooter) {
+      const ctx = ctxAt(space.marginBottom + footerHeight);
+      for (const el of pageFooter.section.elements) await drawElement(ctx, el, 0, pageFooter.section.height);
+    }
+  };
+
   const newPage = async (): Promise<void> => {
-    await drawHeaderFooter();
+    await finishPage();
     page = pdf.addPage([space.width, space.height]);
     yTop = space.height - space.marginTop;
     pageNumber++;
+    headerDrawn = false;
     if (tree.watermark) await drawWatermark(page, tree.watermark);
   };
 
   const drawSection = async (q: QueuedSection): Promise<void> => {
     const availableBottom = space.marginBottom + footerHeight;
-    if (q.section.pageBreakBefore || yTop - q.heightPt < availableBottom) {
+    const isReportHeader = q.section.band === 'reportHeader';
+    const pending = !headerDrawn && !isReportHeader ? headerHeight : 0;
+    if (q.section.pageBreakBefore || yTop - pending - q.heightPt < availableBottom) {
       await newPage();
-      yTop -= headerHeight;
     }
-    const ctx: DrawCtx = { page, space, originYTop: yTop, dir: tree.dir, text };
+    // Report header comes first on page 1; the page header follows it (and tops every later page).
+    if (!isReportHeader) await placeHeader();
+    const ctx = ctxAt(yTop);
     for (const el of q.section.elements) await drawElement(ctx, el, 0, q.section.height);
     yTop -= q.heightPt;
-    if (q.section.pageBreakAfter) {
-      await newPage();
-      yTop -= headerHeight;
-    }
+    if (q.section.pageBreakAfter) await newPage();
   };
 
-  yTop -= headerHeight;
   for (const q of queued) {
     if (q.section.band === 'pageHeader' || q.section.band === 'pageFooter') continue;
     await drawSection(q);
   }
-  await drawHeaderFooter();
+  await finishPage();
+  // Page tokens need the final page count, so those texts are drawn last.
+  const totalPages = pdf.getPageCount();
+  for (const draw of deferred) await draw(totalPages);
   await text.finalize();
 
   const bytes = await pdf.save();

@@ -71,6 +71,11 @@ const bidi = bidiFactory();
 
 const ARABIC_SCRIPT_RE = /\p{Script=Arabic}/u;
 const MARK_OR_FORMAT_RE = /[\p{M}\p{Cf}]/u;
+/**
+ * Explicit directional marks (LRM/RLM/ALM) keep their own bidi level: they are what places
+ * the separators of e.g. an Intl `ar` date «١٥‏/١٠‏/٢٠٢٦» and extractors need them in place.
+ */
+const BIDI_MARK_RE = /[\u200E\u200F\u061C]/;
 const ASCII_DIGIT_RE = /[0-9]/;
 
 interface Item {
@@ -109,7 +114,7 @@ export function itemize(text: string, rtl: boolean, chain: FaceChain): Item[] {
     const len = ch.length;
     const face = pickFace(cp, ch, prevFace, chain);
     // Marks inherit the level of their base so a cluster is never split across items.
-    const level: number = cur && MARK_OR_FORMAT_RE.test(ch) ? cur.level : levels[i]!;
+    const level: number = cur && MARK_OR_FORMAT_RE.test(ch) && !BIDI_MARK_RE.test(ch) ? cur.level : levels[i]!;
     if (!cur || cur.face !== face || cur.level !== level) {
       if (cur) items.push({ start: cur.start, end: i, level: cur.level, face: cur.face });
       cur = { start: i, level, face };
@@ -158,6 +163,37 @@ function clusterText(s: string, rtl: boolean): string {
   return rtl && s.length > 1 ? Array.from(s).reverse().join('') : s;
 }
 
+/**
+ * Characters each glyph stands for (index-aligned with `shaped`). Inside a cluster, glyphs in
+ * logical order take one character each and the last one takes the rest (so a ligature such
+ * as lam-alef carries both letters); surplus glyphs of a decomposed cluster get ''.
+ */
+function glyphTexts(
+  shaped: readonly ShapedGlyph[],
+  clusterEnd: ReadonlyMap<number, number>,
+  text: string,
+  itemEnd: number,
+  rtl: boolean,
+): string[] {
+  const out: string[] = new Array<string>(shaped.length).fill('');
+  const byCluster = new Map<number, number[]>();
+  shaped.forEach((g, k) => {
+    const list = byCluster.get(g.cluster) ?? [];
+    list.push(k);
+    byCluster.set(g.cluster, list);
+  });
+  for (const [cluster, visual] of byCluster) {
+    const logical = rtl ? [...visual].reverse() : visual;
+    const chars = Array.from(text.slice(cluster, clusterEnd.get(cluster) ?? itemEnd));
+    const n = Math.min(logical.length, chars.length);
+    for (let k = 0; k < n; k++) {
+      const part = k === n - 1 ? chars.slice(k).join('') : chars[k]!;
+      out[logical[k]!] = clusterText(part, rtl);
+    }
+  }
+  return out;
+}
+
 export class TextLayouter {
   private readonly cache = new Map<string, LaidOutLine>();
 
@@ -178,22 +214,18 @@ export class TextLayouter {
       const clusterStarts = Array.from(new Set(shaped.map((g) => g.cluster))).sort((a, b) => a - b);
       const clusterEnd = new Map<number, number>();
       clusterStarts.forEach((c, idx) => clusterEnd.set(c, clusterStarts[idx + 1] ?? item.end));
-      const seen = new Set<number>();
-      for (const g of shaped) {
-        // In RTL runs the first glyph (logically) of a multi-glyph cluster is the right-most one;
-        // attaching the text to whichever glyph we meet first is enough for ToUnicode purposes.
-        const first = !seen.has(g.cluster);
-        seen.add(g.cluster);
+      const texts = glyphTexts(shaped, clusterEnd, text, item.end, itemRtl);
+      shaped.forEach((g, k) => {
         glyphs.push({
           face: item.face,
           gid: g.gid,
           x: x + g.xOffset,
           y: g.yOffset,
           advance: g.xAdvance,
-          text: first ? clusterText(text.slice(g.cluster, clusterEnd.get(g.cluster) ?? item.end), itemRtl) : '',
+          text: texts[k]!,
         });
         x += g.xAdvance;
-      }
+      });
     }
     const line: LaidOutLine = { text, width: x, glyphs, rtl };
     if (this.cache.size > 5000) this.cache.clear();

@@ -21,35 +21,48 @@ import type { Font as FontkitFont } from '@pdf-lib/fontkit';
 /** Code points always kept in the subset in addition to the drawn glyphs (e.g. Basic Latin). */
 export type KeepCodePoints = readonly number[];
 
+/** One source font of a merged PDF font. The first source is the primary (metrics, hinting). */
+export interface CidFontSource {
+  readonly font: FontkitFont;
+  readonly keep?: KeepCodePoints;
+}
+
+/**
+ * One PDF font for several source fonts (e.g. Noto Sans Arabic + Noto Sans as Latin fallback).
+ *
+ * The glyphs of all sources are merged into a single TrueType program, so a mixed line such
+ * as «منتج ABC-123 (إصدار 2)» is a single `Tj` string. Text extractors (pdf.js, poppler) apply
+ * their bidi pass per string, so splitting a line at every font change would make them reorder
+ * each piece on its own and return the pieces in visual instead of logical order.
+ */
 export class CidFontWriter {
   readonly ref: PDFRef;
   private readonly cids = new Map<string, number>();
   /** Index = CID. */
-  private readonly entries: { gid: number; width: number; text: string }[] = [{ gid: 0, width: 0, text: '' }];
-  private readonly scale: number;
+  private readonly entries: { src: number; gid: number; width: number; text: string }[] = [
+    { src: 0, gid: 0, width: 0, text: '' },
+  ];
 
   constructor(
     private readonly pdf: PDFDocument,
-    private readonly font: FontkitFont,
-    private readonly bytes: Uint8Array,
-    private readonly keep: KeepCodePoints = [],
+    private readonly sources: readonly CidFontSource[],
   ) {
+    if (sources.length === 0) throw new Error('PDF font: no source font');
     this.ref = pdf.context.nextRef();
-    this.scale = 1000 / font.unitsPerEm;
   }
 
-  /** CID for glyph `gid` whose advance (1/1000 em) inside the run is `width`. */
-  cid(gid: number, width: number, text: string): number {
+  /** CID for glyph `gid` of source `src` whose advance (1/1000 em) inside the run is `width`. */
+  cid(src: number, gid: number, width: number, text: string): number {
     if (gid === 0) {
-      this.entries[0] = { gid: 0, width, text: this.entries[0]!.text || text };
+      this.entries[0] = { src: 0, gid: 0, width, text: this.entries[0]!.text || text };
       return 0;
     }
-    const key = `${gid}|${width}|${text}`;
+    const key = `${src}|${gid}|${width}|${text}`;
     let cid = this.cids.get(key);
     if (cid === undefined) {
       cid = this.entries.length;
       if (cid > 0xffff) throw new Error('PDF font: too many distinct glyphs');
-      this.entries.push({ gid, width, text });
+      this.entries.push({ src, gid, width, text });
       this.cids.set(key, cid);
     }
     return cid;
@@ -57,33 +70,58 @@ export class CidFontWriter {
 
   /** Write font program, descriptor, CID font and Type0 dictionaries. Call once, before save. */
   async finalize(): Promise<void> {
-    const { pdf, font } = this;
+    const { pdf, sources } = this;
     const ctx = pdf.context;
+    const primary = sources[0]!.font;
 
-    const subset = font.createSubset();
-    subset.includeGlyph(0);
-    const newGid = new Map<number, number>([[0, 0]]);
-    const include = (gid: number): void => {
-      if (!newGid.has(gid)) newGid.set(gid, subset.includeGlyph(gid));
-    };
-    for (const e of this.entries) include(e.gid);
-    for (const cp of this.keep) {
-      const g = font.glyphForCodePoint(cp);
-      if (g && g.id !== 0) include(g.id);
+    // 1. Subset every source font that is used (the primary always, for metrics/.notdef).
+    const parts: ParsedTrueType[] = [];
+    /** Per source: original gid → gid in the merged program. */
+    const gidMaps: Map<number, number>[] = [];
+    let nextGid = 0;
+    for (let si = 0; si < sources.length; si++) {
+      const { font, keep = [] } = sources[si]!;
+      const used = this.entries.filter((e) => e.src === si && e.gid !== 0);
+      const local = new Map<number, number>();
+      gidMaps.push(local);
+      if (si > 0 && used.length === 0) continue;
+      const subset = font.createSubset();
+      subset.includeGlyph(0);
+      const sub = new Map<number, number>([[0, 0]]);
+      const include = (gid: number): void => {
+        if (!sub.has(gid)) sub.set(gid, subset.includeGlyph(gid));
+      };
+      for (const e of used) include(e.gid);
+      for (const cp of keep) {
+        const g = font.glyphForCodePoint(cp);
+        if (g && g.id !== 0) include(g.id);
+      }
+      const parsed = parseTrueType(await encodeSubset(subset));
+      // Secondary sources drop their .notdef; their glyphs follow the previous ones.
+      const offset = si === 0 ? 0 : nextGid - 1;
+      for (const [orig, sg] of sub) {
+        if (si > 0 && sg === 0) continue;
+        local.set(orig, sg + offset);
+      }
+      parts.push(si === 0 ? parsed : { ...parsed, glyphs: parsed.glyphs.slice(1), metrics: parsed.metrics.slice(1), gidOffset: offset });
+      nextGid += si === 0 ? parsed.glyphs.length : parsed.glyphs.length - 1;
     }
-    // Keep a cmap for every code point whose nominal glyph made it into the subset.
+
+    // 2. cmap: every code point whose nominal glyph made it into the merged program.
     const cmap = new Map<number, number>();
-    for (const cp of font.characterSet) {
-      if (cp > 0xffff) continue;
-      const g = font.glyphForCodePoint(cp);
-      const ng = g ? newGid.get(g.id) : undefined;
-      if (ng !== undefined && ng !== 0) cmap.set(cp, ng);
-    }
-    const program = addCmapTable(await encodeSubset(subset), buildCmapFormat4(cmap));
+    sources.forEach(({ font }, si) => {
+      for (const cp of font.characterSet) {
+        if (cp > 0xffff || cmap.has(cp)) continue;
+        const g = font.glyphForCodePoint(cp);
+        const ng = g ? gidMaps[si]!.get(g.id) : undefined;
+        if (ng !== undefined && ng !== 0) cmap.set(cp, ng);
+      }
+    });
+    const program = mergeTrueType(parts, buildCmapFormat4(cmap));
 
-    const tag = subsetTag(this.entries.map((e) => e.gid).join(','));
-    const baseName = `${tag}+${(font.postscriptName ?? 'Font').replace(/[^A-Za-z0-9-]/g, '')}`;
-    const s = this.scale;
+    const tag = subsetTag(this.entries.map((e) => `${e.src}:${e.gid}`).join(','));
+    const baseName = `${tag}+${(primary.postscriptName ?? 'Font').replace(/[^A-Za-z0-9-]/g, '')}`;
+    const s = 1000 / primary.unitsPerEm;
     const r = (n: number): number => Math.round(n * s);
 
     const fontFile = ctx.register(ctx.flateStream(program, { Length1: program.length }));
@@ -92,11 +130,11 @@ export class CidFontWriter {
         Type: 'FontDescriptor',
         FontName: baseName,
         Flags: 4,
-        FontBBox: [r(font.bbox.minX), r(font.bbox.minY), r(font.bbox.maxX), r(font.bbox.maxY)],
-        ItalicAngle: font.italicAngle,
-        Ascent: r(font.ascent),
-        Descent: r(font.descent),
-        CapHeight: r(font.capHeight || font.ascent),
+        FontBBox: [r(primary.bbox.minX), r(primary.bbox.minY), r(primary.bbox.maxX), r(primary.bbox.maxY)],
+        ItalicAngle: primary.italicAngle,
+        Ascent: r(primary.ascent),
+        Descent: r(primary.descent),
+        CapHeight: r(primary.capHeight || primary.ascent),
         StemV: 80,
         FontFile2: fontFile,
       }),
@@ -104,7 +142,7 @@ export class CidFontWriter {
 
     const cidToGid = new Uint8Array(this.entries.length * 2);
     this.entries.forEach((e, cid) => {
-      const g = newGid.get(e.gid) ?? 0;
+      const g = gidMaps[e.src]?.get(e.gid) ?? 0;
       cidToGid[cid * 2] = g >> 8;
       cidToGid[cid * 2 + 1] = g & 0xff;
     });
@@ -197,7 +235,9 @@ function utf16Hex(text: string): string {
 export function buildToUnicode(texts: readonly string[]): string {
   const pairs: string[] = [];
   texts.forEach((t, cid) => {
-    if (t) pairs.push(`<${cid.toString(16).padStart(4, '0')}> <${utf16Hex(t)}>`);
+    // Glyphs that carry no characters of their own (e.g. the second glyph of a decomposed
+    // cluster) map to an empty string so extractors do not invent a character for them.
+    if (cid > 0 || t) pairs.push(`<${cid.toString(16).padStart(4, '0')}> <${utf16Hex(t)}>`);
   });
   const blocks: string[] = [];
   for (let i = 0; i < pairs.length; i += 100) {
@@ -280,6 +320,26 @@ function checksum(data: Uint8Array): number {
 
 /** Return a copy of an sfnt font with `cmap` added (or replaced). */
 export function addCmapTable(font: Uint8Array, cmap: Uint8Array): Uint8Array {
+  const tables = readTables(font);
+  tables.set('cmap', cmap);
+  return writeSfnt(tables);
+}
+
+/* ------------------------------------------------------------------------------------------ */
+/* TrueType merging                                                                             */
+/* ------------------------------------------------------------------------------------------ */
+
+interface ParsedTrueType {
+  readonly tables: ReadonlyMap<string, Uint8Array>;
+  /** Raw `glyf` data per glyph (may be empty). */
+  readonly glyphs: readonly Uint8Array[];
+  /** [advanceWidth, leftSideBearing] per glyph. */
+  readonly metrics: readonly (readonly [number, number])[];
+  /** Added to component glyph ids of composite glyphs when merging. */
+  readonly gidOffset?: number;
+}
+
+function readTables(font: Uint8Array): Map<string, Uint8Array> {
   const dv = new DataView(font.buffer, font.byteOffset, font.byteLength);
   const numTables = dv.getUint16(4);
   const tables = new Map<string, Uint8Array>();
@@ -290,14 +350,139 @@ export function addCmapTable(font: Uint8Array, cmap: Uint8Array): Uint8Array {
     const len = dv.getUint32(rec + 12);
     tables.set(tag, font.subarray(off, off + len));
   }
+  return tables;
+}
+
+const view = (b: Uint8Array): DataView => new DataView(b.buffer, b.byteOffset, b.byteLength);
+
+/** Parse the glyph outlines and horizontal metrics of a TrueType (glyf-based) font. */
+export function parseTrueType(font: Uint8Array): ParsedTrueType {
+  const tables = readTables(font);
+  const head = tables.get('head');
+  const maxp = tables.get('maxp');
+  const loca = tables.get('loca');
+  const glyf = tables.get('glyf');
+  const hhea = tables.get('hhea');
+  const hmtx = tables.get('hmtx');
+  if (!head || !maxp || !loca || !glyf || !hhea || !hmtx) throw new Error('PDF font: not a TrueType font');
+  const numGlyphs = view(maxp).getUint16(4);
+  const longLoca = view(head).getInt16(50) === 1;
+  const lv = view(loca);
+  const off = (i: number): number => (longLoca ? lv.getUint32(i * 4) : lv.getUint16(i * 2) * 2);
+  const glyphs: Uint8Array[] = [];
+  for (let i = 0; i < numGlyphs; i++) glyphs.push(glyf.subarray(off(i), off(i + 1)));
+  const numH = view(hhea).getUint16(34);
+  const hv = view(hmtx);
+  const metrics: [number, number][] = [];
+  let lastAdvance = 0;
+  for (let i = 0; i < numGlyphs; i++) {
+    if (i < numH) {
+      lastAdvance = hv.getUint16(i * 4);
+      metrics.push([lastAdvance, hv.getInt16(i * 4 + 2)]);
+    } else {
+      metrics.push([lastAdvance, hv.getInt16(numH * 4 + (i - numH) * 2)]);
+    }
+  }
+  return { tables, glyphs, metrics };
+}
+
+/** Copy of a composite glyph with every component glyph id shifted by `offset`. */
+function shiftComposite(glyph: Uint8Array, offset: number): Uint8Array {
+  if (offset === 0 || glyph.length < 10 || view(glyph).getInt16(0) >= 0) return glyph;
+  const out = glyph.slice();
+  const dv = view(out);
+  let p = 10;
+  for (;;) {
+    const flags = dv.getUint16(p);
+    dv.setUint16(p + 2, dv.getUint16(p + 2) + offset);
+    p += 4 + (flags & 0x0001 ? 4 : 2);
+    if (flags & 0x0008) p += 2;
+    else if (flags & 0x0040) p += 4;
+    else if (flags & 0x0080) p += 8;
+    if (!(flags & 0x0020)) break;
+  }
+  return out;
+}
+
+/**
+ * Concatenate the glyphs of several TrueType fonts into one program. Global tables (head,
+ * hhea, hinting programs) come from the first font; glyphs of the others must not depend on
+ * those programs (the Latin fallback is shipped unhinted).
+ */
+export function mergeTrueType(parts: readonly ParsedTrueType[], cmap: Uint8Array): Uint8Array {
+  const first = parts[0]!;
+  const glyphs: Uint8Array[] = [];
+  const metrics: (readonly [number, number])[] = [];
+  for (const p of parts) {
+    for (const g of p.glyphs) glyphs.push(shiftComposite(g, p.gidOffset ?? 0));
+    metrics.push(...p.metrics);
+  }
+  const n = glyphs.length;
+  if (n > 0xffff) throw new Error('PDF font: too many glyphs');
+
+  let glyfLen = 0;
+  for (const g of glyphs) glyfLen += (g.length + 3) & ~3;
+  const glyf = new Uint8Array(glyfLen);
+  const loca = new Uint8Array((n + 1) * 4);
+  const locaV = view(loca);
+  let o = 0;
+  glyphs.forEach((g, i) => {
+    locaV.setUint32(i * 4, o);
+    glyf.set(g, o);
+    o += (g.length + 3) & ~3;
+  });
+  locaV.setUint32(n * 4, o);
+
+  const hmtx = new Uint8Array(n * 4);
+  const hmtxV = view(hmtx);
+  let maxAdvance = 0;
+  metrics.forEach(([adv, lsb], i) => {
+    hmtxV.setUint16(i * 4, adv);
+    hmtxV.setInt16(i * 4 + 2, lsb);
+    if (adv > maxAdvance) maxAdvance = adv;
+  });
+
+  const head = first.tables.get('head')!.slice();
+  view(head).setUint32(8, 0); // checkSumAdjustment: recomputed by nobody, 0 is accepted
+  view(head).setInt16(50, 1); // long loca
+  const hhea = first.tables.get('hhea')!.slice();
+  view(hhea).setUint16(10, maxAdvance);
+  view(hhea).setUint16(34, n);
+  // maxp: field-wise maximum of the profile values, so every glyph's needs are covered.
+  const maxp = first.tables.get('maxp')!.slice();
+  const mv = view(maxp);
+  mv.setUint16(4, n);
+  if (maxp.length >= 32) {
+    for (const p of parts.slice(1)) {
+      const other = p.tables.get('maxp');
+      if (!other || other.length < 32) continue;
+      const ov = view(other);
+      for (let f = 6; f < 32; f += 2) mv.setUint16(f, Math.max(mv.getUint16(f), ov.getUint16(f)));
+    }
+  }
+
+  const tables = new Map<string, Uint8Array>();
+  for (const [tag, data] of first.tables) {
+    if (['cvt ', 'fpgm', 'prep', 'name', 'OS/2', 'post'].includes(tag)) tables.set(tag, data);
+  }
+  tables.set('head', head);
+  tables.set('hhea', hhea);
+  tables.set('maxp', maxp);
+  tables.set('loca', loca);
+  tables.set('glyf', glyf);
+  tables.set('hmtx', hmtx);
   tables.set('cmap', cmap);
+  return writeSfnt(tables);
+}
+
+function writeSfnt(tables: ReadonlyMap<string, Uint8Array>): Uint8Array {
   const tags = [...tables.keys()].sort();
   const n = tags.length;
   let size = 12 + n * 16;
   for (const t of tags) size += (tables.get(t)!.length + 3) & ~3;
   const out = new Uint8Array(size);
   const ov = new DataView(out.buffer);
-  ov.setUint32(0, dv.getUint32(0));
+  ov.setUint32(0, 0x00010000);
   let p = 1;
   let e = 0;
   while (p * 2 <= n) {
@@ -321,4 +506,3 @@ export function addCmapTable(font: Uint8Array, cmap: Uint8Array): Uint8Array {
   });
   return out;
 }
-

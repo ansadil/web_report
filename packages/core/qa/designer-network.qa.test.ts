@@ -11,6 +11,16 @@ const playground = fileURLToPath(new URL('../../../apps/playground/', import.met
 const PORT = 5199;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
+/** True once Cairo 400 and 700 are both in document.fonts with status loaded. */
+function cairoFacesLoaded(): boolean {
+  const loaded = [...document.fonts].filter((face) => {
+    const family = face.family.replace(/["']/g, '');
+    return face.status === 'loaded' && family === 'Cairo';
+  });
+  const weights = new Set(loaded.map((face) => String(face.weight)));
+  return weights.has('400') && weights.has('700');
+}
+
 function isLocal(url: string): boolean {
   if (url.startsWith('data:') || url.startsWith('blob:')) return true;
   try {
@@ -71,7 +81,7 @@ describe('playground designer stays on the local origin', () => {
       const ribbon = document.querySelector('reports-builder')?.shadowRoot?.querySelector('[data-testid="ribbon"]');
       return view instanceof HTMLElement && view.hidden === false && !!ribbon && ribbon.getBoundingClientRect().width > 200;
     });
-    await page.waitForFunction(() => document.fonts.check('16px Cairo'), undefined, { timeout: 15_000 });
+    await page.waitForFunction(cairoFacesLoaded, undefined, { timeout: 15_000 });
     const info = await page.evaluate(() => {
       const root = document.querySelector('reports-builder')?.shadowRoot;
       return {
@@ -90,8 +100,14 @@ describe('playground designer stays on the local origin', () => {
     await page.goto(ORIGIN);
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#btn-ar');
+    await page.locator('#reports-list .report-card').filter({ hasText: 'المبيعات حسب المنطقة' }).click();
     await page.click('#tab-builder');
-    await page.waitForFunction(() => document.fonts.check('700 16px Cairo'), undefined, { timeout: 15_000 });
+    await page.waitForFunction(cairoFacesLoaded, undefined, { timeout: 15_000 });
+    for (const file of ['Cairo-Regular.woff2', 'Cairo-Bold.woff2']) {
+      const res = await page.request.get(`${ORIGIN}/assets/fonts/${file}`);
+      expect(res.status(), file).toBe(200);
+      expect(new URL(res.url()).origin).toBe(new URL(ORIGIN).origin);
+    }
     const open = await page.evaluate(() => {
       const root = document.querySelector('reports-builder')?.shadowRoot;
       const cards = [...document.querySelectorAll('#reports-list .report-card .name')].map((n) => n.textContent ?? '');
@@ -101,13 +117,13 @@ describe('playground designer stays on the local origin', () => {
     expect(open.dir).toBe('rtl');
     const measure = () => page.evaluate(() => {
       const root = document.querySelector('reports-builder')!.shadowRoot!;
-      const rows: { kind: string; text: string; w: number; h: number; overflow: number }[] = [];
+      const rows: { kind: string; text: string; w: number; h: number; overflow: number; fontFamily: string }[] = [];
       for (const el of root.querySelectorAll<HTMLElement>('.element')) {
         const kind = el.getAttribute('data-kind') ?? '';
         if (kind !== 'text' && kind !== 'field') continue;
         const body = el.querySelector('.el-body');
         if (!body?.firstChild) {
-          rows.push({ kind, text: '', w: 0, h: 0, overflow: 1 });
+          rows.push({ kind, text: '', w: 0, h: 0, overflow: 1, fontFamily: '' });
           continue;
         }
         const range = document.createRange();
@@ -122,7 +138,8 @@ describe('playground designer stays on the local origin', () => {
           h = Math.max(h, ih);
         }
         const clip = getComputedStyle(body).overflowY;
-        rows.push({ kind, text: body.textContent ?? '', w, h, overflow: clip === 'hidden' ? 0 : 1 });
+        const fontFamily = getComputedStyle(body).fontFamily;
+        rows.push({ kind, text: body.textContent ?? '', w, h, overflow: clip === 'hidden' ? 0 : 1, fontFamily });
       }
       return rows;
     });
@@ -132,6 +149,7 @@ describe('playground designer stays on the local origin', () => {
       expect(row.w, row.text).toBeGreaterThan(2);
       expect(row.h, row.text).toBeGreaterThan(2);
       expect(row.overflow, row.text).toBe(0);
+      expect(row.fontFamily.replace(/["']/g, ''), row.text).toMatch(/^Cairo\b/);
     }
     await page.evaluate(() => {
       const el = document.querySelector('reports-builder')!.shadowRoot!.querySelector<HTMLElement>('.element');

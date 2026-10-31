@@ -17,7 +17,6 @@ export interface RibbonFontState {
   underline: boolean;
   color: string;
   align: Style['align'] | '';
-  valign: NonNullable<Style['valign']> | '';
 }
 
 export interface RibbonState {
@@ -165,9 +164,6 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
               ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
               ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
-              ${valignBtn(state, 'valignStart', 'start', font.valign === 'start', cb)}
-              ${valignBtn(state, 'valignCenter', 'center', font.valign === 'center', cb)}
-              ${valignBtn(state, 'valignEnd', 'end', font.valign === 'end', cb)}
             `,
           )}
         </div>
@@ -275,16 +271,6 @@ function alignBtn(
   cb: RibbonCallbacks,
 ) {
   return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-align-${value}`} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ align: value })}><span>${t(state.locale, label)}</span></button>`;
-}
-
-function valignBtn(
-  state: RibbonState,
-  label: 'valignStart' | 'valignCenter' | 'valignEnd',
-  value: NonNullable<Style['valign']>,
-  pressed: boolean,
-  cb: RibbonCallbacks,
-) {
-  return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-valign-${value}`} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ valign: value })}><span>${t(state.locale, label)}</span></button>`;
 }
 
 function arrange(locale: LocaleTag, id: string, label: Parameters<typeof t>[1], disabled: boolean, action: () => void) {

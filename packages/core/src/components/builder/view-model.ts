@@ -112,7 +112,6 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
         underline: Boolean(selectedOnly?.style?.underline),
         color: selectedOnly?.style?.color ?? '#111111',
         align: selectedOnly?.style?.align ?? '',
-        valign: selectedOnly?.style?.valign ?? '',
       },
     },
     status: {
@@ -120,7 +119,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       digits: session.schema.meta.pageNumberDigits ?? 'locale',
       zoom: session.zoom,
       cursor: session.cursorMm,
-      selection: selectedOnly ? { name: elementStatusName(selectedOnly), w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
+      selection: selectedOnly ? { name: elementStatusName(selectedOnly, locale), w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
       page: 1,
       pages: 1,
     },

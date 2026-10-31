@@ -133,6 +133,7 @@ type StringKey =
   | 'newReport'
   | 'open'
   | 'saveAs'
+  | 'copySuffix'
   | 'alignStart'
   | 'alignCenter'
   | 'alignEnd'
@@ -145,9 +146,6 @@ type StringKey =
   | 'sameWidth'
   | 'sameHeight'
   | 'sameSize'
-  | 'valignStart'
-  | 'valignCenter'
-  | 'valignEnd'
   | 'typeString'
   | 'typeNumber'
   | 'typeDate'
@@ -289,6 +287,7 @@ const en: Record<StringKey, string> = {
   newReport: 'New',
   open: 'Open',
   saveAs: 'Save as',
+  copySuffix: ' (2)',
   alignStart: 'Start',
   alignCenter: 'Center',
   alignEnd: 'End',
@@ -301,9 +300,6 @@ const en: Record<StringKey, string> = {
   sameWidth: 'Width',
   sameHeight: 'Height',
   sameSize: 'Both',
-  valignStart: 'Top',
-  valignCenter: 'Middle',
-  valignEnd: 'Bottom',
   typeString: 'string',
   typeNumber: 'number',
   typeDate: 'date',
@@ -446,6 +442,7 @@ const ar: Record<StringKey, string> = {
   newReport: 'جديد',
   open: 'فتح',
   saveAs: 'حفظ باسم',
+  copySuffix: ' (٢)',
   alignStart: 'البداية',
   alignCenter: 'الوسط',
   alignEnd: 'النهاية',
@@ -458,9 +455,6 @@ const ar: Record<StringKey, string> = {
   sameWidth: 'العرض',
   sameHeight: 'الارتفاع',
   sameSize: 'الاثنان',
-  valignStart: 'أعلى',
-  valignCenter: 'منتصف',
-  valignEnd: 'أسفل',
   typeString: 'نص',
   typeNumber: 'رقم',
   typeDate: 'تاريخ',

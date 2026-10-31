@@ -4,6 +4,10 @@
  * Only ever reached through a dynamic `import()` from {@link exportPdf}, so neither the
  * WASM shaper nor the font bytes are part of the main bundle. Works in Node (fs) and
  * browsers (fetch relative to `import.meta.url`).
+ *
+ * Fonts live in the shared package folder `packages/core/assets/fonts/` (see its README and
+ * `fonts.json`); `../../assets/fonts/` resolves to it from both `src/exporters/` and
+ * `dist/exporters/`.
  */
 import type { ShapedGlyph, ShapingFace } from './pdf-text-layout.js';
 
@@ -19,10 +23,10 @@ export async function loadFontBytes(fileName: PdfFontFile): Promise<Uint8Array> 
     const { createRequire } = await import('node:module');
     const { readFile } = await import('node:fs/promises');
     const req = createRequire(import.meta.url);
-    const resolved = req.resolve(`./fonts/${fileName}`);
+    const resolved = req.resolve(`../../assets/fonts/${fileName}`);
     return new Uint8Array(await readFile(resolved));
   }
-  const url = new URL(`./fonts/${fileName}`, import.meta.url);
+  const url = new URL(`../../assets/fonts/${fileName}`, import.meta.url);
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to load PDF font ${fileName}: ${res.status} ${res.statusText}`);

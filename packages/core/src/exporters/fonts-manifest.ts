@@ -54,12 +54,33 @@ export const FALLBACK_ARABIC_FAMILY = 'Noto Sans Arabic';
 export const FALLBACK_LATIN_FAMILY = 'Noto Sans';
 
 /**
- * URL of the bundled fonts folder (`<package>/assets/fonts/`, trailing slash), derived from
- * this module's URL — the same from `src/exporters/` and `dist/exporters/`. Reliable in Node
- * and when the package is served unbundled; an app bundler that moves this module should copy
- * the folder and pass its URL as `fontsBaseUrl` instead.
+ * Fonts folder relative to this module: `src/exporters/` and `dist/exporters/` are both two
+ * levels below `<package>/`, so `../../assets/fonts/` is `<package>/assets/fonts/`.
+ * Held in a variable on purpose: Vite/rollup rewrite `new URL('<literal>', import.meta.url)`
+ * into an emitted asset, which cannot work for a folder.
  */
-export const DEFAULT_FONTS_BASE_URL: string = `${import.meta.url.replace(/[?#].*$/, '').replace(/\/[^/]*\/[^/]*\/[^/]*$/, '')}/assets/fonts/`;
+const FONTS_DIR_FROM_MODULE = '../../assets/fonts/';
+
+/**
+ * Default fonts folder for a module URL. URL resolution (not string stripping) so it stays on
+ * the module's origin: a bundled `http://host/assets/index-abc.js` gives
+ * `http://host/assets/fonts/`, never a bogus host such as `http://assets/` (BUG-35). Query and
+ * hash of the module URL are dropped.
+ *
+ * @internal Not re-exported from the package index; exported for tests.
+ */
+export function defaultFontsBaseUrlFor(moduleUrl: string): string {
+  return new URL(FONTS_DIR_FROM_MODULE, moduleUrl).href;
+}
+
+/**
+ * URL of the bundled fonts folder (`<package>/assets/fonts/`, trailing slash), resolved from
+ * this module's URL — the same from `src/exporters/` and `dist/exporters/`. Reliable in Node
+ * and when the package is served unbundled. An app bundler moves this module (e.g. to
+ * `/assets/index-abc.js`), so apps that bundle the library should copy `assets/fonts` into
+ * their build and pass its URL as `fontsBaseUrl`.
+ */
+export const DEFAULT_FONTS_BASE_URL: string = defaultFontsBaseUrlFor(import.meta.url);
 
 const SAFE_PATH_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.(ttf|woff2)$/;
 

@@ -224,7 +224,9 @@ type StringKey =
   | 'tips'
   | 'sampleTips'
   | 'datasetLabel'
-  | 'noSavedReports';
+  | 'noSavedReports'
+  | 'alignHorizontal'
+  | 'alignVertical';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -452,6 +454,8 @@ const en: Record<StringKey, string> = {
   sampleTips: 'Drag elements from the toolbox onto bands. Click an element to edit it in the property grid.',
   datasetLabel: 'Dataset',
   noSavedReports: 'No saved reports yet',
+  alignHorizontal: 'Horizontal alignment',
+  alignVertical: 'Vertical alignment',
 };
 
 const ar: Record<StringKey, string> = {
@@ -680,6 +684,8 @@ const ar: Record<StringKey, string> = {
   sampleTips: 'اسحب العناصر من صندوق الأدوات إلى الأشرطة. انقر عنصرًا لتعديله في جدول الخصائص.',
   datasetLabel: 'مصدر البيانات',
   noSavedReports: 'لا توجد تقارير محفوظة',
+  alignHorizontal: 'المحاذاة الأفقية',
+  alignVertical: 'المحاذاة الرأسية',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

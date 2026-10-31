@@ -18,7 +18,7 @@ original family names are kept.
 | Cairo | `Cairo-Regular.*`, `Cairo-Bold.*` (static 400/700 instances of the variable font) | Copyright 2009 The Cairo Project Authors | `OFL-Cairo.txt` |
 | Tajawal | `Tajawal-Regular.*`, `Tajawal-Bold.*` | Copyright 2018 Boutros International | `OFL-Tajawal.txt` |
 | Noto Naskh Arabic | `NotoNaskhArabic-Regular.*`, `NotoNaskhArabic-Bold.*` (static 400/700 instances of the variable font) | Copyright 2022 The Noto Project Authors | `OFL-NotoNaskhArabic.txt` |
-| Noto Sans, Noto Sans Arabic | `NotoSans-*.ttf`, `NotoSansArabic-*.ttf` (PDF fallback fonts) | Copyright 2022 The Noto Project Authors | `OFL-NotoSans.txt` |
+| Noto Sans, Noto Sans Arabic | `NotoSans-*.*`, `NotoSansArabic-*.*` (PDF fallback fonts; woff2 is the same subset) | Copyright 2022 The Noto Project Authors | `OFL-NotoSans.txt` |
 
 OFL-1.1: https://openfontlicense.org
 

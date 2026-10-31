@@ -21,3 +21,4 @@ export {
   type SideSectionKey,
 } from './types.js';
 export { buildViewModel } from './view-model.js';
+export { formatCursorMm } from './status-bar.js';

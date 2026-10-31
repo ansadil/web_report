@@ -19,6 +19,7 @@ export interface BuilderViewState {
   zoom: number;
   widthMm: number;
   heightMm: number;
+  bandHeightsMm: readonly number[];
   collapsed: Record<SideSectionKey, boolean>;
   ribbon: RibbonState;
   status: StatusBarState;
@@ -33,6 +34,7 @@ export interface BuilderViewCallbacks {
   onToggleLeft: () => void;
   onToggleSection: (key: SideSectionKey) => void;
   onHostContextMenu: (ev: Event) => void;
+  onCanvasPointerLeave: () => void;
   ribbon: RibbonCallbacks;
   actions: ActionsCallbacks;
   toolbox: ToolboxCallbacks;

@@ -51,6 +51,8 @@ const map = {
   toolBox: 'square',
   toolQr: 'qr-code',
   toolBarcode: 'barcode',
+  portrait: 'rectangle-vertical',
+  landscape: 'rectangle-horizontal',
 };
 
 const entries = [];

@@ -189,7 +189,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     >
       <span class="kind">${el.kind}</span>
       ${showHandles ? html`<span class="el-name" data-testid="element-name">${label}</span>` : nothing}
-      <div class="${el.kind === 'richtext' ? 'element-preview' : ''}">${label}</div>
+      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''}">${label}</div>
       ${showHandles
         ? html`<div class="resize-handles" aria-hidden="true">
             ${RESIZE_HANDLE_KINDS.map(

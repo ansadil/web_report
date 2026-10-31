@@ -14,7 +14,13 @@ import { renderToolbox } from './toolbox.js';
 export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks) {
   const zoomOrigin = state.canvasDir === 'rtl' ? 'top right' : 'top left';
   const startIcon = state.uiDir === 'rtl' ? 'chevronRight' : 'chevronLeft';
-  const rulers = { widthMm: state.widthMm, heightMm: state.heightMm, zoom: state.zoom, dir: state.canvasDir };
+  const rulers = {
+    widthMm: state.widthMm,
+    heightMm: state.heightMm,
+    bandHeightsMm: state.bandHeightsMm,
+    zoom: state.zoom,
+    dir: state.canvasDir,
+  };
   return html`
     <div class="ribbon-host">
       ${renderRibbon(state.ribbon, cb.ribbon)}
@@ -99,6 +105,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
             data-testid="canvas"
             style="width:${state.widthPx}px;transform:scale(${state.zoom});transform-origin:${zoomOrigin}"
             dir=${state.canvasDir}
+            @pointerleave=${cb.onCanvasPointerLeave}
           >
             ${renderBands(state.canvas, cb.canvas)}
           </div>

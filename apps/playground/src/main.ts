@@ -23,6 +23,7 @@ const storage = createLocalStorageAdapter();
 viewer.dataAdapter = dataAdapter;
 builder.dataAdapter = dataAdapter;
 builder.storageAdapter = storage;
+viewer.fontsBaseUrl = builder.fontsBaseUrl;
 
 const state = {
   locale: 'en' as Locale,
@@ -172,6 +173,10 @@ viewer.addEventListener('export', (e) => {
 viewer.addEventListener('export-error', (e) => {
   const detail = (e as CustomEvent<{ kind: string; error: string }>).detail;
   toast(`${detail.kind}: ${detail.error}`, 'error');
+});
+
+builder.addEventListener('request-preview', () => {
+  viewer.fontsBaseUrl = builder.fontsBaseUrl;
 });
 
 builder.addEventListener('save', (e) => {

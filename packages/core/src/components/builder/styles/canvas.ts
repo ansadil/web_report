@@ -46,18 +46,37 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
       border: none;
       outline: 1px dashed transparent;
       outline-offset: 0;
-      padding: 2px;
+      padding: 0;
       cursor: move;
       overflow: hidden;
       font-size: 11px;
+      line-height: 1.2;
       background: rgba(255,255,255,0.6);
     }
     .element:hover:not(.selected) { outline-color: #94a3b8; }
     .element.selected {
       outline: 2px solid #2563eb;
       box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+      overflow: visible;
     }
-    .element.selected { overflow: visible; }
+    .element .el-body {
+      box-sizing: border-box;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      line-height: 1.2;
+      padding-block: 1px;
+      padding-inline: 2px 2.4em;
+    }
+    .element .kind {
+      position: absolute;
+      top: 0;
+      inset-inline-end: 0;
+      z-index: 1;
+      line-height: 1;
+      pointer-events: none;
+      background: rgba(255,255,255,0.9);
+    }
     .element.richtext {
       display: flex;
       flex-direction: column;

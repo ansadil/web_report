@@ -1,4 +1,5 @@
 import { css } from 'lit';
+import { BAND_HEAD_PX } from '../metrics.js';
 
 export const chromeStyles = css`
   .ribbon-host, .status-host { display: contents; }
@@ -21,7 +22,7 @@ export const chromeStyles = css`
   .ribbon-insert-btn { cursor: grab; flex-direction: column; min-width: 64px; }
   .band-strip { display: flex; flex-direction: column; }
   .band-head {
-    height: 18px; display: flex; align-items: center; padding-inline: 6px;
+    height: ${BAND_HEAD_PX}px; display: flex; align-items: center; padding-inline: 6px;
     background: #334155; color: #fff; font-size: 10px; font-weight: 700; flex: none;
   }
   .band-head .band-label {

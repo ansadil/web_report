@@ -49,4 +49,16 @@ describe('date parameters in Asia/Riyadh (UTC+3)', () => {
       at: '2026-09-30T21:00:00.000Z',
     });
   });
+
+  it('BUG-20: ISO date-time strings are converted to the local (Riyadh) calendar date', () => {
+    const defs: ParameterDef[] = [{ name: 'd', type: 'date' }];
+    const val = (d: string) => resolveParameterValues(defs, { d });
+    expect(val('2026-09-30T21:00:00Z')).toEqual({ ok: true, values: { d: '2026-10-01' } }); // 00:00 local
+    expect(val('2026-09-30T20:59:59Z')).toEqual({ ok: true, values: { d: '2026-09-30' } }); // 23:59:59 local
+    expect(val('2026-10-01T00:00:00+03:00')).toEqual({ ok: true, values: { d: '2026-10-01' } });
+    expect(val('2026-10-01T01:00:00+05:00')).toEqual({ ok: true, values: { d: '2026-09-30' } }); // 23:00 local
+    expect(val('2026-10-01T00:30')).toEqual({ ok: true, values: { d: '2026-10-01' } }); // local, no zone
+    expect(val('2026-02-30')).toMatchObject({ ok: false, issues: [{ name: 'd', code: 'invalid' }] });
+    expect(val('hello 5')).toMatchObject({ ok: false, issues: [{ name: 'd', code: 'invalid' }] });
+  });
 });

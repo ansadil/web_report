@@ -6,8 +6,8 @@ import type { ReportSchemaV1 } from '../schema/report-schema.js';
 export type ParameterValues = Readonly<Record<string, unknown>>;
 
 /**
- * Normalized value of a `dateRange` parameter. Each end is a local `YYYY-MM-DD` for Date/epoch inputs (other date
- * strings as given). Both ends are present for required parameters; an OPTIONAL dateRange may be open-ended, in which
+ * Normalized value of a `dateRange` parameter. Each end is a local calendar date `YYYY-MM-DD` (from a Date, epoch ms,
+ * a `YYYY-MM-DD` string or an ISO 8601 date-time string). Both ends are present for required parameters; an OPTIONAL dateRange may be open-ended, in which
  * case only the provided end is set (`{ from }` or `{ to }`).
  */
 export interface DateRangeValue {
@@ -48,7 +48,12 @@ function isBlank(v: unknown): boolean {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
 }
 
-const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+/**
+ * ISO 8601 date-time (extended format): `YYYY-MM-DDTHH:mm`, optional `:ss` and `.fraction`, then `Z`, `±HH:mm`,
+ * `±HHmm`, `±HH` or nothing (local time). The `T` separator is required (case-insensitive).
+ */
+const ISO_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:[.,](\d{1,9}))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/i;
 
 /** Local calendar date of `d` as `YYYY-MM-DD` (no time, no zone), e.g. local 2026-10-01 00:00 -> `2026-10-01` in any TZ. */
 function toLocalDateString(d: Date): string {
@@ -56,12 +61,57 @@ function toLocalDateString(d: Date): string {
   return `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** True when year/month/day form a real calendar date (round-trip through Date.UTC: rejects 2026-02-30, 2026-13-01). */
+function isValidYmd(y: number, m: number, d: number): boolean {
+  if (m < 1 || m > 12 || d < 1 || d > 31) return false;
+  const t = new Date(Date.UTC(2000, m - 1, d));
+  t.setUTCFullYear(y);
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}
+
+interface ParsedDateString {
+  /** `YYYY-MM-DD` as written in the string. */
+  ymd: string;
+  /** Epoch ms of the instant when the string carries a zone (`Z` / offset); undefined for date-only or local times. */
+  instant?: number;
+}
+
 /**
- * Serializes a `date` parameter (and each end of a `dateRange`):
- * - `Date` object or epoch milliseconds -> the LOCAL calendar date `YYYY-MM-DD` (never `toISOString()`, which would
- *   shift e.g. local 2026-10-01 00:00 in UTC+3 to 2026-09-30T21:00Z).
- * - `YYYY-MM-DD` string -> unchanged.
- * - Any other string `Date.parse` accepts (e.g. a full ISO timestamp) -> kept as-is (trimmed); the host owns its zone.
+ * Parses a strict `YYYY-MM-DD` or ISO 8601 date-time string, validating every component (month 1-12, day within the
+ * month, hour 0-23, minute/second 0-59, offset up to ±23:59). Returns undefined for anything else.
+ */
+function parseIsoDateString(s: string): ParsedDateString | undefined {
+  const d = ISO_DATE_ONLY.exec(s);
+  if (d) return isValidYmd(+d[1]!, +d[2]!, +d[3]!) ? { ymd: s } : undefined;
+  const m = ISO_DATE_TIME.exec(s);
+  if (!m) return undefined;
+  const [, ys, mos, ds, hs, mis, ss, frac, zone] = m;
+  const y = +ys!, mo = +mos!, day = +ds!, h = +hs!, mi = +mis!, sec = ss ? +ss : 0;
+  if (!isValidYmd(y, mo, day) || h > 23 || mi > 59 || sec > 59) return undefined;
+  const ymd = `${ys}-${mos}-${ds}`;
+  if (!zone) return { ymd };
+  let offsetMin = 0;
+  if (zone.toUpperCase() !== 'Z') {
+    const digits = zone.slice(1).replace(':', '');
+    const oh = +digits.slice(0, 2);
+    const om = digits.length > 2 ? +digits.slice(2) : 0;
+    if (oh > 23 || om > 59) return undefined;
+    offsetMin = (zone[0] === '-' ? -1 : 1) * (oh * 60 + om);
+  }
+  const ms = frac ? Math.floor(+`0.${frac}` * 1000) : 0;
+  const utc = new Date(Date.UTC(2000, mo - 1, day, h, mi, sec, ms));
+  utc.setUTCFullYear(y);
+  return { ymd, instant: utc.getTime() - offsetMin * 60_000 };
+}
+
+/**
+ * Serializes a `date` parameter (and each end of a `dateRange`) to the LOCAL calendar date `YYYY-MM-DD`:
+ * - `Date` object or epoch milliseconds -> local calendar date (never `toISOString()`, which would shift e.g. local
+ *   2026-10-01 00:00 in UTC+3 to 2026-09-30T21:00Z).
+ * - Strict `YYYY-MM-DD` string with a real calendar date -> unchanged (2026-02-30, 2026-04-31, 2026-13-01 rejected).
+ * - ISO 8601 date-time string (`T` + time): with `Z` / an offset it is converted to the local calendar date of that
+ *   instant; without a zone it is local time, so its own date part is used. Components are validated.
+ * - Anything else ("1", "hello 5", "10/01/2026", ...) -> invalid.
  */
 function coerceDate(v: unknown): string {
   if (v instanceof Date) {
@@ -74,24 +124,28 @@ function coerceDate(v: unknown): string {
     return toLocalDateString(d);
   }
   if (typeof v === 'string') {
-    const s = v.trim();
-    if (ISO_DATE_ONLY.test(s)) {
-      if (Number.isNaN(Date.parse(s))) throw new InvalidValue('expected a valid date');
-      return s;
-    }
-    if (!Number.isNaN(Date.parse(s))) return s;
+    const p = parseIsoDateString(v.trim());
+    if (p) return p.instant === undefined ? p.ymd : toLocalDateString(new Date(p.instant));
+    throw new InvalidValue('expected a valid YYYY-MM-DD or ISO 8601 date-time string');
   }
   throw new InvalidValue('expected a YYYY-MM-DD string, Date or epoch milliseconds');
 }
 
-/** `datetime`: Date / epoch ms -> full ISO via `toISOString()` (UTC instant); other parseable strings kept as-is. */
+/**
+ * `datetime`: Date / epoch ms -> full ISO via `toISOString()` (UTC instant). Strings must be an ISO 8601 date-time
+ * or a `YYYY-MM-DD` date with valid components and are sent as given (trimmed); anything else is invalid.
+ */
 function coerceDateTime(v: unknown): string {
   if (v instanceof Date || (typeof v === 'number' && Number.isFinite(v))) {
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) throw new InvalidValue('expected a valid date-time');
     return d.toISOString();
   }
-  if (typeof v === 'string' && !Number.isNaN(Date.parse(v.trim()))) return v.trim();
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (parseIsoDateString(s)) return s;
+    throw new InvalidValue('expected a valid ISO 8601 date-time string');
+  }
   throw new InvalidValue('expected an ISO date-time string, Date or epoch milliseconds');
 }
 
@@ -157,7 +211,7 @@ function coerce(def: ParameterDef, v: unknown): Coerced {
 
 /**
  * Resolves effective parameter values: explicit value (blank = absent) ?? `ParameterDef.default`, coerced to the declared type
- * (number, bool, date -> local `YYYY-MM-DD` for Date/epoch ms, datetime -> ISO via toISOString(), dateRange -> `{ from, to }` local dates (optional ranges may be open-ended), select -> matching option value).
+ * (number, bool, date -> local `YYYY-MM-DD` (Date, epoch ms, strict YYYY-MM-DD or ISO 8601 date-time; anything else invalid), datetime -> ISO via toISOString() or a validated ISO string, dateRange -> `{ from, to }` local dates (optional ranges may be open-ended), select -> matching option value).
  * Required parameters without a value produce a `required` issue. Optional parameters without a value are omitted.
  * Values for names that are not declared are passed through unchanged.
  */

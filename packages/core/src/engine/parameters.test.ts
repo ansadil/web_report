@@ -13,6 +13,11 @@ const issues = (defs: ParameterDef[], values?: Record<string, unknown>) => {
   return r.issues;
 };
 
+const localYmd = (ms: number) => {
+  const t = new Date(ms);
+  return `${String(t.getFullYear()).padStart(4, '0')}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+
 describe('resolveParameterValues: resolution', () => {
   it('returns empty values without definitions or values', () => {
     expect(ok([])).toEqual({});
@@ -97,8 +102,8 @@ describe('resolveParameterValues: coercion', () => {
     expect(ok(d, { d: new Date(2026, 9, 1, 23, 59, 59, 999) })).toEqual({ d: '2026-10-01' });
     expect(ok(d, { d: new Date(2026, 0, 2).getTime() })).toEqual({ d: '2026-01-02' }); // epoch ms
     expect(ok(d, { d: new Date(999, 0, 5) })).toEqual({ d: '0999-01-05' }); // zero-padded year
-    // other parseable strings are kept as-is (host owns their zone)
-    expect(ok(d, { d: '2026-10-01T00:00:00+03:00' })).toEqual({ d: '2026-10-01T00:00:00+03:00' });
+    // ISO date-time with an offset -> local calendar date of that instant (TZ-independent expectation)
+    expect(ok(d, { d: '2026-10-01T00:00:00+03:00' })).toEqual({ d: localYmd(Date.UTC(2026, 8, 30, 21)) });
     expect(issues(d, { d: 'not a date' })[0]!.code).toBe('invalid');
     expect(issues(d, { d: '2026-13-01' })[0]!.code).toBe('invalid');
     expect(issues(d, { d: new Date('x') })[0]!.code).toBe('invalid');
@@ -205,5 +210,77 @@ describe('parameterValuesEqual', () => {
     expect(parameterValuesEqual(null, undefined)).toBe(true);
     expect(parameterValuesEqual({ a: undefined }, {})).toBe(true);
     expect(parameterValuesEqual(null, {})).toBe(false);
+  });
+});
+
+describe('BUG-20: strict date / datetime string validation', () => {
+  const d: ParameterDef[] = [{ name: 'day', type: 'date', required: true }];
+  const t: ParameterDef[] = [{ name: 'at', type: 'datetime' }];
+  const r: ParameterDef[] = [{ name: 'p', type: 'dateRange' }];
+
+  it.each(['2026-02-30', '2026-04-31', '2026-13-01', '2026-00-10', '2026-01-00', '2026-01-32', '2025-02-29', '2100-02-29'])(
+    'date "%s" (impossible calendar date) is invalid',
+    (bad) => {
+      expect(issues(d, { day: bad })[0]).toMatchObject({ name: 'day', code: 'invalid' });
+    },
+  );
+
+  it.each(['1', 'hello 5', '10/01/2026', '2026-10-01 10:00', '2026-1-01', '2026-10-1', '20261001', '2026-10', 'Oct 1 2026', '2026-10-01T', '2026-10-01T10', '+002026-10-01'])(
+    'date "%s" (not YYYY-MM-DD / ISO 8601 date-time) is invalid',
+    (bad) => {
+      const i = issues(d, { day: bad })[0]!;
+      expect(i).toMatchObject({ name: 'day', code: 'invalid' });
+      expect(i.message).toBe('expected a valid YYYY-MM-DD or ISO 8601 date-time string');
+    },
+  );
+
+  it('valid YYYY-MM-DD strings pass through, leap days included', () => {
+    expect(ok(d, { day: '2026-10-01' })).toEqual({ day: '2026-10-01' });
+    expect(ok(d, { day: '2024-02-29' })).toEqual({ day: '2024-02-29' });
+    expect(ok(d, { day: '2000-02-29' })).toEqual({ day: '2000-02-29' });
+    expect(ok(d, { day: '2026-04-30' })).toEqual({ day: '2026-04-30' });
+  });
+
+  it('ISO date-time strings with Z / offset become the local calendar date of the instant', () => {
+    expect(ok(d, { day: '2026-10-01T12:00:00Z' })).toEqual({ day: localYmd(Date.UTC(2026, 9, 1, 12)) });
+    expect(ok(d, { day: '2026-09-30T21:00:00.000Z' })).toEqual({ day: localYmd(Date.UTC(2026, 8, 30, 21)) });
+    expect(ok(d, { day: '2026-10-01T08:30+0300' })).toEqual({ day: localYmd(Date.UTC(2026, 9, 1, 5, 30)) });
+    expect(ok(d, { day: '2026-10-01T08:30:15.123456-05:00' })).toEqual({ day: localYmd(Date.UTC(2026, 9, 1, 13, 30, 15)) });
+    expect(ok(d, { day: '2026-10-01t08:30z' })).toEqual({ day: localYmd(Date.UTC(2026, 9, 1, 8, 30)) });
+  });
+
+  it('ISO date-time strings without a zone are local time: their own date part is used', () => {
+    expect(ok(d, { day: '2026-10-01T00:00' })).toEqual({ day: '2026-10-01' });
+    expect(ok(d, { day: '2026-10-01T23:59:59.999' })).toEqual({ day: '2026-10-01' });
+  });
+
+  it.each([
+    '2026-02-30T10:00:00Z', '2026-04-31T00:00', '2026-13-01T00:00Z', '2026-10-01T24:00:00Z', '2026-10-01T10:60Z',
+    '2026-10-01T10:00:60Z', '2026-10-01T10:00+24:00', '2026-10-01T10:00+03:60', '2026-10-01T10:00:00+3',
+  ])('date-time "%s" with an invalid component is invalid', (bad) => {
+    expect(issues(d, { day: bad })[0]).toMatchObject({ name: 'day', code: 'invalid' });
+    expect(issues(t, { at: bad })[0]).toMatchObject({ name: 'at', code: 'invalid' });
+  });
+
+  it('dateRange: each end follows the date rules', () => {
+    expect(issues(r, { p: { from: '2026-02-30', to: '2026-03-01' } })[0]).toMatchObject({ name: 'p', code: 'invalid' });
+    expect(issues(r, { p: { from: '2026-03-01', to: '2026-04-31' } })[0]).toMatchObject({ name: 'p', code: 'invalid' });
+    expect(issues(r, { p: { from: '1', to: '2026-03-01' } })[0]).toMatchObject({ name: 'p', code: 'invalid' });
+    expect(issues(r, { p: ['2026-03-01', 'hello 5'] })[0]).toMatchObject({ name: 'p', code: 'invalid' });
+    expect(issues(r, { p: { to: '10/01/2026' } })[0]).toMatchObject({ name: 'p', code: 'invalid' });
+    expect(ok(r, { p: { from: '2026-10-01T00:00', to: '2026-10-31T23:59:59' } })).toEqual({ p: { from: '2026-10-01', to: '2026-10-31' } });
+    expect(ok(r, { p: { from: '2026-10-01T12:00:00Z' } })).toEqual({ p: { from: localYmd(Date.UTC(2026, 9, 1, 12)) } });
+  });
+
+  it('datetime: Date / epoch -> toISOString(); valid ISO strings (or YYYY-MM-DD) kept as given; others invalid', () => {
+    expect(ok(t, { at: Date.UTC(2026, 9, 1, 5) })).toEqual({ at: '2026-10-01T05:00:00.000Z' });
+    expect(ok(t, { at: '2026-10-01T08:00:00+03:00' })).toEqual({ at: '2026-10-01T08:00:00+03:00' });
+    expect(ok(t, { at: ' 2026-10-01T08:00Z ' })).toEqual({ at: '2026-10-01T08:00Z' });
+    expect(ok(t, { at: '2026-10-01T08:00' })).toEqual({ at: '2026-10-01T08:00' });
+    expect(ok(t, { at: '2026-10-01' })).toEqual({ at: '2026-10-01' });
+    for (const bad of ['1', 'hello 5', '10/01/2026', '2026-02-30', '2026-04-31', '2026-13-01', 'Thu, 01 Oct 2026 08:00:00 GMT']) {
+      expect(issues(t, { at: bad })[0]).toMatchObject({ name: 'at', code: 'invalid' });
+    }
+    expect(issues(t, { at: '1' })[0]!.message).toBe('expected a valid ISO 8601 date-time string');
   });
 });

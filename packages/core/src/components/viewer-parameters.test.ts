@@ -99,6 +99,24 @@ describe('reports-viewer parameters', () => {
     expect(calls.length).toBe(0);
   });
 
+  it('BUG-20: impossible or non-ISO date strings are rejected without fetching', async () => {
+    const base = schemaWithParams();
+    const s = { ...base, parameters: [{ name: 'day', type: 'date' as const, required: true }] };
+    for (const bad of ['2026-02-30', '2026-04-31', '2026-13-01', '1', 'hello 5', '10/01/2026']) {
+      const err = nextEvent(v, 'parameters-error');
+      v.dataAdapter = adapter;
+      v.params = { day: bad };
+      v.schema = { ...s };
+      const e = await err;
+      expect(e.detail.issues[0]).toMatchObject({ name: 'day', code: 'invalid' });
+    }
+    expect(calls.length).toBe(0);
+    const rendered = nextEvent(v, 'report-rendered');
+    v.params = { day: '2026-10-01' };
+    await rendered;
+    expect(calls.at(-1)!.params).toMatchObject({ day: '2026-10-01' });
+  });
+
   it('ignores a stale response superseded by a newer parameter change', async () => {
     const resolvers: Array<(rows: { x: number }[]) => void> = [];
     const slow: DataAdapter = { id: 'slow', fetch: (q) => { calls.push(q); return new Promise((r) => resolvers.push(r)); } };

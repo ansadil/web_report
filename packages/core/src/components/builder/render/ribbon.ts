@@ -193,11 +193,6 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
                   ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
                   ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
                 </div>
-                <div class="row">
-                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-valign-start" aria-label=${t(state.locale, 'alignTop')} ?disabled=${!font.enabled}>${icon('valignStart')}</button>
-                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-valign-center" aria-label=${t(state.locale, 'alignMiddle')} ?disabled=${!font.enabled}>${icon('valignCenter')}</button>
-                  <button type="button" class="ribbon-cmd icon-only" data-testid="ribbon-valign-end" aria-label=${t(state.locale, 'alignBottom')} ?disabled=${!font.enabled}>${icon('valignEnd')}</button>
-                </div>
               </div>
             `,
           )}

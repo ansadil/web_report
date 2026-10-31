@@ -16,79 +16,11 @@
       #app {
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: 40px minmax(0, 1fr);
-        grid-template-areas: 'bar' 'stage';
+        grid-template-rows: minmax(0, 1fr);
         height: 100vh;
       }
-      #app.drawer-open {
-        grid-template-columns: 280px minmax(0, 1fr);
-        grid-template-areas: 'bar bar' 'drawer stage';
-      }
-      header.playground-bar { grid-area: bar; }
-      main.main { grid-area: stage; }
-      header.playground-bar {
-        position: relative;
-        z-index: 30;
-        background: #f7f9fc;
-        color: #1b2433;
-        border-bottom: 1px solid #dfe4ec;
-        padding: 0 10px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-      }
-      header.playground-bar .locale-switch { margin-inline-start: auto; }
-      header.playground-bar h1 { display: none; }
-      #btn-samples {
-        border: 1px solid #dfe4ec;
-        background: #fff;
-        border-radius: 6px;
-        height: 28px;
-        padding: 0 8px;
-        cursor: pointer;
-      }
+      #app.drawer-open { grid-template-columns: 280px minmax(0, 1fr); }
       #reports-list { display: block; }
-      header.playground-bar .tabs {
-        display: flex;
-        gap: 4px;
-        background: #e7eef6;
-        padding: 4px;
-        border-radius: 8px;
-      }
-      header.playground-bar .tabs button {
-        background: transparent;
-        color: #334155;
-        border: none;
-        padding: 6px 14px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-      }
-      header.playground-bar .tabs button.active {
-        background: #1f5fa8;
-        color: #fff;
-      }
-      header.playground-bar .locale-switch {
-        display: flex;
-        gap: 4px;
-      }
-      header.playground-bar .locale-switch button {
-        background: #fff;
-        color: #334155;
-        border: 1px solid #dfe4ec;
-        padding: 5px 10px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 700;
-      }
-      header.playground-bar .locale-switch button.active {
-        background: #1f5fa8;
-        color: #fff;
-        border-color: #1f5fa8;
-      }
       aside.sidebar {
         display: none;
         grid-area: drawer;
@@ -184,8 +116,13 @@
         min-width: 0;
         min-height: 0;
       }
-      #view-viewer reports-viewer { display: block; height: calc(100vh - 40px); }
-      #view-builder reports-builder { display: grid; height: calc(100vh - 40px); }
+      #view-viewer, #view-builder { height: 100%; min-height: 0; }
+      #view-viewer reports-viewer { display: block; height: 100vh; }
+      #view-builder reports-builder { display: grid; height: 100vh; }
+      #tab-builder {
+        position: absolute; z-index: 5; top: 8px; inset-inline-start: 8px;
+        border: 0; background: #1f5fa8; color: #fff; border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer;
+      }
       [hidden] { display: none !important; }
       .toast {
         position: fixed;
@@ -209,18 +146,6 @@
   </head>
   <body>
     <div id="app">
-      <header class="playground-bar">
-        <button id="btn-samples" type="button">Samples</button>
-        <div class="locale-switch">
-          <button id="btn-en">EN</button>
-          <button id="btn-ar" class="active">AR</button>
-        </div>
-        <div class="tabs" role="tablist">
-          <button id="tab-builder" class="active">Builder</button>
-          <button id="tab-viewer">Viewer</button>
-        </div>
-      </header>
-
       <aside class="sidebar" id="sample-drawer">
         <h3 id="samples-heading">Sample Reports</h3>
         <div id="reports-list"></div>
@@ -238,6 +163,7 @@
 
       <main class="main">
         <div id="view-viewer" hidden>
+          <button id="tab-builder" type="button" data-testid="back-to-builder">Builder</button>
           <reports-viewer id="viewer"></reports-viewer>
         </div>
         <div id="view-builder">

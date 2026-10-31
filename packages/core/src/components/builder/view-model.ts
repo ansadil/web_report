@@ -187,6 +187,8 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
   const cb: BuilderViewCallbacks = {
     onToggleLeft: () => toggleLeft(session),
     onToggleLocale: () => undefined,
+    onSetLocale: () => undefined,
+    onSamples: () => undefined,
     onSideTab: (tab) => setSideTab(session, tab),
     onToggleSection: (key) => toggleSection(session, key),
     onHostContextMenu: ports.pointer.onHostContextMenu,
@@ -274,6 +276,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       onNew: () => newReport(session),
       onOpenText: (text) => openReportText(session, text),
       onSaveAs: () => saveAsCopy(session),
+      onSamples: () => undefined,
       onArrange: (mode) => arrangeSelected(session, mode),
       onStyle: (patch) => {
         const next = { ...patch };

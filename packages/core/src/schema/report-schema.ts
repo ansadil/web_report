@@ -179,6 +179,8 @@ export const FieldDeclaration = z.object({
   name: z.string().min(1),
   type: FieldType,
   label: z.string().optional(),
+  /** UI-only dictionary folder. Omitted fields stay directly under the data source. */
+  group: z.string().optional(),
 });
 export type FieldDeclaration = z.infer<typeof FieldDeclaration>;
 

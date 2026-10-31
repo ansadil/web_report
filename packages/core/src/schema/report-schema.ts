@@ -217,10 +217,11 @@ const ReportMetaSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   locale: Locale.default('en'),
-  dir: Direction.default('ltr'),
+  /** When omitted, inferred from locale: 'ar' means 'rtl'. */
+  dir: Direction.optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
-});
+}).transform((m) => ({ ...m, dir: m.dir ?? (m.locale === 'ar' ? 'rtl' : 'ltr') }));
 
 const BandsBlockSchema = z.object({
   reportHeader: BandSchema.optional(),

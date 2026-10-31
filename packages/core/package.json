@@ -63,7 +63,8 @@
     "build": "tsc -p tsconfig.json && node scripts/bundle-render-code.mjs && node scripts/copy-pdf-fonts.mjs",
     "typecheck": "tsc -p tsconfig.json --emitDeclarationOnly",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:qa": "vitest run --config vitest.qa.config.ts"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
@@ -84,6 +85,7 @@
     "@types/qrcode": "^1.5.6",
     "esbuild": "^0.25.0",
     "happy-dom": "^15.11.7",
+    "pdfjs-dist": "^4.10.38",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

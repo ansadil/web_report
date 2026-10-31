@@ -61,3 +61,58 @@ describe('validateReport', () => {
     if (!r.ok) expect(r.error.length).toBeGreaterThan(10);
   });
 });
+
+describe('validateReport: data dictionary additions', () => {
+  it('old templates without parameters validate unchanged', () => {
+    const r = validateReport(minimal);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.parameters).toBeUndefined();
+      expect(r.value.fields).toEqual(minimal.fields);
+    }
+  });
+
+  it('accepts image field type', () => {
+    const r = validateReport({ ...minimal, fields: [...minimal.fields, { name: 'logo', type: 'image' }] });
+    expect(r.ok).toBe(true);
+  });
+
+  it('accepts valid parameters (static and source options, localized labels)', () => {
+    const r = validateReport({
+      ...minimal,
+      parameters: [
+        { name: 'from', type: 'date', required: true, label: { ar: 'من', en: 'From' } },
+        { name: 'period', type: 'dateRange' },
+        { name: 'active', type: 'bool', default: true },
+        { name: 'status', type: 'select', options: [{ value: 'paid', label: { ar: 'مدفوعة', en: 'Paid' } }, { value: 'open', label: 'Open' }] },
+        { name: 'branch', type: 'select', options: { source: 'branches', valueField: 'id', labelField: 'name' } },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.parameters).toHaveLength(5);
+  });
+
+  it('rejects unknown parameter type', () => {
+    expect(validateReport({ ...minimal, parameters: [{ name: 'x', type: 'color' }] }).ok).toBe(false);
+  });
+
+  it('rejects parameter without name', () => {
+    expect(validateReport({ ...minimal, parameters: [{ name: '', type: 'string' }] }).ok).toBe(false);
+  });
+
+  it('rejects select parameter without options', () => {
+    const r = validateReport({ ...minimal, parameters: [{ name: 's', type: 'select' }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/select parameters require options/);
+  });
+
+  it('rejects incomplete options source', () => {
+    expect(validateReport({ ...minimal, parameters: [{ name: 's', type: 'select', options: { source: 'b', valueField: 'id' } }] }).ok).toBe(false);
+  });
+
+  it('rejects duplicate parameter names', () => {
+    const r = validateReport({ ...minimal, parameters: [{ name: 'a', type: 'string' }, { name: 'a', type: 'number' }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/duplicate parameter name/);
+  });
+});

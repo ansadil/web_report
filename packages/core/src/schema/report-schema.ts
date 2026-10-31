@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import type { ParameterDef } from '@reports-web/shared';
 
 export const PageSizeName = z.enum(['A4', 'A5', 'Letter']);
 export type PageSizeName = z.infer<typeof PageSizeName>;
 
-export const FieldType = z.enum(['string', 'number', 'date', 'bool']);
+export const FieldType = z.enum(['string', 'number', 'date', 'bool', 'image']);
 export type FieldType = z.infer<typeof FieldType>;
 
 export const Direction = z.enum(['rtl', 'ltr']);
@@ -164,6 +165,47 @@ export const FieldDeclaration = z.object({
 });
 export type FieldDeclaration = z.infer<typeof FieldDeclaration>;
 
+/** `string` or a per-locale map such as `{ ar: '...', en: '...' }`. */
+export const LocalizedTextSchema = z.union([z.string(), z.record(z.string())]);
+
+export const ParameterType = z.enum(['string', 'number', 'date', 'dateRange', 'bool', 'select']);
+
+const ParameterOptionSchema = z.object({
+  value: z.unknown(),
+  label: LocalizedTextSchema,
+});
+
+const ParameterOptionsSourceSchema = z.object({
+  source: z.string().min(1),
+  valueField: z.string().min(1),
+  labelField: z.string().min(1),
+});
+
+export const ParameterDefSchema = z
+  .object({
+    name: z.string().min(1),
+    label: LocalizedTextSchema.optional(),
+    type: ParameterType,
+    required: z.boolean().optional(),
+    default: z.unknown().optional(),
+    options: z.union([z.array(ParameterOptionSchema), ParameterOptionsSourceSchema]).optional(),
+  })
+  .superRefine((p, ctx) => {
+    if (p.type === 'select' && p.options === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['options'], message: 'select parameters require options' });
+    }
+  });
+
+const ParametersSchema = z.array(ParameterDefSchema).superRefine((params, ctx) => {
+  const seen = new Set<string>();
+  params.forEach((p, i) => {
+    if (seen.has(p.name)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i, 'name'], message: `duplicate parameter name "${p.name}"` });
+    }
+    seen.add(p.name);
+  });
+});
+
 export const PageSchema = z.object({
   size: PageSizeName.default('A4'),
   orientation: z.enum(['portrait', 'landscape']).default('portrait'),
@@ -233,6 +275,7 @@ export type ReportSchemaV1 = {
   groups: z.infer<typeof GroupSchema>[];
   bands: z.infer<typeof BandsBlockSchema>;
   watermark?: z.infer<typeof WatermarkSchema>;
+  parameters?: ParameterDef[];
 };
 
 export const ReportSchemaV1 = z.object({
@@ -249,6 +292,7 @@ export const ReportSchemaV1 = z.object({
   groups: z.array(GroupSchema).default([]),
   bands: BandsBlockSchema,
   watermark: WatermarkSchema.optional(),
+  parameters: ParametersSchema.optional(),
 }) as z.ZodType<ReportSchemaV1>;
 
 export function validateReport(input: unknown): { ok: true; value: ReportSchemaV1 } | { ok: false; error: string } {

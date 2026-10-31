@@ -13,6 +13,8 @@ import { validateReport, type ReportSchemaV1 } from '../schema/report-schema.js'
 interface DrawnLine {
   readonly page: number;
   readonly y: number;
+  /** Left edge (pt) of the leftmost run on the line. */
+  readonly x: number;
   /** Concatenated ToUnicode text of the glyphs, left → right. */
   readonly visual: string;
   readonly fonts: readonly string[];
@@ -73,7 +75,7 @@ async function readDrawnLines(bytes: Uint8Array): Promise<DrawnLine[]> {
     }
     for (const [y, rs] of [...byY].sort((a, b) => b[0] - a[0])) {
       rs.sort((a, b) => a.x - b.x);
-      out.push({ page: pi + 1, y, visual: rs.map((r) => r.text).join(' '), fonts: [...new Set(rs.map((r) => r.font))] });
+      out.push({ page: pi + 1, y, x: rs[0]!.x, visual: rs.map((r) => r.text).join(' '), fonts: [...new Set(rs.map((r) => r.font))] });
     }
   });
   return out;
@@ -156,6 +158,52 @@ describe('PDF Arabic text corpus (drawn order)', () => {
 
   it('each line uses a single (merged Arabic+Latin) font', () => {
     for (const l of lines) expect(l.fonts, l.visual).toHaveLength(1);
+  });
+});
+
+describe('BUG-21: explicit dir wins over the locale (PDF)', () => {
+  /** Mixed strings whose visual order differs between an LTR and an RTL paragraph. */
+  const MIXED = ['منتج ABC-123 (إصدار 2)', 'Total: الإجمالي 50', 'العميل Acme Corp'];
+  const SHORT = 'قصير';
+  const els = () => [...MIXED.map((t, i) => text(`m${i}`, t, i)), text('s', SHORT, MIXED.length)];
+  const leftMarginPt = 15 * 2.8346;
+  const pageWidthPt = 210 * 2.8346;
+
+  async function draw(meta: AnyObj, mutate?: (s: ReportSchemaV1) => ReportSchemaV1) {
+    const s = schema(els(), meta);
+    return readDrawnLines(await pdfBytes(mutate ? mutate(s) : s));
+  }
+  const expectDir = (lines: DrawnLine[], dir: 'ltr' | 'rtl') => {
+    const visuals = lines.map((l) => l.visual);
+    for (const t of MIXED) {
+      expect(expectedVisual(t, 'ltr')).not.toBe(expectedVisual(t, 'rtl'));
+      expect(visuals).toContain(expectedVisual(t, dir));
+    }
+    const short = lines.find((l) => l.visual === expectedVisual(SHORT, dir))!;
+    expect(short).toBeDefined();
+    // Start alignment: LTR → at the left margin; RTL → flush right (well past the page centre).
+    if (dir === 'ltr') {
+      expect(short.x).toBeGreaterThanOrEqual(leftMarginPt);
+      expect(short.x).toBeLessThan(leftMarginPt + 10); // margin + small inner padding
+    }
+    else expect(short.x).toBeGreaterThan(pageWidthPt / 2);
+  };
+
+  it('Arabic locale + dir ltr → LTR paragraphs and left alignment', async () => {
+    expectDir(await draw({ name: 'T', locale: 'ar', dir: 'ltr' }), 'ltr');
+  });
+
+  it('Arabic locale + no dir → RTL (schema default from the locale)', async () => {
+    expectDir(await draw({ name: 'T', locale: 'ar' }), 'rtl');
+  });
+
+  it('Arabic locale + dir missing on an unvalidated schema → RTL (locale fallback)', async () => {
+    const strip = (s: ReportSchemaV1) => ({ ...s, meta: { ...s.meta, dir: undefined } }) as unknown as ReportSchemaV1;
+    expectDir(await draw({ name: 'T', locale: 'ar' }, strip), 'rtl');
+  });
+
+  it('English locale + dir rtl → RTL', async () => {
+    expectDir(await draw({ name: 'T', locale: 'en', dir: 'rtl' }), 'rtl');
   });
 });
 

@@ -567,9 +567,13 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
   const pdf = await PDFDocument.create();
   const tree = interpret({ schema, rows });
   const useUnicode = needsUnicodePdfFont(tree, schema);
-  /** Paragraph base direction for bidi. Arabic reports default to RTL. */
+  /**
+   * Paragraph base direction for bidi and layout. An explicit template/host `dir` always wins (BUG-21: Arabic +
+   * `dir: 'ltr'` must stay LTR). Validated schemas always carry `meta.dir` (the schema defaults it from the locale);
+   * the locale fallback only covers unvalidated input where `dir` is missing.
+   */
   const paragraphBaseDir: 'ltr' | 'rtl' =
-    tree.dir === 'rtl' || isRtlLocale(schema.meta.locale) ? 'rtl' : 'ltr';
+    tree.dir ?? (isRtlLocale(schema.meta.locale) ? 'rtl' : 'ltr');
   const text: TextEngine = useUnicode
     ? await HarfBuzzEngine.create(pdf, paragraphBaseDir === 'rtl')
     : await StandardFontEngine.create(pdf);
@@ -623,7 +627,7 @@ export async function renderPdf({ schema, rows }: PdfExportInput): Promise<Blob>
     page,
     space,
     originYTop,
-    dir: tree.dir,
+    dir: paragraphBaseDir,
     text,
     pageNo: pageNumber,
     pages: null,

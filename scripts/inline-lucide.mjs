@@ -61,6 +61,14 @@ const map = {
   alignCenter: 'text-align-center',
   alignEnd: 'text-align-end',
   alignJustify: 'text-align-justify',
+  clipboard: 'clipboard',
+  hash: 'hash',
+  wand: 'wand-sparkles',
+  styles: 'paintbrush',
+  conditional: 'list-filter',
+  borderAll: 'grid-2x2',
+  layers: 'layers',
+  database: 'database',
 };
 
 const entries = [];

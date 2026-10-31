@@ -6,7 +6,7 @@ import type { ArrangeMode } from '../ops/arrange.js';
 import { ribbonTabFromKey } from '../ribbon-keys.js';
 import { formatLocalizedNumber, parseLocalizedNumber } from '../status-bar.js';
 import { TOOL_KINDS, type RibbonTab, type ToolKind } from '../types.js';
-import { renderActions, type ActionsCallbacks, type ActionsState } from './toolbar.js';
+import type { ActionsCallbacks, ActionsState } from './toolbar.js';
 
 const FONT_FAMILIES = ['Cairo', 'Tajawal', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Noto Sans'] as const;
 
@@ -92,7 +92,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
           (tab) => html`
             <button
               type="button"
-              class="ribbon-tab ${state.tab === tab.id ? 'active' : ''}"
+              class="ribbon-tab ${tab.id === 'file' ? 'file' : ''} ${tab.id === 'preview' ? 'preview-tab' : ''} ${state.tab === tab.id ? 'active' : ''}"
               role="tab"
               id=${`ribbon-tab-${tab.id}`}
               aria-controls=${`ribbon-panel-${tab.id}`}
@@ -128,15 +128,16 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
           )}
         </div>
         <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-home" aria-labelledby="ribbon-tab-home" tabindex=${state.tab === 'home' ? '0' : '-1'} ?hidden=${state.tab !== 'home'}>
-          ${renderActions(state.actions, cb.actions)}
           ${cluster(
             state.locale,
             'ribbonGroupClipboard',
             html`
-              ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut, true)}
-              ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy, true)}
-              ${cmd(state.locale, 'paste', 'paste', 'paste', !state.canPaste, cb.onPaste, true)}
-              ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete, true)}
+              ${bigBtn(state.locale, 'paste', 'clipboard', 'paste', 'blue', !state.canPaste, cb.onPaste)}
+              <div class="ribbon-smallcol">
+                ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
+                ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
+                ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete)}
+              </div>
             `,
           )}
           ${cluster(
@@ -176,6 +177,22 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
               ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
               ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'border',
+            html`
+              ${bigBtn(state.locale, 'borders', 'borderAll', 'allBorders', 'slate', false, () => undefined)}
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'conditional',
+            html`
+              ${bigBtn(state.locale, 'number-format', 'hash', 'numberFormat', 'teal', false, () => undefined)}
+              ${bigBtn(state.locale, 'styles', 'styles', 'styles', 'violet', false, () => undefined)}
+              ${bigBtn(state.locale, 'conditional', 'conditional', 'conditionalFormat', 'amber', false, () => undefined)}
             `,
           )}
         </div>
@@ -298,6 +315,19 @@ function alignBtn(
 
 function arrange(locale: LocaleTag, id: string, label: Parameters<typeof t>[1], disabled: boolean, action: () => void) {
   return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-btn-${id}`} ?disabled=${disabled} @click=${action}><span>${t(locale, label)}</span></button>`;
+}
+
+function bigBtn(
+  locale: LocaleTag,
+  id: string,
+  iconName: string,
+  labelKey: Parameters<typeof t>[1],
+  tone: 'blue' | 'teal' | 'amber' | 'violet' | 'slate',
+  disabled: boolean,
+  action: () => void,
+) {
+  const label = t(locale, labelKey);
+  return html`<button type="button" class="ribbon-big c-${tone}" data-testid=${`ribbon-btn-${id}`} aria-label=${label} title=${label} ?disabled=${disabled} @click=${action}><span class="ic">${icon(iconName)}</span><span>${label}</span></button>`;
 }
 
 function cmd(

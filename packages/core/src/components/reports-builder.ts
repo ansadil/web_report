@@ -28,6 +28,7 @@ import type {
   RibbonTab,
   ReportSchemaV1,
   SideSectionKey,
+  SideTab,
   StorageAdapter,
 } from './builder/index.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
@@ -58,6 +59,7 @@ export class ReportsBuilderElement extends LitElement {
   @state() private _hoverBand: BandKey | null = null;
   @state() private _marquee: MarqueeState | null = null;
   @state() private _leftCollapsed = false;
+  @state() private _sideTab: SideTab = 'dictionary';
   @state() private _menuOpen = false;
   @state() private _historyVersion = 0;
   @state() private _zoom = 1;
@@ -213,6 +215,10 @@ export class ReportsBuilderElement extends LitElement {
     const setLeftCollapsed = (v: boolean) => {
       this._leftCollapsed = v;
     };
+    const sideTab = () => this._sideTab;
+    const setSideTabValue = (v: SideTab) => {
+      this._sideTab = v;
+    };
     const menuOpen = () => this._menuOpen;
     const setMenuOpen = (v: boolean) => {
       this._menuOpen = v;
@@ -308,6 +314,12 @@ export class ReportsBuilderElement extends LitElement {
       },
       set leftCollapsed(v) {
         setLeftCollapsed(v);
+      },
+      get sideTab() {
+        return sideTab();
+      },
+      set sideTab(v) {
+        setSideTabValue(v);
       },
       get menuOpen() {
         return menuOpen();

@@ -44,7 +44,7 @@ function renderBand(state: CanvasState, cb: CanvasCallbacks, name: BandKey) {
   if (!band) return nothing;
   const dropClass = state.hoverBand === name ? 'band-drop-on' : '';
   return html`
-    <div class="band-strip">
+    <div class="band-strip" data-band=${name}>
       <div class="band-head" data-testid=${`band-head-${name}`}>
         <span class="band-label">${t(state.locale, name as 'reportHeader')}</span>
       </div>

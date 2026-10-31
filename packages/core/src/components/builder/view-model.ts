@@ -27,6 +27,7 @@ import {
   toggleLeft,
   toggleMenu,
   toggleSection,
+  setSideTab,
   insertToolKind,
   patchSelectedStyle,
   updateElement,
@@ -78,6 +79,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     uiDir: session.uiDir,
     canvasDir: session.canvasDir,
     leftCollapsed: session.leftCollapsed,
+    sideTab: session.sideTab,
     name: session.schema.meta.name,
     widthPx,
     heightPx,
@@ -172,6 +174,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
 
   const cb: BuilderViewCallbacks = {
     onToggleLeft: () => toggleLeft(session),
+    onSideTab: (tab) => setSideTab(session, tab),
     onToggleSection: (key) => toggleSection(session, key),
     onHostContextMenu: ports.pointer.onHostContextMenu,
     onCanvasPointerLeave: () => {

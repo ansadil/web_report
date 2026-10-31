@@ -27,7 +27,7 @@ viewer.fontsBaseUrl = builder.fontsBaseUrl;
 
 const state = {
   locale: 'en' as Locale,
-  view: 'viewer' as View,
+  view: 'builder' as View,
   activeReportId: SAMPLE_REPORTS[0]!.id,
 };
 
@@ -198,6 +198,7 @@ builder.addEventListener('export-json', (e) => {
   toast(state.locale === 'ar' ? 'تم تصدير JSON' : 'JSON exported');
 });
 
+$('btn-samples').addEventListener('click', () => $('sample-drawer').classList.toggle('open'));
 $('tab-viewer').addEventListener('click', () => switchView('viewer'));
 $('tab-builder').addEventListener('click', () => switchView('builder'));
 $('btn-en').addEventListener('click', () => switchLocale('en'));

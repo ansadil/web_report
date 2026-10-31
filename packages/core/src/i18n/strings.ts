@@ -157,7 +157,20 @@ type StringKey =
   | 'labelsField'
   | 'chartType'
   | 'title'
-  | 'elementMissing';
+  | 'elementMissing'
+  | 'designerProduct'
+  | 'dataSources'
+  | 'systemVariables'
+  | 'dictionaryHint'
+  | 'allBorders'
+  | 'numberFormat'
+  | 'styles'
+  | 'conditionalFormat'
+  | 'pageOne'
+  | 'localeLtr'
+  | 'localeRtl'
+  | 'reportParameters'
+  | 'elements';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -318,6 +331,19 @@ const en: Record<StringKey, string> = {
   chartType: 'Type',
   title: 'Title',
   elementMissing: 'Element not found',
+  designerProduct: 'Report designer',
+  dataSources: 'Data sources',
+  systemVariables: 'System variables',
+  dictionaryHint: 'Drag a field onto a band to create a bound element.',
+  allBorders: 'All borders',
+  numberFormat: 'Number format',
+  styles: 'Styles',
+  conditionalFormat: 'Conditional',
+  pageOne: 'Page 1',
+  localeLtr: 'English · left to right',
+  localeRtl: 'Arabic · right to left',
+  reportParameters: 'Parameters',
+  elements: 'Elements',
 };
 
 const ar: Record<StringKey, string> = {
@@ -479,6 +505,19 @@ const ar: Record<StringKey, string> = {
   chartType: 'النوع',
   title: 'العنوان',
   elementMissing: 'العنصر غير موجود',
+  designerProduct: 'مصمم التقارير',
+  dataSources: 'مصادر البيانات',
+  systemVariables: 'متغيرات النظام',
+  dictionaryHint: 'اسحب أي حقل إلى شريط في الصفحة لإنشاء عنصر مربوط بالبيانات.',
+  allBorders: 'كل الحدود',
+  numberFormat: 'تنسيق الأرقام',
+  styles: 'الأنماط',
+  conditionalFormat: 'تنسيق شرطي',
+  pageOne: 'الصفحة 1',
+  localeLtr: 'English · left to right',
+  localeRtl: 'العربية · من اليمين لليسار',
+  reportParameters: 'المعاملات',
+  elements: 'العناصر',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

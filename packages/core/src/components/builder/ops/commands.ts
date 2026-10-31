@@ -27,6 +27,7 @@ import {
   type ToolKind,
   type BuilderAction,
   type SideSectionKey,
+  type SideTab,
 } from '../types.js';
 
 export function applySelection(session: BuilderSession, sel: SelectionState): void {
@@ -306,6 +307,10 @@ export function toggleLeft(session: BuilderSession): void {
 
 export function toggleMenu(session: BuilderSession): void {
   session.menuOpen = !session.menuOpen;
+}
+
+export function setSideTab(session: BuilderSession, tab: SideTab): void {
+  session.sideTab = tab;
 }
 
 export function toggleSection(session: BuilderSession, key: SideSectionKey): void {

@@ -55,8 +55,8 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
     }
     .element:hover:not(.selected) { outline-color: #94a3b8; }
     .element.selected {
-      outline: 2px solid #2563eb;
-      box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+      outline: 1.5px solid #f0752a;
+      box-shadow: none;
       overflow: visible;
     }
     .element .el-body {
@@ -126,7 +126,7 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
       width: 8px;
       height: 8px;
       margin: -4px;
-      background: #2563eb;
+      background: #f0752a;
       border: 1px solid #fff;
       border-radius: 1px;
       pointer-events: auto;

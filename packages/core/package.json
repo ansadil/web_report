@@ -7,24 +7,53 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@reports-web/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
     "./viewer": {
+      "@reports-web/source": "./src/components/reports-viewer.ts",
       "types": "./dist/components/reports-viewer.d.ts",
       "import": "./dist/components/reports-viewer.js"
     },
     "./builder": {
+      "@reports-web/source": "./src/components/reports-builder.ts",
       "types": "./dist/components/reports-builder.d.ts",
       "import": "./dist/components/reports-builder.js"
     },
     "./adapters/data/*": {
+      "@reports-web/source": "./src/adapters/data/*.ts",
       "types": "./dist/adapters/data/*.d.ts",
       "import": "./dist/adapters/data/*.js"
     },
     "./exporters/*": {
+      "@reports-web/source": "./src/exporters/*.ts",
       "types": "./dist/exporters/*.d.ts",
       "import": "./dist/exporters/*.js"
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./viewer": {
+        "types": "./dist/components/reports-viewer.d.ts",
+        "import": "./dist/components/reports-viewer.js"
+      },
+      "./builder": {
+        "types": "./dist/components/reports-builder.d.ts",
+        "import": "./dist/components/reports-builder.js"
+      },
+      "./adapters/data/*": {
+        "types": "./dist/adapters/data/*.d.ts",
+        "import": "./dist/adapters/data/*.js"
+      },
+      "./exporters/*": {
+        "types": "./dist/exporters/*.d.ts",
+        "import": "./dist/exporters/*.js"
+      }
     }
   },
   "files": [
@@ -32,7 +61,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/bundle-render-code.mjs && node scripts/copy-pdf-fonts.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --emitDeclarationOnly",
     "test": "vitest",
     "test:run": "vitest run"
   },

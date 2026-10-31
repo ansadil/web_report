@@ -193,16 +193,34 @@ export function cidHex(cids: readonly number[]): PDFHexString {
 }
 
 interface SubsetLike {
+  encode(stream: unknown): void;
   encodeStream(): { on(ev: 'data', cb: (chunk: Uint8Array) => void): void; on(ev: 'end', cb: () => void): void };
 }
 
-function encodeSubset(subset: unknown): Promise<Uint8Array> {
+/**
+ * Encoded subset font program. fontkit's `encodeStream()` runs `encode()` in a `nextTick`
+ * callback, where a throw (e.g. from a corrupt glyph) escaped every promise and crashed the
+ * process (BUG-24); `encode` is wrapped so such an error rejects this promise instead.
+ */
+export function encodeSubset(subset: unknown): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
+    let failed = false;
     try {
+      const s = subset as SubsetLike;
+      const encode = s.encode.bind(s);
+      s.encode = (stream: unknown): void => {
+        try {
+          encode(stream);
+        } catch (err) {
+          failed = true;
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
       const chunks: Uint8Array[] = [];
-      const stream = (subset as SubsetLike).encodeStream();
+      const stream = s.encodeStream();
       stream.on('data', (c) => chunks.push(c));
       stream.on('end', () => {
+        if (failed) return;
         const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
         let o = 0;
         for (const c of chunks) {
@@ -212,7 +230,7 @@ function encodeSubset(subset: unknown): Promise<Uint8Array> {
         resolve(out);
       });
     } catch (err) {
-      reject(err);
+      reject(err instanceof Error ? err : new Error(String(err)));
     }
   });
 }

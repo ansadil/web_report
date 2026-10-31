@@ -169,7 +169,16 @@ export class ReportsBuilderElement extends LitElement {
 
   override render(): unknown {
     const view = buildViewModel(this.session, { pointer: this.pointer, dnd: this.dnd });
+    view.cb.onToggleLocale = () => this.toggleUiLocale();
     return renderBuilder(view.state, view.cb);
+  }
+
+  private toggleUiLocale(): void {
+    const next = this._uiLocale.toLowerCase().startsWith('ar') ? 'en' : 'ar';
+    const dir = next === 'ar' ? 'rtl' : 'ltr';
+    this.locale = next;
+    this.dir = dir;
+    this.dispatchEvent(new CustomEvent('locale-change', { bubbles: true, composed: true, detail: { locale: next, dir } }));
   }
 
   getSchema(): ReportSchemaV1 {

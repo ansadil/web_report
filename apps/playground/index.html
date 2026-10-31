@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,11 +15,20 @@
       }
       #app {
         display: grid;
-        grid-template-columns: 1fr;
-        grid-template-rows: 40px 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 40px minmax(0, 1fr);
+        grid-template-areas: 'bar' 'stage';
         height: 100vh;
       }
+      #app.drawer-open {
+        grid-template-columns: 280px minmax(0, 1fr);
+        grid-template-areas: 'bar bar' 'drawer stage';
+      }
+      header.playground-bar { grid-area: bar; }
+      main.main { grid-area: stage; }
       header.playground-bar {
+        position: relative;
+        z-index: 30;
         background: #f7f9fc;
         color: #1b2433;
         border-bottom: 1px solid #dfe4ec;
@@ -29,6 +38,7 @@
         gap: 8px;
         min-width: 0;
       }
+      header.playground-bar .locale-switch { margin-inline-start: auto; }
       header.playground-bar h1 { display: none; }
       #btn-samples {
         border: 1px solid #dfe4ec;
@@ -42,13 +52,13 @@
       header.playground-bar .tabs {
         display: flex;
         gap: 4px;
-        background: #1e293b;
+        background: #e7eef6;
         padding: 4px;
         border-radius: 8px;
       }
       header.playground-bar .tabs button {
         background: transparent;
-        color: #cbd5e1;
+        color: #334155;
         border: none;
         padding: 6px 14px;
         border-radius: 6px;
@@ -57,7 +67,7 @@
         font-weight: 500;
       }
       header.playground-bar .tabs button.active {
-        background: #2563eb;
+        background: #1f5fa8;
         color: #fff;
       }
       header.playground-bar .locale-switch {
@@ -65,34 +75,36 @@
         gap: 4px;
       }
       header.playground-bar .locale-switch button {
-        background: transparent;
-        color: #cbd5e1;
-        border: 1px solid #334155;
+        background: #fff;
+        color: #334155;
+        border: 1px solid #dfe4ec;
         padding: 5px 10px;
         border-radius: 6px;
         cursor: pointer;
         font-size: 12px;
+        font-weight: 700;
       }
       header.playground-bar .locale-switch button.active {
-        background: #2563eb;
+        background: #1f5fa8;
         color: #fff;
-        border-color: #2563eb;
+        border-color: #1f5fa8;
       }
       aside.sidebar {
         display: none;
-        position: absolute;
-        z-index: 20;
-        top: 40px;
-        inset-inline-start: 8px;
-        width: 280px;
-        max-height: calc(100vh - 56px);
+        grid-area: drawer;
+        position: static;
+        z-index: 1;
+        width: auto;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
         background: #fff;
-        border: 1px solid #e5e7eb;
+        border-inline-end: 1px solid #e5e7eb;
         overflow: auto;
         padding: 16px;
-        box-shadow: 0 10px 30px rgba(15,25,45,.12);
+        box-shadow: none;
       }
-      aside.sidebar.open { display: block; }
+      #app.drawer-open aside.sidebar { display: block; }
       aside.sidebar h3 {
         font-size: 11px;
         text-transform: uppercase;
@@ -169,6 +181,7 @@
       main.main {
         overflow: hidden;
         background: #eef1f5;
+        min-width: 0;
         min-height: 0;
       }
       #view-viewer reports-viewer { display: block; height: calc(100vh - 40px); }
@@ -198,30 +211,28 @@
     <div id="app">
       <header class="playground-bar">
         <button id="btn-samples" type="button">Samples</button>
-      </header>
-
-      <aside class="sidebar" id="sample-drawer">
-        <h3>Sample Reports</h3>
-        <div id="reports-list"></div>
+        <div class="locale-switch">
+          <button id="btn-en">EN</button>
+          <button id="btn-ar" class="active">AR</button>
+        </div>
         <div class="tabs" role="tablist">
           <button id="tab-builder" class="active">Builder</button>
           <button id="tab-viewer">Viewer</button>
         </div>
-        <div class="locale-switch">
-          <button id="btn-en" class="active">EN · LTR</button>
-          <button id="btn-ar">AR · RTL</button>
-        </div>
-        <h3>My Saved Reports</h3>
+      </header>
+
+      <aside class="sidebar" id="sample-drawer">
+        <h3 id="samples-heading">Sample Reports</h3>
+        <div id="reports-list"></div>
+        <h3 id="saved-heading">My Saved Reports</h3>
         <div id="saved-list"></div>
 
-        <h3>Datasets</h3>
+        <h3 id="datasets-heading">Datasets</h3>
         <div id="datasets-list" class="info-box"></div>
 
-        <h3>Tips</h3>
-        <div class="info-box">
-          Drag elements from the toolbox in <strong>Builder</strong> onto bands.
-          Click an element to edit its properties on the right panel.
-          Use <kbd>Save</kbd> to persist to localStorage and open it later from the sidebar.
+        <h3 id="tips-heading">Tips</h3>
+        <div id="tips-body" class="info-box">
+          Drag elements from the toolbox onto bands. Click an element to edit it in the property grid.
         </div>
       </aside>
 

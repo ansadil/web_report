@@ -26,6 +26,7 @@ export const hostStyles = css`
         'status status status';
       height: 100%;
       min-height: 540px;
+      overflow: hidden;
       background: var(--rb-bg);
       font-family: var(--rb-font);
       font-size: 13px;

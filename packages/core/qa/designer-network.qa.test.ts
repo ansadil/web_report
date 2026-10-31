@@ -99,10 +99,10 @@ describe('playground designer stays on the local origin', () => {
   it('BUG-27: Cairo text stays visible inside each text and field element', async () => {
     const page = await browser.newPage();
     await page.goto(ORIGIN);
+    await page.click('#btn-ar');
     await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
-    await page.click('#btn-ar');
-    await page.locator('#reports-list .report-card').filter({ hasText: 'المبيعات حسب المنطقة' }).click();
+    await page.locator('#reports-list .report-card').filter({ hasText: 'تقرير المبيعات الشهري' }).click();
     await page.click('#tab-builder');
     await page.waitForFunction(cairoFacesLoaded, undefined, { timeout: 15_000 });
     for (const file of ['Cairo-Regular.woff2', 'Cairo-Bold.woff2']) {
@@ -168,7 +168,7 @@ describe('playground designer stays on the local origin', () => {
     await page.click('#btn-samples');
     await page.waitForSelector('#reports-list .report-card');
     await page.click('#tab-builder');
-    await page.click('#btn-samples');
+    await page.keyboard.press('Escape');
     const root = page.locator('reports-builder');
     await root.locator('[data-testid="ribbon"]').waitFor();
     const shown = (id: string) =>

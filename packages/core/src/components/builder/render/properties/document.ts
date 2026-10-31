@@ -17,6 +17,33 @@ export interface DocumentCallbacks extends BandsCallbacks, WatermarkCallbacks {
   updateMargins: (patch: Partial<ReportSchemaV1['page']['margins']>) => void;
 }
 
+export function renderInspectorChrome(locale: DocumentState['locale'], onFilter: (event: Event) => void) {
+  return html`
+    <div class="prop-tools">
+      <button type="button" title=${t(locale, 'sortAlpha')} @click=${(e: Event) => layoutProps(e, 'alpha')}>A–Z</button>
+      <button type="button" class="on" title=${t(locale, 'categorize')} @click=${(e: Event) => layoutProps(e, 'category')}>${t(locale, 'categorize')}</button>
+    </div>
+    <div class="prop-search"><input placeholder=${t(locale, 'searchProperties')} @input=${onFilter} /></div>
+  `;
+}
+
+function layoutProps(event: Event, mode: 'alpha' | 'category'): void {
+  const button = event.currentTarget as HTMLButtonElement;
+  const grid = button.closest('.prop-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.prop-tools button').forEach((node) => node.classList.toggle('on', node === button));
+  grid.querySelectorAll('.cat').forEach((cat) => {
+    const rows = [...cat.querySelectorAll(':scope > .prow')] as HTMLElement[];
+    rows.forEach((row, index) => {
+      if (!row.dataset.order) row.dataset.order = String(index);
+    });
+    const sorted = [...rows].sort((a, b) => mode === 'alpha'
+      ? (a.querySelector('.k')?.textContent ?? '').localeCompare(b.querySelector('.k')?.textContent ?? '', undefined, { sensitivity: 'base' })
+      : Number(a.dataset.order) - Number(b.dataset.order));
+    for (const row of sorted) cat.append(row);
+  });
+}
+
 export function renderDocumentProperties(state: DocumentState, cb: DocumentCallbacks) {
   const meta = state.schema.meta;
   const page = state.schema.page;
@@ -33,7 +60,7 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
         <div><b>${meta.name}</b><small>${t(state.locale, 'page')}</small></div>
       </div>
       <div class="ptoggle"><button type="button" class="on">${t(state.locale, 'properties')}</button><button type="button">${t(state.locale, 'events')}</button></div>
-      <div class="prop-search"><input placeholder=${t(state.locale, 'properties')} @input=${filterPropRows} /></div>
+      ${renderInspectorChrome(state.locale, filterPropRows)}
       <section class="cat">
         <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">6</span></div>
         <div class="prow"><span class="k">${t(state.locale, 'paperSize')}</span><span class="v"><select data-testid="prop-paper-size" @change=${(e: Event) => cb.updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>

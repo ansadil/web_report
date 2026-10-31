@@ -10,87 +10,80 @@ export interface SampleReport {
 
 const salesByRegion: SampleReport = {
   id: 'sales-by-region',
-  name: { en: 'Sales by Region', ar: 'المبيعات حسب المنطقة' },
-  description: { en: 'Grouped report with subtotals and a chart.', ar: 'تقرير مُجَمَّع بإجماليات فرعية ورسم بياني.' },
+  name: { en: 'Monthly Sales', ar: 'تقرير المبيعات الشهري' },
+  description: { en: 'Arabic monthly sales layout with a logo, QR code, and group totals.', ar: 'تقرير المبيعات الشهري مع شعار ورمز QR وإجماليات المجموعة.' },
   dataset: 'sales',
   build: () => ({
     version: '1',
     id: 'sales-by-region',
-    meta: { name: 'Sales by Region — FY 2026', locale: 'en', dir: 'ltr' },
+    meta: { name: 'تقرير المبيعات الشهري', locale: 'ar', dir: 'rtl' },
     page: { size: 'A4', orientation: 'portrait', margins: { top: 15, right: 15, bottom: 15, left: 15 } },
-    dataset: { adapter: 'static', source: 'sales' },
+    dataset: { adapter: 'rest-json', source: 'sales' },
     fields: [
-      { name: 'region', type: 'string', label: 'Region' },
-      { name: 'product', type: 'string', label: 'Product' },
-      { name: 'qty', type: 'number', label: 'Qty' },
-      { name: 'unitPrice', type: 'number', label: 'Unit Price' },
-      { name: 'amount', type: 'number', label: 'Amount' },
-      { name: 'date', type: 'date', label: 'Date' },
+      { name: 'region', type: 'string', label: 'المنطقة' },
+      { name: 'product', type: 'string', label: 'الصنف' },
+      { name: 'qty', type: 'number', label: 'الكمية' },
+      { name: 'unitPrice', type: 'number', label: 'السعر' },
+      { name: 'amount', type: 'number', label: 'الإجمالي' },
+      { name: 'date', type: 'date', label: 'التاريخ' },
     ],
     groups: [
       {
         key: 'region',
-        header: {
+        footer: {
           height: 8,
           elements: [
-            { id: 'gh1', kind: 'field', field: 'region', style: { bold: true, fontSize: 12, background: '#eef2ff', color: '#1e3a8a' }, pos: { x: 0, y: 1, w: 180, h: 6 } },
-          ],
-        },
-        footer: {
-          height: 6,
-          elements: [
-            { id: 'gf1', kind: 'text', value: 'Subtotal', style: { italic: true, align: 'end' }, pos: { x: 90, y: 0, w: 30, h: 5 } },
-            { id: 'gf2', kind: 'aggregate', fn: 'sum', field: 'amount', scope: 'group', format: 'decimal2', style: { bold: true, align: 'end', color: '#1e40af' }, pos: { x: 130, y: 0, w: 50, h: 5 } },
+            { id: 'gf1', kind: 'text', value: 'الإجمالي', style: { bold: true, color: '#be3a5a' }, pos: { x: 0, y: 1, w: 70, h: 6 } },
+            { id: 'gf2', kind: 'aggregate', fn: 'sum', field: 'qty', scope: 'group', format: 'integer', style: { bold: true, align: 'center' }, pos: { x: 70, y: 1, w: 30, h: 6 } },
+            { id: 'gf3', kind: 'aggregate', fn: 'sum', field: 'amount', scope: 'group', format: 'decimal2', style: { bold: true, align: 'center' }, pos: { x: 130, y: 1, w: 50, h: 6 } },
           ],
         },
       },
     ],
     bands: {
       reportHeader: {
-        height: 18,
+        height: 24,
         elements: [
-          { id: 'rh1', kind: 'text', value: 'Sales by Region — FY 2026', style: { bold: true, fontSize: 16, align: 'center' }, pos: { x: 0, y: 2, w: 180, h: 8 } },
-          { id: 'rh2', kind: 'text', value: 'Confidential — Internal Use Only', style: { italic: true, color: '#64748b', align: 'center', fontSize: 9 }, pos: { x: 0, y: 11, w: 180, h: 4 } },
+          { id: 'logo', kind: 'image', src: 'logo', alt: 'الشعار', pos: { x: 2, y: 3, w: 26, h: 18 } },
+          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 32, y: 3, w: 112, h: 10 } },
+          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 32, y: 14, w: 112, h: 7 } },
+          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 156, y: 3, w: 18, h: 18 } },
         ],
       },
       pageHeader: {
         height: 10,
         elements: [
-          { id: 'ph1', kind: 'text', value: 'Product', style: { bold: true, background: '#f1f5f9' }, pos: { x: 0, y: 2, w: 60, h: 6 } },
-          { id: 'ph2', kind: 'text', value: 'Qty', style: { bold: true, align: 'end', background: '#f1f5f9' }, pos: { x: 60, y: 2, w: 30, h: 6 } },
-          { id: 'ph3', kind: 'text', value: 'Unit Price', style: { bold: true, align: 'end', background: '#f1f5f9' }, pos: { x: 90, y: 2, w: 40, h: 6 } },
-          { id: 'ph4', kind: 'text', value: 'Amount', style: { bold: true, align: 'end', background: '#f1f5f9' }, pos: { x: 130, y: 2, w: 50, h: 6 } },
+          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 2, y: 2, w: 90, h: 6 } },
+          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 100, y: 2, w: 78, h: 6 } },
         ],
       },
       detail: {
-        height: 6,
+        height: 8,
         elements: [
-          { id: 'd1', kind: 'field', field: 'product', pos: { x: 0, y: 0, w: 60, h: 5 } },
-          { id: 'd2', kind: 'field', field: 'qty', format: 'integer', style: { align: 'end' }, pos: { x: 60, y: 0, w: 30, h: 5 } },
-          { id: 'd3', kind: 'field', field: 'unitPrice', format: 'decimal2', style: { align: 'end' }, pos: { x: 90, y: 0, w: 40, h: 5 } },
+          { id: 'd1', kind: 'field', field: 'product', style: { font: 'Cairo', color: '#1d5a9e' }, pos: { x: 0, y: 1, w: 70, h: 6 } },
+          { id: 'd2', kind: 'field', field: 'qty', format: 'integer', style: { align: 'center', font: 'Cairo', color: '#1d5a9e' }, pos: { x: 70, y: 1, w: 30, h: 6 } },
+          { id: 'd3', kind: 'field', field: 'unitPrice', format: 'decimal2', style: { align: 'center', font: 'Cairo', color: '#1d5a9e' }, pos: { x: 100, y: 1, w: 30, h: 6 } },
           {
-            id: 'd4', kind: 'field', field: 'amount', format: 'decimal2', style: { align: 'end' },
+            id: 'd4', kind: 'field', field: 'amount', format: 'decimal2', style: { align: 'center', font: 'Cairo', color: '#1d5a9e' },
             cond: [{ when: 'amount >= 500', style: { color: '#16a34a', bold: true } }],
-            pos: { x: 130, y: 0, w: 50, h: 5 },
+            pos: { x: 130, y: 1, w: 50, h: 6 },
           },
         ],
       },
       pageFooter: {
         height: 8,
         elements: [
-          { id: 'pf1', kind: 'text', value: 'Reports Web', style: { color: '#94a3b8', fontSize: 9 }, pos: { x: 0, y: 1, w: 90, h: 5 } },
-          { id: 'pf2', kind: 'text', value: 'Page {page}', style: { color: '#94a3b8', align: 'end', fontSize: 9 }, pos: { x: 90, y: 1, w: 90, h: 5 } },
+          { id: 'pf1', kind: 'text', value: 'صفحة {page} من {pages}', style: { font: 'Cairo', fontSize: 9 }, pos: { x: 2, y: 1, w: 80, h: 5 } },
+          { id: 'pf2', kind: 'text', value: 'أُنشئ بواسطة web_report', style: { color: '#7a8699', align: 'end', fontSize: 9, font: 'Cairo' }, pos: { x: 90, y: 1, w: 90, h: 5 } },
         ],
       },
       reportFooter: {
         height: 70,
         elements: [
           { id: 'rf0', kind: 'line', orientation: 'horizontal', thickness: 0.5, pos: { x: 0, y: 0, w: 180, h: 0.5 } },
-          { id: 'rf1', kind: 'text', value: 'GRAND TOTAL', style: { bold: true, fontSize: 12, align: 'end' }, pos: { x: 60, y: 3, w: 70, h: 6 } },
+          { id: 'rf1', kind: 'text', value: 'الإجمالي الكلي', style: { bold: true, fontSize: 12, align: 'end', font: 'Cairo' }, pos: { x: 60, y: 3, w: 70, h: 6 } },
           { id: 'rf2', kind: 'aggregate', fn: 'sum', field: 'amount', scope: 'report', format: 'decimal2', style: { bold: true, fontSize: 12, align: 'end', background: '#dbeafe', color: '#1e40af' }, pos: { x: 130, y: 3, w: 50, h: 6 } },
-          { id: 'rf3', kind: 'text', value: 'Average Order Value', style: { italic: true, align: 'end', fontSize: 10 }, pos: { x: 60, y: 11, w: 70, h: 5 } },
-          { id: 'rf4', kind: 'aggregate', fn: 'avg', field: 'amount', scope: 'report', format: 'decimal2', style: { align: 'end', fontSize: 10 }, pos: { x: 130, y: 11, w: 50, h: 5 } },
-          { id: 'rf5', kind: 'chart', type: 'bar', labelsField: 'region', valueField: 'amount', title: 'Sales by Region', pos: { x: 0, y: 20, w: 180, h: 45 } },
+          { id: 'rf5', kind: 'chart', type: 'bar', labelsField: 'region', valueField: 'amount', title: 'المبيعات حسب المنطقة', pos: { x: 0, y: 20, w: 180, h: 45 } },
         ],
       },
     },

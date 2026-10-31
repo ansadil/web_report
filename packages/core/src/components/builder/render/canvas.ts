@@ -1,10 +1,10 @@
 import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing } from 'lit';
 import { MM_TO_PX } from '@reports-web/shared';
-import { t } from '../api.js';
+import { icon, t } from '../api.js';
 import type { ReportElement, ReportSchemaV1 } from '../api.js';
 import { builderCanvasStyleCss } from '../canvas-style.js';
-import { bandPixelHeight, marqueeRect } from '../geometry.js';
+import { bandPixelHeight, dataHeaderHeightMm, marqueeRect } from '../geometry.js';
 import {
   BAND_KEYS,
   LINE_RESIZE_HANDLES,
@@ -17,6 +17,8 @@ import {
 export interface CanvasState {
   locale: LocaleTag;
   bands: ReportSchemaV1['bands'];
+  groups: ReportSchemaV1['groups'];
+  fields: readonly { name: string; label?: string }[];
   hoverBand: BandKey | null;
   marquee: MarqueeState | null;
   selectedIds: ReadonlySet<string>;
@@ -39,18 +41,70 @@ export function renderBands(state: CanvasState, cb: CanvasCallbacks) {
   return BAND_KEYS.flatMap((name) => {
     const band = renderBand(state, cb, name);
     if (name !== 'detail' || !state.bands.detail) return [band];
-    return [renderDataHeader(state), band];
+    return [renderDataHeader(state), band, ...renderGroupFooters(state, cb)];
   });
 }
 
+function bandIcon(name: string) {
+  if (name === 'reportHeader') return icon('layers');
+  if (name === 'pageHeader' || name === 'pageFooter') return icon('copy');
+  if (name === 'dataHeader' || name === 'detail') return icon('table');
+  if (name.startsWith('groupFooter') || name === 'reportFooter') return icon('hash');
+  return icon('folder');
+}
+
+function bandHead(name: string, label: string) {
+  return html`<div class="band-head" data-testid=${`band-head-${name}`}>
+    ${bandIcon(name)}
+    <span class="band-label">${label}</span>
+    <button type="button" class="band-settings" data-testid=${`band-settings-${name}`} aria-label=${label} @pointerdown=${(e: Event) => e.stopPropagation()}>${icon('cog')}</button>
+  </div>`;
+}
+
+function fieldCaption(state: CanvasState, name: string): string {
+  return (state.fields ?? []).find((field) => field.name === name)?.label?.trim() || name;
+}
+
+function aggregateCaption(state: CanvasState, fn: 'sum' | 'count' | 'avg' | 'min' | 'max', field: string): string {
+  const key = fn === 'sum' ? 'fnSum' : fn === 'count' ? 'fnCount' : fn === 'avg' ? 'fnAvg' : fn === 'min' ? 'fnMin' : 'fnMax';
+  return `${t(state.locale, key)}(${fieldCaption(state, field)})`;
+}
+
 function renderDataHeader(state: CanvasState) {
-  return html`
-    <div class="band-strip" data-band="dataHeader">
-      <div class="band-head" data-testid="band-head-dataHeader">
-        <span class="band-label">${t(state.locale, 'dataHeader')}</span>
+  const mm = dataHeaderHeightMm(state.bands);
+  const columns = (state.bands.detail?.elements ?? []).filter((el) => el.kind === 'field');
+  return html`<div class="band-strip" data-band="dataHeader">
+    ${bandHead('dataHeader', t(state.locale, 'dataHeader'))}
+    ${mm > 0
+      ? html`<div class="band" data-testid="band-data-header" style="height:${bandPixelHeight({ height: mm, elements: [] })}px">
+          ${columns.map((el) => html`<div class="col-head" style="inset-inline-start:${el.pos.x * MM_TO_PX}px;top:${MM_TO_PX}px;width:${el.pos.w * MM_TO_PX}px;height:${6 * MM_TO_PX}px">${fieldCaption(state, el.field)}</div>`)}
+        </div>`
+      : nothing}
+  </div>`;
+}
+
+function renderGroupFooters(state: CanvasState, cb: CanvasCallbacks) {
+  const quiet: CanvasCallbacks = {
+    ...cb,
+    onElementContextMenu: (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    },
+    onElementPointerDown: (ev) => {
+      ev.stopPropagation();
+    },
+  };
+  return (state.groups ?? []).flatMap((group, index) => {
+    if (!group.footer) return [];
+    return [html`
+      <div class="band-strip" data-band="groupFooter">
+        ${bandHead(`groupFooter-${index}`, t(state.locale, 'groupFooter'))}
+        <div class="band" data-testid=${`band-group-footer-${index}`} style="height:${bandPixelHeight(group.footer)}px">
+          ${group.footer.elements.map((el) => renderElement(state, quiet, 'detail', el))}
+        </div>
       </div>
-    </div>
-  `;
+    `];
+  });
 }
 
 function renderBand(state: CanvasState, cb: CanvasCallbacks, name: BandKey) {
@@ -59,9 +113,7 @@ function renderBand(state: CanvasState, cb: CanvasCallbacks, name: BandKey) {
   const dropClass = state.hoverBand === name ? 'band-drop-on' : '';
   return html`
     <div class="band-strip" data-band=${name}>
-      <div class="band-head" data-testid=${`band-head-${name}`}>
-        <span class="band-label">${t(state.locale, name as 'reportHeader')}</span>
-      </div>
+      ${bandHead(name, t(state.locale, name as 'reportHeader'))}
       <div
         class="band ${dropClass}"
         data-testid=${`band-${name}`}
@@ -93,30 +145,32 @@ function renderMarquee(state: CanvasState, band: BandKey) {
   return html`<div class="marquee" data-testid="marquee" style="${style}"></div>`;
 }
 
-function kindLabel(el: ReportElement): 'text' | 'field' | 'image' | 'chart' | 'expression' | 'aggregate' | 'line' | 'box' | 'qr' | 'barcode' | 'html' | 'markdown' {
-  if (el.kind === 'expr') return 'expression';
-  if (el.kind === 'richtext') return el.mode === 'markdown' ? 'markdown' : 'html';
-  return el.kind;
+function qrMark() {
+  return html`<svg class="qr-mark" viewBox="0 0 7 7" aria-hidden="true"><rect width="7" height="7" fill="#fff"/><path fill="#15233a" d="M0 0h3v3H0zm4 0h3v3H4zM0 4h3v3H0zM1 1h1v1H1zm4 0h1v1H5zM1 5h1v1H1zm3-1h1v1H4zm2 1h1v1H6zM5 6h1v1H5z"/></svg>`;
 }
 
 function elementLabel(state: CanvasState, cb: CanvasCallbacks, el: Exclude<ReportElement, { kind: 'line' }>): string {
   switch (el.kind) {
     case 'text':
       return el.value;
-    case 'field':
-      return `[${el.field}]`;
+    case 'field': {
+      const bound = el.field.trim();
+      const known = (state.fields ?? []).find((field) => field.name === bound);
+      if (!known) return `[${t(state.locale, 'field')}]`;
+      return `[${known.label?.trim() || bound}]`;
+    }
     case 'aggregate':
-      return `${el.fn}(${el.field})`;
+      return aggregateCaption(state, el.fn, el.field);
     case 'chart':
-      return `${el.type} chart`;
+      return t(state.locale, el.type === 'line' ? 'chartLine' : el.type === 'pie' ? 'chartPie' : el.type === 'doughnut' ? 'chartDoughnut' : 'chartBar');
     case 'expr':
       return cb.previewExpr(el);
     case 'image':
-      return el.src ? '🖼️' : '[image]';
+      return el.alt || t(state.locale, 'image');
     case 'box':
       return '';
     case 'qr':
-      return `QR: ${el.value ?? el.field ?? el.expression ?? ''}`;
+      return '';
     case 'barcode':
       return `${el.symbology}: ${el.value ?? el.field ?? el.expression ?? ''}`;
     case 'richtext': {
@@ -164,7 +218,6 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
         @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}
         @pointerdown=${onPointerDown}
       >
-        <span class="kind">${t(state.locale, 'line')}</span>
         ${showHandles ? html`<span class="el-name" data-testid="element-name">${t(state.locale, 'line')}</span>` : nothing}
         <div class="line-stroke" style=${strokeStyle}></div>
         ${showHandles
@@ -200,9 +253,10 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     ${canvasDecor ? `;${canvasDecor}` : ''}
   `;
   const label = elementLabel(state, cb, el);
+  const body = el.kind === 'qr' ? qrMark() : el.kind === 'image' ? html`${icon('image')}<span>${label}</span>` : label;
   return html`
     <div
-      class="element ${isSel ? 'selected' : ''} ${el.kind === 'richtext' ? 'richtext' : ''}"
+      class="element ${isSel ? 'selected' : ''} ${el.kind} ${el.style?.valign ? `valign-${el.style.valign}` : ''}"
       data-testid=${`element-${el.id}`}
       data-kind=${el.kind}
       style="${style}"
@@ -210,9 +264,8 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
       @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}
       @pointerdown=${onPointerDown}
     >
-      <span class="kind">${t(state.locale, kindLabel(el))}</span>
       ${showHandles ? html`<span class="el-name" data-testid="element-name">${label}</span>` : nothing}
-      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''}">${label}</div>
+      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''}">${body}</div>
       ${showHandles
         ? html`<div class="resize-handles" aria-hidden="true">
             ${RESIZE_HANDLE_KINDS.map(

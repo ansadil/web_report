@@ -200,7 +200,33 @@ type StringKey =
   | 'propXRight'
   | 'propYTop'
   | 'propWidth'
-  | 'propHeight';
+  | 'propHeight'
+  | 'dataConnected'
+  | 'searchProperties'
+  | 'sortAlpha'
+  | 'categorize'
+  | 'highlight'
+  | 'relation'
+  | 'listTag'
+  | 'fnSum'
+  | 'fnCount'
+  | 'fnAvg'
+  | 'fnMin'
+  | 'fnMax'
+  | 'chartBar'
+  | 'chartLine'
+  | 'chartPie'
+  | 'chartDoughnut'
+  | 'samples'
+  | 'sampleReports'
+  | 'savedReports'
+  | 'datasetsHeading'
+  | 'tips'
+  | 'sampleTips'
+  | 'datasetLabel'
+  | 'noSavedReports'
+  | 'alignHorizontal'
+  | 'alignVertical';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -291,7 +317,7 @@ const en: Record<StringKey, string> = {
   when: 'When',
   description: 'Description',
   locale: 'Locale',
-  direction: 'Direction',
+  direction: 'Text direction',
   hide: 'Hide',
   show: 'Show',
   customize: 'Customize',
@@ -374,7 +400,7 @@ const en: Record<StringKey, string> = {
   localeRtl: 'Arabic · right to left',
   reportParameters: 'Parameters',
   elements: 'Elements',
-  savedState: 'Saved',
+  savedState: 'Saved just now',
   propertyGrid: 'Property grid',
   events: 'Events',
   positionSize: 'Position & size',
@@ -404,6 +430,32 @@ const en: Record<StringKey, string> = {
   propYTop: 'Top',
   propWidth: 'Width',
   propHeight: 'Height',
+  dataConnected: 'Data source connected',
+  searchProperties: 'Search properties…',
+  sortAlpha: 'Sort',
+  categorize: 'Categorize',
+  highlight: 'Highlight',
+  relation: 'Relation',
+  listTag: 'List',
+  fnSum: 'Sum',
+  fnCount: 'Count',
+  fnAvg: 'Average',
+  fnMin: 'Min',
+  fnMax: 'Max',
+  chartBar: 'Bar chart',
+  chartLine: 'Line chart',
+  chartPie: 'Pie chart',
+  chartDoughnut: 'Doughnut chart',
+  samples: 'Samples',
+  sampleReports: 'Sample Reports',
+  savedReports: 'My Saved Reports',
+  datasetsHeading: 'Datasets',
+  tips: 'Tips',
+  sampleTips: 'Drag elements from the toolbox onto bands. Click an element to edit it in the property grid.',
+  datasetLabel: 'Dataset',
+  noSavedReports: 'No saved reports yet',
+  alignHorizontal: 'Horizontal alignment',
+  alignVertical: 'Vertical alignment',
 };
 
 const ar: Record<StringKey, string> = {
@@ -495,7 +547,7 @@ const ar: Record<StringKey, string> = {
   when: 'عندما',
   description: 'الوصف',
   locale: 'اللغة',
-  direction: 'الاتجاه',
+  direction: 'اتجاه النص',
   hide: 'إخفاء',
   show: 'إظهار',
   customize: 'تخصيص',
@@ -578,7 +630,7 @@ const ar: Record<StringKey, string> = {
   localeRtl: 'العربية · من اليمين لليسار',
   reportParameters: 'المعاملات',
   elements: 'العناصر',
-  savedState: 'تم الحفظ',
+  savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',
   events: 'الأحداث',
   positionSize: 'الموضع والحجم',
@@ -608,6 +660,32 @@ const ar: Record<StringKey, string> = {
   propYTop: 'الأعلى (Y)',
   propWidth: 'العرض',
   propHeight: 'الارتفاع',
+  dataConnected: 'مصدر البيانات متصل',
+  searchProperties: 'ابحث عن خاصية…',
+  sortAlpha: 'ترتيب',
+  categorize: 'تصنيف',
+  highlight: 'لون التعبئة',
+  relation: 'علاقة',
+  listTag: 'قائمة',
+  fnSum: 'مجموع',
+  fnCount: 'عدد',
+  fnAvg: 'متوسط',
+  fnMin: 'أدنى',
+  fnMax: 'أعلى',
+  chartBar: 'رسم بياني عمودي',
+  chartLine: 'رسم بياني خطي',
+  chartPie: 'رسم بياني دائري',
+  chartDoughnut: 'رسم بياني حلقي',
+  samples: 'عينات',
+  sampleReports: 'تقارير نموذجية',
+  savedReports: 'تقاريري المحفوظة',
+  datasetsHeading: 'مجموعات البيانات',
+  tips: 'تلميحات',
+  sampleTips: 'اسحب العناصر من صندوق الأدوات إلى الأشرطة. انقر عنصرًا لتعديله في جدول الخصائص.',
+  datasetLabel: 'مصدر البيانات',
+  noSavedReports: 'لا توجد تقارير محفوظة',
+  alignHorizontal: 'المحاذاة الأفقية',
+  alignVertical: 'المحاذاة الرأسية',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

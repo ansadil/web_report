@@ -19,7 +19,9 @@ export interface RibbonFontState {
   underline: boolean;
   strike: boolean;
   color: string;
+  highlight?: string;
   align: Style['align'] | '';
+  valign: 'start' | 'center' | 'end' | '';
 }
 
 export interface RibbonState {
@@ -137,7 +139,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
               <div class="ribbon-smallcol">
                 ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
                 ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
-                <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-format-painter" ?disabled=${!state.canCut}><span>${t(state.locale, 'formatPainter')}</span></button>
+                <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-format-painter" ?disabled=${!state.canCut}>${icon('wand')}<span>${t(state.locale, 'formatPainter')}</span></button>
               </div>
             `,
           )}
@@ -152,8 +154,7 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
                     ?disabled=${!font.enabled}
                     @change=${(ev: Event) => cb.onStyle({ font: (ev.target as HTMLSelectElement).value || undefined })}
                   >
-                    <option value="" ?selected=${font.family === ''}>—</option>
-                    ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family}>${family}</option>`)}
+                    ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family || (font.family === '' && family === 'Cairo') || font.family.startsWith(`${family},`)}>${family}</option>`)}
                   </select>
                   <input
                     data-testid="ribbon-font-size"
@@ -178,6 +179,10 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
                     <span class="bar" style=${`background:${colorInputValue(font.color)}`}></span>
                     <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
                   </label>
+                  <label class="color-swatch" title=${t(state.locale, 'highlight')}>
+                    <span class="bar" style=${`background:${colorInputValue(font.highlight ?? '#f6c344')}`}></span>
+                    <input data-testid="ribbon-font-highlight" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.highlight ?? '#f6c344')} @input=${(ev: Event) => cb.onStyle({ background: (ev.target as HTMLInputElement).value })} />
+                  </label>
                 </div>
               </div>
             `,
@@ -186,14 +191,15 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
             state.locale,
             'ribbonGroupAlign',
             html`
-              <div class="ribbon-fontcol">
-                <div class="row">
-                  ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
-                  ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
-                  ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
-                  ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
-                </div>
+              <div class="align-grid" data-testid="ribbon-align-grid">
+                ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
+                ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
+                ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
+                ${valignBtn(state, 'start', font.valign === 'start', cb)}
+                ${valignBtn(state, 'center', font.valign === 'center', cb)}
+                ${valignBtn(state, 'end', font.valign === 'end', cb)}
               </div>
+              ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
             `,
           )}
           ${cluster(
@@ -322,6 +328,12 @@ function onTabsKey(ev: KeyboardEvent, state: RibbonState, cb: RibbonCallbacks): 
 
 function cluster(locale: LocaleTag, caption: Parameters<typeof t>[1], body: TemplateResult) {
   return html`<div class="ribbon-cluster"><div class="ribbon-group">${body}</div><span class="ribbon-caption">${t(locale, caption)}</span></div>`;
+}
+
+function valignBtn(state: RibbonState, value: 'start' | 'center' | 'end', pressed: boolean, cb: RibbonCallbacks) {
+  const label = t(state.locale, value === 'start' ? 'alignTop' : value === 'center' ? 'alignMiddle' : 'alignBottom');
+  const iconName = value === 'start' ? 'valignStart' : value === 'center' ? 'valignCenter' : 'valignEnd';
+  return html`<button type="button" class="ribbon-cmd icon-only" data-testid=${`ribbon-valign-${value}`} aria-label=${label} title=${label} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ valign: value })}>${icon(iconName)}</button>`;
 }
 
 function alignBtn(

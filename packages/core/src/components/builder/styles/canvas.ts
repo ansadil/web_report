@@ -1,6 +1,17 @@
 import { css } from 'lit';
 
-export const canvasStyles = css`    main.center { grid-area: center; padding: 16px; overflow: auto; background: var(--rb-canvas-bg); min-width: 0; min-height: 0; }
+export const canvasStyles = css`    main.center { grid-area: center; padding: 0; overflow: hidden; background: var(--rb-canvas-bg); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .center-scroll { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+    .crumb-bar {
+      height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 10px; flex: none;
+      background: #f8fafc; border-bottom: 1px solid #dfe4ec; font-size: 11.5px; color: #4a5568; white-space: nowrap;
+    }
+    .crumb-bar .crumb { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; }
+    .crumb-bar .crumb b { color: #1b2433; }
+    .crumb-bar .sep { color: #7a8699; }
+    .crumb-bar .sp { flex: 1; }
+    .crumb-bar .chip { border: 1px solid #dfe4ec; background: #fff; border-radius: 20px; padding: 1px 10px; display: flex; gap: 5px; align-items: center; }
+    .crumb-bar .dot { width: 7px; height: 7px; border-radius: 50%; background: #22a06b; flex: none; }
     .canvas {
       width: 100%; margin: 0 auto; background: #fff;
       box-shadow: 0 1px 4px rgba(0,0,0,0.15);
@@ -43,7 +54,7 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
     .element {
       position: absolute;
       box-sizing: border-box;
-      border: none;
+      border: 1px dashed rgba(90, 105, 130, 0.45);
       outline: 1px dashed transparent;
       outline-offset: 0;
       padding: 0;
@@ -71,14 +82,21 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
       flex-direction: column;
       justify-content: flex-start;
     }
-    .element .kind {
-      position: absolute;
-      top: 0;
-      inset-inline-end: 0;
-      z-index: 1;
-      line-height: 1;
-      pointer-events: none;
-      background: rgba(255,255,255,0.9);
+    .element.valign-center .el-body { justify-content: center; }
+    .element.valign-end .el-body { justify-content: flex-end; }
+    .element.field { color: #1d5a9e; }
+    .element.image .el-body, .element.qr .el-body {
+      align-items: center; justify-content: center; gap: 2px; text-align: center;
+    }
+    .element.image .el-body {
+      background: repeating-linear-gradient(45deg, #f2f5fa 0 6px, #e9eef6 6px 12px);
+      color: #5b6b82;
+    }
+    .element.qr .el-body { background: #fff; padding: 2px; }
+    .element.qr .qr-mark { width: 100%; height: 100%; display: block; }
+    .col-head {
+      position: absolute; box-sizing: border-box; background: #0f8a7c; color: #fff; font-weight: 700;
+      font-size: 11px; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap;
     }
     .element.richtext {
       display: flex;
@@ -114,7 +132,7 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 16
       flex: none;
       pointer-events: none;
     }
-    .element .kind { color: #64748b; font-size: 9px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .element .kind { display: none !important; }
     .resize-handles {
       position: absolute;
       inset: 0;

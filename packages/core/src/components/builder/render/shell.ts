@@ -1,5 +1,6 @@
 import { html, nothing } from 'lit';
-import { icon, t } from '../api.js';
+import { icon, resolveLabel, t } from '../api.js';
+import { elementStatusName, formatLocalizedNumber } from '../status-bar.js';
 import { renderBands } from './canvas.js';
 import { renderContextMenu } from './context-menu.js';
 import type { BuilderViewCallbacks, BuilderViewState } from './model.js';
@@ -46,7 +47,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
         <span class="saved">${t(state.uiLocale, 'savedState')}</span>
       </div>
       <div class="tb-end">
-        <span>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</span>
+        <button type="button" class="locale-toggle" data-testid="title-locale" @click=${cb.onToggleLocale}>${t(state.uiLocale, state.uiDir === 'rtl' ? 'localeRtl' : 'localeLtr')}</button>
         <span class="avatar" aria-hidden="true">${icon('user')}</span>
       </div>
     </header>
@@ -74,7 +75,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
             <button type="button" class=${state.sideTab === 'reportTree' ? 'on' : ''} @click=${() => cb.onSideTab('reportTree')}>${icon('layers')}<span>${t(state.uiLocale, 'reportTree')}</span></button>
           </div>
           <div class="side-body">
-            <div ?hidden=${sideHidden('dictionary')}>
+            <div class="side-fill" ?hidden=${sideHidden('dictionary')}>
               ${renderSideSection(
                 {
                   key: 'dictionary',
@@ -85,7 +86,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
                 { onToggle: () => cb.onToggleSection('dictionary') },
                 renderDictionary(state),
               )}
-              <p class="dict-hint">${t(state.uiLocale, 'dictionaryHint')}</p>
+              <p class="dict-hint" data-testid="dictionary-hint">${t(state.uiLocale, 'dictionaryHint')}</p>
             </div>
             <div ?hidden=${sideHidden('tools')}>
               ${renderSideSection(
@@ -115,6 +116,8 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
     </aside>
 
     <main class="center" @contextmenu=${cb.onHostContextMenu}>
+      ${renderCrumb(state)}
+      <div class="center-scroll">
       <div class="sheet">
         <div class="ruler-corner" data-testid="ruler-corner"></div>
         ${renderHorizontalRuler(rulers)}
@@ -131,11 +134,12 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
           </div>
         </div>
       </div>
+      </div>
       ${renderContextMenu(state.contextMenu, cb.contextMenu)}
     </main>
     <div class="page-tabs" data-testid="page-tabs">
-      <button type="button" class="page-tab on"><span>${t(state.uiLocale, 'pageOne')}</span></button>
-      <button type="button" class="page-tab add" aria-label=${t(state.uiLocale, 'pageOne')}>${icon('plus')}</button>
+      <button type="button" class="page-tab on"><span>${pageTabLabel(state)}</span></button>
+      <button type="button" class="page-tab add" aria-label=${pageTabLabel(state)}>${icon('plus')}</button>
     </div>
     <aside class="props" data-testid="properties-dock">
       ${renderSideSection(
@@ -153,6 +157,40 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
       ${renderStatusBar(state.status, { onIn: cb.actions.onZoomIn, onOut: cb.actions.onZoomOut, onReset: cb.actions.onZoomReset, onSet: cb.onSetZoom })}
     </div>
   `;
+}
+
+function pageTabLabel(state: BuilderViewState): string {
+  const n = formatLocalizedNumber(1, { locale: state.uiLocale, digits: state.status.digits });
+  return `${t(state.uiLocale, 'page')} ${n}`;
+}
+
+const PAPER_CM: Record<string, readonly [string, string]> = {
+  A4: ['21', '29.7'],
+  A5: ['14.8', '21'],
+  Letter: ['21.6', '27.9'],
+};
+
+function renderCrumb(state: BuilderViewState) {
+  const band = state.canvas.selectedBand;
+  const selected = band
+    ? state.canvas.bands[band]?.elements.find((el) => state.canvas.selectedIds.has(el.id))
+    : undefined;
+  const element = selected ? elementStatusName(selected, state.uiLocale) : t(state.uiLocale, band ?? 'reportHeader');
+  const page = state.properties.schema.page;
+  const dims = PAPER_CM[page.size] ?? PAPER_CM.A4!;
+  const paper = page.orientation === 'landscape' ? `${dims[1]} × ${dims[0]}` : `${dims[0]} × ${dims[1]}`;
+  return html`<div class="crumb-bar" data-testid="crumb-bar">
+    <span class="crumb">
+      <b>${pageTabLabel(state)}</b>
+      <span class="sep">›</span>
+      <span>${state.name}</span>
+      <span class="sep">›</span>
+      <b>${element}</b>
+    </span>
+    <span class="sp"></span>
+    <span class="chip"><span class="dot"></span>${t(state.uiLocale, 'dataConnected')}</span>
+    <span class="chip">${page.size} · ${t(state.uiLocale, page.orientation === 'landscape' ? 'landscape' : 'portrait')} · ${paper} ${t(state.uiLocale, 'unitCm')}</span>
+  </div>`;
 }
 
 function fieldBadge(type: string): string {
@@ -196,10 +234,12 @@ function renderDictionary(state: BuilderViewState) {
       <details open>
         <summary class="dict-node root">${icon('sectionDown')}${icon('folder')}<span>${t(state.uiLocale, 'dataSources')}</span></summary>
         <details open>
-          <summary class="dict-node source">${icon('sectionDown')}${icon('table')}<span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
-          ${fields.map(
-            (field, index) => html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.type}">${fieldBadge(field.type)}</span><span>${field.name}</span><span class="tmeta">${typeLabel(state, field.type)}</span></div>`,
-          )}
+          <summary class="dict-node source">${icon('sectionDown')}<span class="tic tic-table">${icon('table')}</span><span>${source}</span><span class="tmeta">${adapterTag(state, adapter)}</span></summary>
+          ${fields.map((field, index) => {
+            const relation = field.isList ? t(state.uiLocale, 'listTag') : field.children?.length ? t(state.uiLocale, 'relation') : '';
+            return html`<div class="dict-node field ${index === 0 ? 'cur' : ''}"><span class="tic tic-${field.isList || field.children?.length ? 'relation' : field.type}">${fieldBadge(field.type)}</span><span>${resolveLabel(field.label, state.uiLocale, field.name)}</span><span class="tmeta">${relation || typeLabel(state, field.type)}</span></div>`;
+          })}
+          ${state.properties.schema.groups.map((group) => html`<div class="dict-node field"><span class="tic tic-relation">${icon('folder')}</span><span>${group.key}</span><span class="tmeta">${t(state.uiLocale, 'relation')}</span></div>`)}
         </details>
       </details>
       <details open>

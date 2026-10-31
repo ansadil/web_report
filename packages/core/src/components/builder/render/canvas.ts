@@ -4,7 +4,7 @@ import { MM_TO_PX } from '@reports-web/shared';
 import { icon, t } from '../api.js';
 import type { ReportElement, ReportSchemaV1 } from '../api.js';
 import { builderCanvasStyleCss } from '../canvas-style.js';
-import { bandPixelHeight, marqueeRect } from '../geometry.js';
+import { bandPixelHeight, dataHeaderHeightMm, marqueeRect } from '../geometry.js';
 import {
   BAND_KEYS,
   LINE_RESIZE_HANDLES,
@@ -18,6 +18,7 @@ export interface CanvasState {
   locale: LocaleTag;
   bands: ReportSchemaV1['bands'];
   groups: ReportSchemaV1['groups'];
+  fields: readonly { name: string; label?: string }[];
   hoverBand: BandKey | null;
   marquee: MarqueeState | null;
   selectedIds: ReadonlySet<string>;
@@ -60,8 +61,26 @@ function bandHead(name: string, label: string) {
   </div>`;
 }
 
+function fieldCaption(state: CanvasState, name: string): string {
+  return (state.fields ?? []).find((field) => field.name === name)?.label?.trim() || name;
+}
+
+function aggregateCaption(state: CanvasState, fn: 'sum' | 'count' | 'avg' | 'min' | 'max', field: string): string {
+  const key = fn === 'sum' ? 'fnSum' : fn === 'count' ? 'fnCount' : fn === 'avg' ? 'fnAvg' : fn === 'min' ? 'fnMin' : 'fnMax';
+  return `${t(state.locale, key)}(${fieldCaption(state, field)})`;
+}
+
 function renderDataHeader(state: CanvasState) {
-  return html`<div class="band-strip" data-band="dataHeader">${bandHead('dataHeader', t(state.locale, 'dataHeader'))}</div>`;
+  const mm = dataHeaderHeightMm(state.bands);
+  const columns = (state.bands.detail?.elements ?? []).filter((el) => el.kind === 'field');
+  return html`<div class="band-strip" data-band="dataHeader">
+    ${bandHead('dataHeader', t(state.locale, 'dataHeader'))}
+    ${mm > 0
+      ? html`<div class="band" data-testid="band-data-header" style="height:${bandPixelHeight({ height: mm, elements: [] })}px">
+          ${columns.map((el) => html`<div class="col-head" style="inset-inline-start:${el.pos.x * MM_TO_PX}px;top:${MM_TO_PX}px;width:${el.pos.w * MM_TO_PX}px;height:${6 * MM_TO_PX}px">${fieldCaption(state, el.field)}</div>`)}
+        </div>`
+      : nothing}
+  </div>`;
 }
 
 function renderGroupFooters(state: CanvasState, cb: CanvasCallbacks) {
@@ -143,7 +162,7 @@ function elementLabel(state: CanvasState, cb: CanvasCallbacks, el: Exclude<Repor
     case 'field':
       return `[${t(state.locale, 'field')}]`;
     case 'aggregate':
-      return `${el.fn}(${el.field})`;
+      return aggregateCaption(state, el.fn, el.field);
     case 'chart':
       return `${el.type} chart`;
     case 'expr':

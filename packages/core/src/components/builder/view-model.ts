@@ -40,7 +40,7 @@ import { arrangeSelected } from './ops/arrange.js';
 import { exportJson, newReport, openReportText, saveAsCopy, saveReport } from './ops/io.js';
 import { previewExprText } from './ops/preview.js';
 import { canBringForward, canBringToFront, canSendBackward, canSendToBack } from './ops/zorder.js';
-import { bandPixelHeight, canvasHeightPx, pageContentWidthMm } from './geometry.js';
+import { bandPixelHeight, canvasHeightPx, dataHeaderHeightMm, pageContentWidthMm } from './geometry.js';
 import { BAND_HEAD_PX } from './metrics.js';
 import { elementStatusName } from './status-bar.js';
 import { BAND_KEYS } from './types.js';
@@ -57,16 +57,18 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
   const digits = session.schema.meta.pageNumberDigits ?? 'locale';
   const widthMm = pageContentWidthMm(session.schema.page);
   const widthPx = widthMm * MM_TO_PX;
+  const headerMm = dataHeaderHeightMm(session.schema.bands);
   const bandHeightsMm = BAND_KEYS.flatMap((key) => {
     const band = session.schema.bands[key];
     if (!band) return [];
-    const own = key === 'detail' ? [0, band.height] : [band.height];
+    const own = key === 'detail' ? [headerMm, band.height] : [band.height];
     if (key !== 'detail') return own;
     return [...own, ...session.schema.groups.flatMap((group) => (group.footer ? [group.footer.height] : []))];
   });
   const heightMm = bandHeightsMm.reduce((sum, height) => sum + height, 0);
   const groupFooterPx = session.schema.groups.reduce((sum, group) => sum + (group.footer ? bandPixelHeight(group.footer) : 0), 0);
-  const heightPx = canvasHeightPx(session.schema.bands) + groupFooterPx + bandHeightsMm.length * BAND_HEAD_PX;
+  const dataHeaderPx = headerMm > 0 ? bandPixelHeight({ height: headerMm, elements: [] }) : 0;
+  const heightPx = canvasHeightPx(session.schema.bands) + groupFooterPx + dataHeaderPx + bandHeightsMm.length * BAND_HEAD_PX;
   const selectedOnly = session.selectedIds.size === 1 && session.selectedBand
     ? session.schema.bands[session.selectedBand]?.elements.find((el) => session.selectedIds.has(el.id))
     : undefined;
@@ -152,6 +154,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       locale,
       bands: session.schema.bands,
       groups: session.schema.groups,
+      fields: session.schema.fields.map((field) => ({ name: field.name, ...(field.label ? { label: field.label } : {}) })),
       hoverBand: session.hoverBand,
       marquee: session.marquee,
       selectedIds: session.selectedIds,

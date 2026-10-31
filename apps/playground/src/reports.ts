@@ -46,17 +46,15 @@ const salesByRegion: SampleReport = {
         elements: [
           { id: 'logo', kind: 'image', src: 'logo', alt: 'الشعار', pos: { x: 2, y: 3, w: 26, h: 18 } },
           { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 32, y: 3, w: 112, h: 10 } },
-          { id: 'sub', kind: 'field', field: 'date', style: { align: 'center', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 32, y: 14, w: 112, h: 7 } },
+          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 32, y: 14, w: 112, h: 7 } },
           { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 156, y: 3, w: 18, h: 18 } },
         ],
       },
       pageHeader: {
         height: 10,
         elements: [
-          { id: 'ph1', kind: 'text', value: 'الصنف', style: { bold: true, color: '#ffffff', background: '#0f8a7c', font: 'Cairo' }, pos: { x: 0, y: 2, w: 70, h: 6 } },
-          { id: 'ph2', kind: 'text', value: 'الكمية', style: { bold: true, align: 'center', color: '#ffffff', background: '#0f8a7c', font: 'Cairo' }, pos: { x: 70, y: 2, w: 30, h: 6 } },
-          { id: 'ph3', kind: 'text', value: 'السعر', style: { bold: true, align: 'center', color: '#ffffff', background: '#0f8a7c', font: 'Cairo' }, pos: { x: 100, y: 2, w: 30, h: 6 } },
-          { id: 'ph4', kind: 'text', value: 'الإجمالي', style: { bold: true, align: 'center', color: '#ffffff', background: '#0f8a7c', font: 'Cairo' }, pos: { x: 130, y: 2, w: 50, h: 6 } },
+          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 2, y: 2, w: 90, h: 6 } },
+          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 100, y: 2, w: 78, h: 6 } },
         ],
       },
       detail: {

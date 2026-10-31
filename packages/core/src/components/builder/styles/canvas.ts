@@ -93,6 +93,10 @@ export const canvasStyles = css`    main.center { grid-area: center; padding: 0;
     }
     .element.qr .el-body { background: #fff; padding: 2px; }
     .element.qr .qr-mark { width: 100%; height: 100%; display: block; }
+    .col-head {
+      position: absolute; box-sizing: border-box; background: #0f8a7c; color: #fff; font-weight: 700;
+      font-size: 11px; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap;
+    }
     .element.richtext {
       display: flex;
       flex-direction: column;

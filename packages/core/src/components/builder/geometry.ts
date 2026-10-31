@@ -37,6 +37,11 @@ export function bandPixelHeight(b: Band | undefined): number {
   return Math.max(20, (b?.height ?? 10) * MM_TO_PX);
 }
 
+/** Visible data-header body, in millimetres, when the detail band has field columns. */
+export function dataHeaderHeightMm(bands: ReportSchemaV1['bands']): number {
+  return bands.detail?.elements.some((el) => el.kind === 'field') ? 8 : 0;
+}
+
 export function canvasHeightPx(bands: ReportSchemaV1['bands']): number {
   return BAND_KEYS.reduce((sum, key) => sum + bandPixelHeight(bands[key]), 0);
 }

@@ -207,7 +207,12 @@ type StringKey =
   | 'categorize'
   | 'highlight'
   | 'relation'
-  | 'listTag';
+  | 'listTag'
+  | 'fnSum'
+  | 'fnCount'
+  | 'fnAvg'
+  | 'fnMin'
+  | 'fnMax';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -418,6 +423,11 @@ const en: Record<StringKey, string> = {
   highlight: 'Highlight',
   relation: 'Relation',
   listTag: 'List',
+  fnSum: 'Sum',
+  fnCount: 'Count',
+  fnAvg: 'Average',
+  fnMin: 'Min',
+  fnMax: 'Max',
 };
 
 const ar: Record<StringKey, string> = {
@@ -629,6 +639,11 @@ const ar: Record<StringKey, string> = {
   highlight: 'لون التعبئة',
   relation: 'علاقة',
   listTag: 'قائمة',
+  fnSum: 'مجموع',
+  fnCount: 'عدد',
+  fnAvg: 'متوسط',
+  fnMin: 'أدنى',
+  fnMax: 'أعلى',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

@@ -140,6 +140,7 @@ export const chromeStyles = css`
   .band-strip[data-band='pageHeader'] .band-head { background: #2f6fc0; }
   .band-strip[data-band='pageHeader'] .band { background-color: #f6faff; border-color: #bcd3f1; }
   .band-strip[data-band='dataHeader'] .band-head { background: #0f8a7c; }
+  .band-strip[data-band='dataHeader'] .band { background-color: #f4fcfa; border-color: #b3e3db; }
   .band-strip[data-band='detail'] .band-head { background: #c47a12; }
   .band-strip[data-band='detail'] .band { background-color: #fffaf0; border-color: #efd4a6; }
   .band-strip[data-band='groupFooter'] .band-head { background: #be3a5a; }

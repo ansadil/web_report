@@ -1,5 +1,5 @@
 import { html } from 'lit';
-import type { FieldMeta } from '@reports-web/shared';
+import type { FieldMeta, LocaleTag } from '@reports-web/shared';
 import { lineThicknessMm, t } from '../../api.js';
 import type { ConditionalFormatRule, ReportElement, Style } from '../../api.js';
 import { elementStatusName, formatLocalizedNumber, parseLocalizedNumber } from '../../status-bar.js';

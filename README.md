@@ -24,6 +24,7 @@ Packages are **0.1.0** (pre-1.0). The license is **proprietary** — see `LICENS
 | `@reports-web/core` | Web Components, report engine, adapters, and exporters |
 | `@reports-web/react` | Thin React 18+ wrapper |
 | `@reports-web/vue` | Thin Vue 3 wrapper |
+| `@reports-web/convex` | Optional Convex backend: versioned template storage and a data adapter |
 
 The designer is part of `@reports-web/core` (`<reports-builder>`). There is no separate builder package.
 

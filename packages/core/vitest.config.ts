@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@reports-web/shared': resolve(__dirname, '../shared/src/index.ts'),
     },
+    conditions: ['@reports-web/source'],
   },
   test: {
     environment: 'happy-dom',

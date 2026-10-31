@@ -21,3 +21,11 @@ original family names are kept.
 | Noto Sans, Noto Sans Arabic | `NotoSans-*.ttf`, `NotoSansArabic-*.ttf` (PDF fallback fonts) | Copyright 2022 The Noto Project Authors | `OFL-NotoSans.txt` |
 
 OFL-1.1: https://openfontlicense.org
+
+## Icons — Lucide
+
+Designer and viewer icons are individual [Lucide](https://lucide.dev) icons (ISC),
+imported one file per icon by `scripts/inline-lucide.mjs` and stored as SVG strings
+in `packages/core/src/components/lucide-svg.ts`. Nothing is loaded from a CDN or an icon font.
+
+ISC: https://opensource.org/licenses/ISC

@@ -13,11 +13,14 @@ export const hostStyles = css`
       --rb-tool-bg: #f8fafc;
       --rb-rail: 40px;
       --rb-side-w: 340px;
-      --rb-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --rb-font: Cairo, Tajawal, 'Noto Naskh Arabic', 'Segoe UI', system-ui, sans-serif;
       display: grid;
       grid-template-columns: var(--rb-side-w) minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr);
-      grid-template-areas: 'side center';
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        'ribbon ribbon'
+        'side center'
+        'status status';
       height: 100%;
       min-height: 540px;
       background: var(--rb-bg);

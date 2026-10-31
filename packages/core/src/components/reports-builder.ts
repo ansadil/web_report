@@ -24,6 +24,7 @@ import type {
   DataAdapter,
   ElementClipboard,
   MarqueeState,
+  RibbonTab,
   ReportSchemaV1,
   SideSectionKey,
   StorageAdapter,
@@ -59,8 +60,12 @@ export class ReportsBuilderElement extends LitElement {
     actions: false,
     tools: false,
     properties: false,
+    dictionary: false,
+    reportTree: false,
   };
   @state() private _contextMenu: ContextMenuState | null = null;
+  @state() private _ribbonTab: RibbonTab = 'home';
+  @state() private _cursorMm: { x: number; y: number } | null = null;
 
   private _clipboard: ElementClipboard | null = null;
   private readonly _history = new HistoryStore(() => {
@@ -191,6 +196,14 @@ export class ReportsBuilderElement extends LitElement {
     const setContextMenu = (v: ContextMenuState | null) => {
       this._contextMenu = v;
     };
+    const ribbonTab = () => this._ribbonTab;
+    const setRibbonTab = (v: RibbonTab) => {
+      this._ribbonTab = v;
+    };
+    const cursorMm = () => this._cursorMm;
+    const setCursorMm = (v: { x: number; y: number } | null) => {
+      this._cursorMm = v;
+    };
     const actions = () => this.actions;
     const setActions = (v: readonly BuilderAction[]) => {
       this.actions = v;
@@ -286,6 +299,18 @@ export class ReportsBuilderElement extends LitElement {
       },
       set contextMenu(v) {
         setContextMenu(v);
+      },
+      get ribbonTab() {
+        return ribbonTab();
+      },
+      set ribbonTab(v) {
+        setRibbonTab(v);
+      },
+      get cursorMm() {
+        return cursorMm();
+      },
+      set cursorMm(v) {
+        setCursorMm(v);
       },
       get actions() {
         return actions();

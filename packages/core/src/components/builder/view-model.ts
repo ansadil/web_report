@@ -36,6 +36,7 @@ import { exportJson, saveReport } from './ops/io.js';
 import { previewExprText } from './ops/preview.js';
 import { canBringForward, canBringToFront, canSendBackward, canSendToBack } from './ops/zorder.js';
 import { canvasHeightPx, pageContentWidthMm } from './geometry.js';
+import { BAND_KEYS } from './types.js';
 import type { BuilderViewCallbacks, BuilderViewState } from './render/model.js';
 import type { BuilderSession } from './session.js';
 
@@ -46,8 +47,14 @@ export interface InteractionPorts {
 
 export function buildViewModel(session: BuilderSession, ports: InteractionPorts): { state: BuilderViewState; cb: BuilderViewCallbacks } {
   const locale = session.uiLocale;
-  const widthPx = pageContentWidthMm(session.schema.page) * MM_TO_PX;
-  const heightPx = canvasHeightPx(session.schema.bands);
+  const widthMm = pageContentWidthMm(session.schema.page);
+  const widthPx = widthMm * MM_TO_PX;
+  const strips = BAND_KEYS.filter((key) => session.schema.bands[key]).length;
+  const heightMm = BAND_KEYS.reduce((sum, key) => sum + (session.schema.bands[key]?.height ?? 0), 0);
+  const heightPx = canvasHeightPx(session.schema.bands) + strips * 18;
+  const selectedOnly = session.selectedIds.size === 1 && session.selectedBand
+    ? session.schema.bands[session.selectedBand]?.elements.find((el) => session.selectedIds.has(el.id))
+    : undefined;
   const menu = session.contextMenu;
   const hasSelection = session.selectedIds.size > 0;
   const canLayer = hasSelection && Boolean(session.selectedBand);
@@ -66,7 +73,36 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     widthPx,
     heightPx,
     zoom: session.zoom,
+    widthMm,
+    heightMm,
     collapsed: session.collapsedSections,
+    ribbon: {
+      locale,
+      tab: session.ribbonTab,
+      actions: {
+        locale,
+        name: session.schema.meta.name,
+        canUndo: session.history.canUndo,
+        canRedo: session.history.canRedo,
+        zoom: session.zoom,
+        actions: session.actions,
+        menuOpen: session.menuOpen,
+      },
+      canCut: hasSelection,
+      canPaste: Boolean(session.clipboard?.elements.length),
+      canBringToFront: canLayer && canBringToFront(layerElements, session.selectedIds),
+      canBringForward: canLayer && canBringForward(layerElements, session.selectedIds),
+      canSendToBack: canLayer && canSendToBack(layerElements, session.selectedIds),
+      canSendBackward: canLayer && canSendBackward(layerElements, session.selectedIds),
+    },
+    status: {
+      locale,
+      zoom: session.zoom,
+      cursor: session.cursorMm,
+      selection: selectedOnly ? { name: selectedOnly.id, w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
+      page: 1,
+      pages: 1,
+    },
     actions: {
       locale,
       name: session.schema.meta.name,
@@ -141,7 +177,53 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       onBandPointerDown: (ev, band) => ports.pointer.onBandPointerDown(ev, band),
       onElementContextMenu: (ev, band, id) => ports.pointer.onElementContextMenu(ev, band, id),
       onElementPointerDown: (ev, band, id, mode) => ports.pointer.onElementPointerDown(ev, band, id, mode),
+      onBandPointerMove: (ev, band) => ports.pointer.onBandPointerMove(ev, band),
       previewExpr: (el) => previewExprText(session.schema, session.sampleRows, el),
+    },
+    ribbon: {
+      onTab: (tab) => {
+        session.ribbonTab = tab;
+      },
+      actions: {
+        onNameInput: (value) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, name: value } }),
+        onUndo: () => performUndo(session),
+        onRedo: () => performRedo(session),
+        onZoomIn: () => zoomIn(session),
+        onZoomOut: () => zoomOut(session),
+        onZoomReset: () => zoomReset(session),
+        onToggleMenu: () => toggleMenu(session),
+        onToggleAction: (action) => toggleAction(session, action),
+        onSave: () => {
+          void saveReport(session);
+        },
+        onExportJson: () => exportJson(session),
+        onPreview: () => {
+          session.dispatchEvent(new CustomEvent('request-preview'));
+        },
+      },
+      onCut: () => {
+        cutSelected(session);
+      },
+      onCopy: () => {
+        copySelected(session);
+      },
+      onPaste: () => {
+        pasteClipboard(session);
+      },
+      onDelete: () => deleteSelected(session),
+      onBringToFront: () => bringSelectionToFront(session),
+      onBringForward: () => bringSelectionForward(session),
+      onSendToBack: () => sendSelectionToBack(session),
+      onSendBackward: () => sendSelectionBackward(session),
+      onInsertDragStart: (ev, kind) => ports.dnd.onToolDragStart(ev, kind),
+      onPortrait: () => {
+        commitSchema(session, { ...session.schema, page: { ...session.schema.page, orientation: 'portrait' } });
+        reclampAllRootBandElements(session);
+      },
+      onLandscape: () => {
+        commitSchema(session, { ...session.schema, page: { ...session.schema.page, orientation: 'landscape' } });
+        reclampAllRootBandElements(session);
+      },
     },
     properties: {
       updateMeta: (patch) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, ...patch } }),

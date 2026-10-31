@@ -1,4 +1,5 @@
 import { canvasStyles } from './canvas.js';
+import { chromeStyles } from './chrome.js';
 import { contextMenuStyles } from './context-menu.js';
 import { hostStyles } from './host.js';
 import { propertiesStyles } from './properties.js';
@@ -15,4 +16,5 @@ export const builderStyles = [
   toolboxStyles,
   contextMenuStyles,
   propertiesStyles,
+  chromeStyles,
 ];

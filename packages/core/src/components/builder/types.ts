@@ -13,7 +13,8 @@ export const LINE_RESIZE_HANDLES: Record<'horizontal' | 'vertical', readonly Res
   vertical: ['n', 's', 'ne', 'nw', 'se', 'sw'],
 };
 
-export type SideSectionKey = 'actions' | 'tools' | 'properties';
+export type SideSectionKey = 'actions' | 'tools' | 'properties' | 'dictionary' | 'reportTree';
+export type RibbonTab = 'home' | 'insert' | 'page' | 'view' | 'preview';
 export type PosMm = { x: number; y: number; w: number; h: number };
 export type RectMm = PosMm;
 export type MarqueeState = { band: BandKey; start: { x: number; y: number }; current: { x: number; y: number } };

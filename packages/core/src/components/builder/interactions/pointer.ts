@@ -72,6 +72,11 @@ export class PointerController implements ReactiveController {
     openElementContextMenu(this.session, ev, band, id);
   }
 
+  onBandPointerMove(ev: PointerEvent, band: BandKey): void {
+    const target = ev.currentTarget as HTMLElement;
+    this.session.cursorMm = this.point(ev, target, band);
+  }
+
   onBandPointerDown(ev: PointerEvent, band: BandKey): void {
     if (ev.button !== 0) return;
     ev.preventDefault();

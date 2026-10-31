@@ -31,6 +31,7 @@ export interface CanvasCallbacks {
   onBandPointerDown: (ev: PointerEvent, band: BandKey) => void;
   onElementContextMenu: (ev: MouseEvent, band: BandKey, id: string) => void;
   onElementPointerDown: (ev: PointerEvent, band: BandKey, id: string, mode: 'move' | ResizeHandleKind) => void;
+  onBandPointerMove: (ev: PointerEvent, band: BandKey) => void;
   previewExpr: (el: Extract<ReportElement, { kind: 'expr' }>) => string;
 }
 
@@ -43,19 +44,24 @@ function renderBand(state: CanvasState, cb: CanvasCallbacks, name: BandKey) {
   if (!band) return nothing;
   const dropClass = state.hoverBand === name ? 'band-drop-on' : '';
   return html`
-    <div
-      class="band ${dropClass}"
-      data-testid=${`band-${name}`}
-      style="height:${bandPixelHeight(band)}px"
-      @dragover=${(e: DragEvent) => cb.onDragOver(e, name)}
-      @dragleave=${cb.onDragLeave}
-      @drop=${(e: DragEvent) => cb.onDrop(e, name)}
-      @contextmenu=${(e: MouseEvent) => cb.onBandContextMenu(e, name)}
-      @pointerdown=${(e: PointerEvent) => cb.onBandPointerDown(e, name)}
-    >
-      <span class="band-label">${t(state.locale, name as 'reportHeader')}</span>
-      ${band.elements.map((el) => renderElement(state, cb, name, el))}
-      ${renderMarquee(state, name)}
+    <div class="band-strip">
+      <div class="band-head" data-testid=${`band-head-${name}`}>
+        <span class="band-label">${t(state.locale, name as 'reportHeader')}</span>
+      </div>
+      <div
+        class="band ${dropClass}"
+        data-testid=${`band-${name}`}
+        style="height:${bandPixelHeight(band)}px"
+        @dragover=${(e: DragEvent) => cb.onDragOver(e, name)}
+        @dragleave=${cb.onDragLeave}
+        @drop=${(e: DragEvent) => cb.onDrop(e, name)}
+        @contextmenu=${(e: MouseEvent) => cb.onBandContextMenu(e, name)}
+        @pointerdown=${(e: PointerEvent) => cb.onBandPointerDown(e, name)}
+        @pointermove=${(e: PointerEvent) => cb.onBandPointerMove(e, name)}
+      >
+        ${band.elements.map((el) => renderElement(state, cb, name, el))}
+        ${renderMarquee(state, name)}
+      </div>
     </div>
   `;
 }
@@ -138,6 +144,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
         @pointerdown=${onPointerDown}
       >
         <span class="kind">${el.kind}</span>
+        ${showHandles ? html`<span class="el-name" data-testid="element-name">${el.kind}</span>` : nothing}
         <div class="line-stroke" style=${strokeStyle}></div>
         ${showHandles
           ? html`<div class="resize-handles" aria-hidden="true">
@@ -181,6 +188,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
       @pointerdown=${onPointerDown}
     >
       <span class="kind">${el.kind}</span>
+      ${showHandles ? html`<span class="el-name" data-testid="element-name">${label}</span>` : nothing}
       <div class="${el.kind === 'richtext' ? 'element-preview' : ''}">${label}</div>
       ${showHandles
         ? html`<div class="resize-handles" aria-hidden="true">

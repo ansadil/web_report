@@ -4,14 +4,20 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+/** Vitest colors the summary (`\x1b[32m318 passed\x1b[39m`). Drop SGR sequences before matching. */
+export function stripAnsi(text) {
+  return String(text).replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 export function countTests(text) {
+  const clean = stripAnsi(text);
   let passed = 0;
   let failed = 0;
   let skipped = 0;
   let todo = 0;
   let parsed = false;
 
-  for (const line of text.split(/\r?\n/)) {
+  for (const line of clean.split(/\r?\n/)) {
     if (!/^\s*Tests\b/.test(line)) continue;
     parsed = true;
     const fail = line.match(/(\d+)\s+failed\b/);
@@ -25,8 +31,8 @@ export function countTests(text) {
   }
 
   if (!parsed) {
-    const passing = [...text.matchAll(/(\d+)\s+passing\b/g)];
-    const failing = [...text.matchAll(/(\d+)\s+failing\b/g)];
+    const passing = [...clean.matchAll(/(\d+)\s+passing\b/g)];
+    const failing = [...clean.matchAll(/(\d+)\s+failing\b/g)];
     if (passing.length > 0 || failing.length > 0) {
       parsed = true;
       passed = passing.reduce((sum, match) => sum + Number(match[1]), 0);
@@ -35,6 +41,30 @@ export function countTests(text) {
   }
 
   return { passed, failed, skipped, todo, parsed };
+}
+
+/**
+ * Totals from a vitest JSON report (`numPassedTests` / `numFailedTests` /
+ * `numPendingTests` / `numTodoTests`). Returns null when `jsonText` is empty,
+ * not JSON, or lacks those numbers. Text parsing is used only when the report
+ * file itself is missing.
+ */
+export function totalsFromReport(jsonText) {
+  if (jsonText == null || String(jsonText).trim() === '') return null;
+  let report;
+  try {
+    report = JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+  const passed = report?.numPassedTests;
+  const failed = report?.numFailedTests;
+  const skipped = report?.numPendingTests;
+  const todo = report?.numTodoTests;
+  if (![passed, failed, skipped, todo].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+    return null;
+  }
+  return { passed, failed, skipped, todo, parsed: true };
 }
 
 /** Names of skipped / todo tests from a vitest JSON report (empty lists when unavailable). */
@@ -110,7 +140,10 @@ function main() {
   const child = spawn(
     'pnpm',
     ['test:qa', '--reporter=default', '--reporter=json', `--outputFile.json=${reportFile}`],
-    { stdio: ['ignore', 'pipe', 'pipe'], env: process.env },
+    {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    },
   );
 
   let output = '';
@@ -135,14 +168,20 @@ function main() {
   });
 
   child.on('close', (code) => {
-    const counts = countTests(output);
     let json = '';
+    let jsonMissing = true;
     try {
       json = readFileSync(reportFile, 'utf8');
+      jsonMissing = json.trim() === '';
     } catch {
       /* report not written */
     }
     rmSync(reportDir, { recursive: true, force: true });
+    // Prefer the JSON report. Text (ANSI-stripped) is only the fallback when that file is missing.
+    const fromJson = jsonMissing ? null : totalsFromReport(json);
+    const counts = fromJson ?? (jsonMissing
+      ? countTests(output)
+      : { passed: 0, failed: 0, skipped: 0, todo: 0, parsed: false });
     const names = listNotRun(json);
     const note = counts.parsed
       ? `command exit code: ${code ?? 'unknown'}`

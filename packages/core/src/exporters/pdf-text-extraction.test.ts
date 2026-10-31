@@ -1,8 +1,9 @@
 // @vitest-environment node
 /**
  * BUG-25: text extractors keep the whole line. /W widths follow what extractors advance over:
- * 0 for glyphs mapped to format characters (U+200B dots of decomposed clusters) or
- * non-spacing marks, never negative; `Td` keeps every glyph where HarfBuzz placed it. Before,
+ * glyphs mapped to format characters (U+200B dots of decomposed clusters) or non-spacing
+ * marks get a width <= 0 that pdf.js ignores (negative for poppler's reading order, BUG-26),
+ * every other glyph a width >= 0; `Td` keeps every glyph where HarfBuzz placed it. Before,
  * pdf.js skipped the (mostly negative) widths of Noto Naskh's dot glyphs, its pen drifted to
  * the right and it dropped the glyphs past the page edge: the first words of long RTL lines.
  */
@@ -151,21 +152,23 @@ describe('BUG-25: advanceless glyphs for extractors', () => {
 });
 
 describe.each(FACES.map(([f, b]) => [label(f, b), f, b] as const))('BUG-25 %s: text extractors keep long lines', (_name, family, bold) => {
-  it.each(['rtl', 'ltr'] as const)('%s: no negative width; U+200B / mark CIDs have width 0', async (dir) => {
+  it.each(['rtl', 'ltr'] as const)('%s: only U+200B / mark CIDs have a negative width; most of them do', async (dir) => {
     const fonts = await cidFonts(await pdfOf(family, bold, dir));
     expect(fonts.length).toBeGreaterThan(0);
     let advanceless = 0;
+    let negative = 0;
     for (const { widths, text } of fonts) {
       for (const [cid, w] of widths) {
-        expect(w, `${label(family, bold)} cid ${cid}`).toBeGreaterThanOrEqual(0);
         const t = text.get(cid);
         if (cid !== 0 && t !== undefined && advancelessForExtractors(t)) {
           advanceless++;
-          expect(w, `${label(family, bold)} cid ${cid} ${JSON.stringify(t)}`).toBe(0);
-        }
+          if (w < 0) negative++;
+          expect(w, `${label(family, bold)} cid ${cid} ${JSON.stringify(t)}`).toBeLessThanOrEqual(0);
+        } else expect(w, `${label(family, bold)} cid ${cid}`).toBeGreaterThanOrEqual(0);
       }
     }
     expect(advanceless).toBeGreaterThan(0); // the tashkeel line has marks in every face
+    expect(negative).toBeGreaterThan(0);
   });
 
   it.each(['rtl', 'ltr'] as const)('%s: pdf.js extracts every line with exactly the source characters', async (dir) => {

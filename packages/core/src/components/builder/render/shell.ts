@@ -20,6 +20,8 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
     bandHeightsMm: state.bandHeightsMm,
     zoom: state.zoom,
     dir: state.canvasDir,
+    locale: state.uiLocale,
+    digits: state.status.digits,
   };
   return html`
     <div class="ribbon-host">

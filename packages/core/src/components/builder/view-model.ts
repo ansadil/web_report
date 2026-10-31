@@ -27,12 +27,14 @@ import {
   toggleLeft,
   toggleMenu,
   toggleSection,
+  patchSelectedStyle,
   updateElement,
   zoomIn,
   zoomOut,
   zoomReset,
 } from './ops/commands.js';
-import { exportJson, saveReport } from './ops/io.js';
+import { arrangeSelected } from './ops/arrange.js';
+import { exportJson, newReport, openReportText, saveAsCopy, saveReport } from './ops/io.js';
 import { previewExprText } from './ops/preview.js';
 import { canBringForward, canBringToFront, canSendBackward, canSendToBack } from './ops/zorder.js';
 import { canvasHeightPx, pageContentWidthMm } from './geometry.js';
@@ -100,12 +102,24 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       canBringForward: canLayer && canBringForward(layerElements, session.selectedIds),
       canSendToBack: canLayer && canSendToBack(layerElements, session.selectedIds),
       canSendBackward: canLayer && canSendBackward(layerElements, session.selectedIds),
+      selectionCount: session.selectedIds.size,
+      font: {
+        enabled: Boolean(selectedOnly),
+        family: selectedOnly?.style?.font ?? '',
+        size: selectedOnly?.style?.fontSize ?? 10,
+        bold: Boolean(selectedOnly?.style?.bold),
+        italic: Boolean(selectedOnly?.style?.italic),
+        underline: Boolean(selectedOnly?.style?.underline),
+        color: selectedOnly?.style?.color ?? '#111111',
+        align: selectedOnly?.style?.align ?? '',
+      },
     },
     status: {
       locale,
+      digits: session.schema.meta.pageNumberDigits ?? 'locale',
       zoom: session.zoom,
       cursor: session.cursorMm,
-      selection: selectedOnly ? { name: elementStatusName(selectedOnly), w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
+      selection: selectedOnly ? { name: elementStatusName(selectedOnly, locale), w: selectedOnly.pos.w, h: selectedOnly.pos.h } : null,
       page: 1,
       pages: 1,
     },
@@ -233,6 +247,11 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
         commitSchema(session, { ...session.schema, page: { ...session.schema.page, orientation: 'landscape' } });
         reclampAllRootBandElements(session);
       },
+      onNew: () => newReport(session),
+      onOpenText: (text) => openReportText(session, text),
+      onSaveAs: () => saveAsCopy(session),
+      onArrange: (mode) => arrangeSelected(session, mode),
+      onStyle: (patch) => patchSelectedStyle(session, patch),
     },
     properties: {
       updateMeta: (patch) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, ...patch } }),

@@ -37,7 +37,7 @@ export const propertiesStyles = css`
     .prow .v input:hover, .prow .v select:hover { border-color: var(--rb-border); }
     .prow .v input:focus { border-color: #8db7e8; background: #fff; }
     .prow .v select.pick, .prow .v select {
-      appearance: none; padding-inline: 2px 18px; padding-block: 0; cursor: pointer; width: 100%;
+      appearance: none; padding-inline: 2px 18px; padding-block: 0; padding-top: 0; padding-bottom: 0; cursor: pointer; width: 100%;
       /* Content box is 24px inside the 1px border; a taller line-height clips the closed value. */
       height: 26px; min-height: 26px; line-height: 22px; box-sizing: border-box;
       background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);

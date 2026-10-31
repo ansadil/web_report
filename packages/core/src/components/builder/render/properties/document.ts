@@ -23,7 +23,7 @@ export function renderInspectorChrome(locale: DocumentState['locale'], onFilter:
       <button type="button" title=${t(locale, 'sortAlpha')} @click=${(e: Event) => layoutProps(e, 'alpha')}>A–Z</button>
       <button type="button" class="on" title=${t(locale, 'categorize')} @click=${(e: Event) => layoutProps(e, 'category')}>${t(locale, 'categorize')}</button>
     </div>
-    <div class="prop-search"><input placeholder=${t(locale, 'searchProperties')} @input=${onFilter} /></div>
+    <div class="prop-search"><input placeholder=${t(locale, 'searchProperties')} @input=${onFilter} /><svg class="search-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></div>
   `;
 }
 
@@ -33,14 +33,15 @@ function layoutProps(event: Event, mode: 'alpha' | 'category'): void {
   if (!grid) return;
   grid.querySelectorAll('.prop-tools button').forEach((node) => node.classList.toggle('on', node === button));
   grid.querySelectorAll('.cat').forEach((cat) => {
-    const rows = [...cat.querySelectorAll(':scope > .prow')] as HTMLElement[];
+    const body = cat.querySelector(':scope > .cat-b') ?? cat;
+    const rows = [...body.querySelectorAll(':scope > .prow')] as HTMLElement[];
     rows.forEach((row, index) => {
       if (!row.dataset.order) row.dataset.order = String(index);
     });
     const sorted = [...rows].sort((a, b) => mode === 'alpha'
       ? (a.querySelector('.k')?.textContent ?? '').localeCompare(b.querySelector('.k')?.textContent ?? '', undefined, { sensitivity: 'base' })
       : Number(a.dataset.order) - Number(b.dataset.order));
-    for (const row of sorted) cat.append(row);
+    for (const row of sorted) body.append(row);
   });
 }
 

@@ -25,14 +25,31 @@ function defaultExtract(json: unknown): readonly Row[] {
   throw new Error('REST adapter could not locate rows in the response payload');
 }
 
+/**
+ * Serializes one query-string value. Raw `Date` values (only reachable for undeclared params, or hosts calling the
+ * adapter directly) become full ISO/UTC strings via `toISOString()`; declared `date`/`dateRange` parameters are already
+ * local `YYYY-MM-DD` strings by the time they get here (see engine/parameters.ts). Plain objects (e.g. a dateRange
+ * `{ from, to }`) use bracket notation (`period[from]=...&period[to]=...`), which Laravel/PHP,
+ * Rails and `qs` parse back into objects. Other values keep the previous `String(v)` behavior.
+ */
+function appendParam(sp: URLSearchParams, key: string, v: unknown): void {
+  if (v == null) return;
+  if (v instanceof Date) {
+    sp.set(key, v.toISOString());
+    return;
+  }
+  if (typeof v === 'object' && !Array.isArray(v)) {
+    for (const [k, inner] of Object.entries(v as Record<string, unknown>)) appendParam(sp, `${key}[${k}]`, inner);
+    return;
+  }
+  sp.set(key, String(v));
+}
+
 function buildUrl(baseUrl: string, q: DataQuery): string {
   const sep = baseUrl.endsWith('/') ? '' : '/';
   const url = new URL(`${baseUrl}${sep}${encodeURIComponent(q.source)}`, baseUrl.startsWith('http') ? undefined : 'http://placeholder');
   if (q.params) {
-    for (const [k, v] of Object.entries(q.params)) {
-      if (v == null) continue;
-      url.searchParams.set(k, String(v));
-    }
+    for (const [k, v] of Object.entries(q.params)) appendParam(url.searchParams, k, v);
   }
   return baseUrl.startsWith('http') ? url.toString() : url.pathname + url.search;
 }

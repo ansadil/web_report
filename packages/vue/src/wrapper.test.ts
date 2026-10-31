@@ -21,3 +21,28 @@ describe('Vue wrappers', () => {
     expect(customElements.get('reports-builder')).toBeTruthy();
   });
 });
+
+describe('Vue ReportViewer params prop', () => {
+  it('passes params to the element, updates on change and emits parameters-error', async () => {
+    const { createApp, nextTick, ref } = await import('vue');
+    const params = ref<Record<string, unknown>>({ year: 2026 });
+    const errors: unknown[] = [];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const app = createApp({
+      render: () => h(ReportViewer, { schema: null, params: params.value, onParametersError: (d: unknown) => errors.push(d) }),
+    });
+    app.mount(host);
+    await nextTick();
+    const el = host.querySelector('reports-viewer') as HTMLElement & { params: unknown };
+    expect(el.params).toEqual({ year: 2026 });
+    params.value = { year: 2027 };
+    await nextTick();
+    await nextTick();
+    expect(el.params).toEqual({ year: 2027 });
+    el.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: 'x', issues: [] } }));
+    expect(errors).toEqual([{ error: 'x', issues: [] }]);
+    app.unmount();
+    host.remove();
+  });
+});

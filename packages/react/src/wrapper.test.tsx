@@ -19,3 +19,28 @@ describe('React wrappers', () => {
     expect(customElements.get('reports-builder')).toBeTruthy();
   });
 });
+
+describe('React ReportViewer params prop', () => {
+  it('passes params to the element and forwards parameters-error', async () => {
+    const { act } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const errors: unknown[] = [];
+    await act(async () => {
+      root.render(createElement(ReportViewer, { schema: null, params: { year: 2026 }, onParametersError: (d) => errors.push(d) }));
+    });
+    const el = host.querySelector('reports-viewer') as HTMLElement & { params: unknown };
+    expect(el.params).toEqual({ year: 2026 });
+    await act(async () => {
+      root.render(createElement(ReportViewer, { schema: null, params: { year: 2027 }, onParametersError: (d) => errors.push(d) }));
+    });
+    expect(el.params).toEqual({ year: 2027 });
+    el.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: 'x', issues: [] } }));
+    expect(errors).toEqual([{ error: 'x', issues: [] }]);
+    await act(async () => root.unmount());
+    host.remove();
+  });
+});

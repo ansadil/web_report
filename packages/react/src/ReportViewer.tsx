@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ReportsViewerElement } from '@reports-web/core';
+import type { ParameterIssue } from '@reports-web/core';
 import type { ReportViewerProps, ExportPayload, ExportKind } from './types.js';
 
 if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer')) {
@@ -8,7 +9,7 @@ if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer
 
 export function ReportViewer(props: ReportViewerProps) {
   const ref = useRef<ReportsViewerElement | null>(null);
-  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, onRendered, onExport, onExportError, className, style } = props;
+  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, onRendered, onExport, onExportError, onParametersError, className, style } = props;
 
   useEffect(() => {
     const el = ref.current;
@@ -22,7 +23,8 @@ export function ReportViewer(props: ReportViewerProps) {
     el.noToolbar = !!noToolbar;
     el.hideViewControls = !!hideViewControls;
     el.hidePageBoundaries = !!hidePageBoundaries;
-  }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries]);
+    el.params = params ?? null;
+  }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params]);
 
   useEffect(() => {
     const el = ref.current;
@@ -32,13 +34,16 @@ export function ReportViewer(props: ReportViewerProps) {
     const onErr = (e: Event) => onExportError?.((e as CustomEvent<{ kind: ExportKind; error: string }>).detail);
     el.addEventListener('report-rendered', onRender);
     el.addEventListener('export', onExp);
+    const onParams = (e: Event) => onParametersError?.((e as CustomEvent<{ error: string; issues: readonly ParameterIssue[] }>).detail);
     el.addEventListener('export-error', onErr);
+    el.addEventListener('parameters-error', onParams);
     return () => {
       el.removeEventListener('report-rendered', onRender);
       el.removeEventListener('export', onExp);
       el.removeEventListener('export-error', onErr);
+      el.removeEventListener('parameters-error', onParams);
     };
-  }, [onRendered, onExport, onExportError]);
+  }, [onRendered, onExport, onExportError, onParametersError]);
 
   return <reports-viewer ref={ref as unknown as React.Ref<HTMLElement>} className={className} style={style} />;
 }

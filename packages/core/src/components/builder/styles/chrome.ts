@@ -122,7 +122,9 @@ export const chromeStyles = css`
   .tic-relation, .tic-list { background: #efeafd; color: #6740c9; }
   .tic-static { background: #e8ecf3; color: #334155; }
   .dict-hint {
-    margin: 6px 10px 10px; padding: 8px 10px; border: 1px dashed #c8d6ea; border-radius: 8px; background: #f7faff; color: #4a5568; font-size: 11.5px; line-height: 1.5;
+    flex: none; box-sizing: border-box; max-width: 100%; margin: 0;
+    padding: 8px 10px; border: 1px dashed #c8d6ea; border-radius: 8px; background: #f7faff; color: #4a5568;
+    font-size: 11.5px; line-height: 1.5; overflow-wrap: anywhere;
   }
   .side-tabs { display: flex; border-bottom: 1px solid #dfe4ec; background: #f7f9fc; }
   .side-tabs button {

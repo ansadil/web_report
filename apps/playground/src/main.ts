@@ -2,6 +2,7 @@ import '@reports-web/core';
 import {
   createStaticAdapter,
   createLocalStorageAdapter,
+  t,
   type ReportSchemaV1,
   type ReportsViewerElement,
   type ReportsBuilderElement,
@@ -54,12 +55,18 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 function applySchema(schema: ReportSchemaV1): void {
-  const adjusted: ReportSchemaV1 = {
-    ...schema,
-    meta: { ...schema.meta, locale: state.locale, dir: state.locale === 'ar' ? 'rtl' : 'ltr' },
-  };
-  viewer.schema = adjusted;
-  builder.schema = adjusted;
+  viewer.schema = schema;
+  builder.schema = schema;
+}
+
+function paintChrome(): void {
+  const loc = state.locale;
+  $('btn-samples').textContent = t(loc, 'samples');
+  $('samples-heading').textContent = t(loc, 'sampleReports');
+  $('saved-heading').textContent = t(loc, 'savedReports');
+  $('datasets-heading').textContent = t(loc, 'datasetsHeading');
+  $('tips-heading').textContent = t(loc, 'tips');
+  $('tips-body').textContent = t(loc, 'sampleTips');
 }
 
 function renderReportsList(): void {
@@ -75,7 +82,7 @@ function renderReportsList(): void {
     `;
     (card.querySelector('.name') as HTMLElement).textContent = r.name[state.locale];
     (card.querySelector('.desc') as HTMLElement).textContent = r.description[state.locale];
-    (card.querySelector('.dataset') as HTMLElement).textContent = `${state.locale === 'ar' ? 'مصدر البيانات' : 'Dataset'}: ${r.dataset}`;
+    (card.querySelector('.dataset') as HTMLElement).textContent = `${t(state.locale, 'datasetLabel')}: ${r.dataset}`;
     card.addEventListener('click', () => {
       state.activeReportId = r.id;
       applySchema(r.build());
@@ -95,7 +102,7 @@ async function renderSavedList(): Promise<void> {
     list = [];
   }
   if (list.length === 0) {
-    container.innerHTML = `<div class="empty-msg">${state.locale === 'ar' ? 'لا توجد تقارير محفوظة' : 'No saved reports yet'}</div>`;
+    container.innerHTML = `<div class="empty-msg">${t(state.locale, 'noSavedReports')}</div>`;
     return;
   }
   for (const item of list) {
@@ -106,7 +113,7 @@ async function renderSavedList(): Promise<void> {
     nameSpan.textContent = item.name;
     const openBtn = document.createElement('button');
     openBtn.className = 'open-btn';
-    openBtn.textContent = state.locale === 'ar' ? 'فتح' : 'Open';
+    openBtn.textContent = t(state.locale, 'open');
     openBtn.addEventListener('click', async () => {
       try {
         const schema = await storage.load(item.id);
@@ -119,7 +126,7 @@ async function renderSavedList(): Promise<void> {
       }
     });
     const delBtn = document.createElement('button');
-    delBtn.textContent = state.locale === 'ar' ? 'حذف' : 'Delete';
+    delBtn.textContent = t(state.locale, 'delete');
     delBtn.addEventListener('click', async () => {
       await storage.delete?.(item.id);
       void renderSavedList();
@@ -151,13 +158,14 @@ function switchLocale(loc: Locale): void {
   state.locale = loc;
   const dir = loc === 'ar' ? 'rtl' : 'ltr';
   viewer.locale = loc;
-  viewer.dir = dir;
+  viewer.dir = '';
   builder.locale = loc;
   builder.dir = dir;
   document.documentElement.setAttribute('dir', dir);
   document.documentElement.setAttribute('lang', loc);
   $('btn-en').classList.toggle('active', loc === 'en');
   $('btn-ar').classList.toggle('active', loc === 'ar');
+  paintChrome();
   renderReportsList();
   void renderSavedList();
   renderDatasets();
@@ -226,10 +234,13 @@ document.addEventListener('keydown', (event) => {
 builder.addEventListener('locale-change', (event) => {
   const detail = (event as CustomEvent<{ locale: Locale; dir: 'rtl' | 'ltr' }>).detail;
   state.locale = detail.locale;
+  viewer.locale = detail.locale;
+  viewer.dir = '';
   document.documentElement.setAttribute('dir', detail.dir);
   document.documentElement.setAttribute('lang', detail.locale);
   $('btn-en').classList.toggle('active', detail.locale === 'en');
   $('btn-ar').classList.toggle('active', detail.locale === 'ar');
+  paintChrome();
   renderReportsList();
   void renderSavedList();
   renderDatasets();

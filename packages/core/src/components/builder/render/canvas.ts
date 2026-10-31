@@ -153,12 +153,16 @@ function elementLabel(state: CanvasState, cb: CanvasCallbacks, el: Exclude<Repor
   switch (el.kind) {
     case 'text':
       return el.value;
-    case 'field':
-      return `[${t(state.locale, 'field')}]`;
+    case 'field': {
+      const bound = el.field.trim();
+      const known = (state.fields ?? []).find((field) => field.name === bound);
+      if (!known) return `[${t(state.locale, 'field')}]`;
+      return `[${known.label?.trim() || bound}]`;
+    }
     case 'aggregate':
       return aggregateCaption(state, el.fn, el.field);
     case 'chart':
-      return `${el.type} chart`;
+      return t(state.locale, el.type === 'line' ? 'chartLine' : el.type === 'pie' ? 'chartPie' : el.type === 'doughnut' ? 'chartDoughnut' : 'chartBar');
     case 'expr':
       return cb.previewExpr(el);
     case 'image':

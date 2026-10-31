@@ -212,7 +212,19 @@ type StringKey =
   | 'fnCount'
   | 'fnAvg'
   | 'fnMin'
-  | 'fnMax';
+  | 'fnMax'
+  | 'chartBar'
+  | 'chartLine'
+  | 'chartPie'
+  | 'chartDoughnut'
+  | 'samples'
+  | 'sampleReports'
+  | 'savedReports'
+  | 'datasetsHeading'
+  | 'tips'
+  | 'sampleTips'
+  | 'datasetLabel'
+  | 'noSavedReports';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -428,6 +440,18 @@ const en: Record<StringKey, string> = {
   fnAvg: 'Average',
   fnMin: 'Min',
   fnMax: 'Max',
+  chartBar: 'Bar chart',
+  chartLine: 'Line chart',
+  chartPie: 'Pie chart',
+  chartDoughnut: 'Doughnut chart',
+  samples: 'Samples',
+  sampleReports: 'Sample Reports',
+  savedReports: 'My Saved Reports',
+  datasetsHeading: 'Datasets',
+  tips: 'Tips',
+  sampleTips: 'Drag elements from the toolbox onto bands. Click an element to edit it in the property grid.',
+  datasetLabel: 'Dataset',
+  noSavedReports: 'No saved reports yet',
 };
 
 const ar: Record<StringKey, string> = {
@@ -644,6 +668,18 @@ const ar: Record<StringKey, string> = {
   fnAvg: 'متوسط',
   fnMin: 'أدنى',
   fnMax: 'أعلى',
+  chartBar: 'رسم بياني عمودي',
+  chartLine: 'رسم بياني خطي',
+  chartPie: 'رسم بياني دائري',
+  chartDoughnut: 'رسم بياني حلقي',
+  samples: 'عينات',
+  sampleReports: 'تقارير نموذجية',
+  savedReports: 'تقاريري المحفوظة',
+  datasetsHeading: 'مجموعات البيانات',
+  tips: 'تلميحات',
+  sampleTips: 'اسحب العناصر من صندوق الأدوات إلى الأشرطة. انقر عنصرًا لتعديله في جدول الخصائص.',
+  datasetLabel: 'مصدر البيانات',
+  noSavedReports: 'لا توجد تقارير محفوظة',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

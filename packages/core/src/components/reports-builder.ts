@@ -1,5 +1,4 @@
 import { LitElement } from 'lit';
-import { commitSchema } from './builder/ops/commands.js';
 import { property, state } from 'lit/decorators.js';
 import type { FieldMeta, LocaleTag, Row } from '@reports-web/shared';
 import {
@@ -179,10 +178,6 @@ export class ReportsBuilderElement extends LitElement {
     const dir = next === 'ar' ? 'rtl' : 'ltr';
     this.locale = next;
     this.dir = dir;
-    commitSchema(this.session, {
-      ...this.session.schema,
-      meta: { ...this.session.schema.meta, locale: next, dir },
-    });
     this.dispatchEvent(new CustomEvent('locale-change', { bubbles: true, composed: true, detail: { locale: next, dir } }));
   }
 

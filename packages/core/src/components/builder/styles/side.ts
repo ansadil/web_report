@@ -66,7 +66,9 @@ export const sideStyles = css`    aside.left {
       display: flex;
       flex-direction: column;
       flex: 1 1 auto;
+      min-width: 0;
       min-height: 0;
+      overflow: hidden;
       gap: 8px;
     }
     .side-fill[hidden] { display: none !important; }

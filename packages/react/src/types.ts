@@ -1,5 +1,5 @@
 import type { Row } from '@reports-web/shared';
-import type { ReportSchemaV1, DataAdapter, StorageAdapter, ChartAdapter } from '@reports-web/core';
+import type { ReportSchemaV1, DataAdapter, StorageAdapter, ChartAdapter, ParameterValues, ParameterIssue } from '@reports-web/core';
 
 export type ExportKind = 'pdf' | 'excel' | 'csv' | 'png' | 'print';
 
@@ -21,11 +21,15 @@ export interface ReportViewerProps {
   hideViewControls?: boolean;
   /** Continuous scroll without stacked page sheets (matches attribute `hide-page-boundaries`). */
   hidePageBoundaries?: boolean;
+  /** Report parameter values (by `ParameterDef.name`), merged into `DataQuery.params`; changes trigger a refetch. */
+  params?: ParameterValues;
   className?: string;
   style?: React.CSSProperties;
   onRendered?: (info: { sections: number; rows: number }) => void;
   onExport?: (payload: ExportPayload) => void;
   onExportError?: (error: { kind: ExportKind; error: string }) => void;
+  /** Required/invalid parameter values; no fetch is made. */
+  onParametersError?: (detail: { error: string; issues: readonly ParameterIssue[] }) => void;
 }
 
 export interface ReportBuilderProps {

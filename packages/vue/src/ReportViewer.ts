@@ -1,3 +1,4 @@
+import type { LocaleTag } from '@reports-web/shared';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue';
 import { ReportsViewerElement } from '@reports-web/core';
 import type { ReportViewerProps } from './types.js';
@@ -13,7 +14,7 @@ export const ReportViewer = defineComponent({
     rows: { type: Array as PropType<ReportViewerProps['rows']>, default: undefined },
     dataAdapter: { type: Object as PropType<ReportViewerProps['dataAdapter']>, default: undefined },
     chartAdapter: { type: Object as PropType<ReportViewerProps['chartAdapter']>, default: undefined },
-    locale: { type: String as PropType<'ar' | 'en'>, default: undefined },
+    locale: { type: String as PropType<LocaleTag>, default: undefined },
     dir: { type: String as PropType<'rtl' | 'ltr'>, default: undefined },
     noToolbar: { type: Boolean, default: false },
     hideViewControls: { type: Boolean, default: false },

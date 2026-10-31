@@ -1,4 +1,4 @@
-import type { Locale } from '@reports-web/shared';
+import { uiLanguage, type LocaleTag } from '@reports-web/shared';
 
 type StringKey =
   | 'export'
@@ -328,8 +328,9 @@ const ar: Record<StringKey, string> = {
   sendBackward: 'تأخير',
 };
 
-export function t(locale: Locale, key: StringKey): string {
-  return (locale === 'ar' ? ar : en)[key];
+/** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */
+export function t(locale: LocaleTag | undefined, key: StringKey): string {
+  return (uiLanguage(locale) === 'ar' ? ar : en)[key];
 }
 
 export type { StringKey };

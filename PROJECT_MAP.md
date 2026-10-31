@@ -1,7 +1,7 @@
 # Reports Web — PROJECT_MAP
 
 > الذاكرة الخارجية للمشروع. مصدر الحقيقة الوحيد للقرارات المعمارية.
-> آخر تحديث: 2026-05-12 · المالك: Tech Lead · الحالة: **v0.4.0 — Viewer: تكبير/تصغير + تنقل بين أقسام العرض، 118 اختبار أخضر**
+> آخر تحديث: 2026-10-31 · المالك: Tech Lead · الحالة: **v0.1.0** (pre-1.0). الترخيص مملوك (`UNLICENSED`)، وليس مفتوح المصدر. عدد الاختبارات يُقاس بـ `pnpm test`.
 
 ---
 
@@ -26,9 +26,9 @@
 | **Collapsible Panels (v0.3)** | ✅ | Left (Toolbox) + Right (Properties) قابلان للطي إلى rail 40px مع keyboard-accessible toggles |
 | **Customizable Toolbar Actions (v0.3)** | ✅ | `actions` property على Viewer (`['print','pdf','excel','csv','image']`) و Builder (`['save','json','preview']`) + قائمة Customize تفاعلية بالـ ⚙ cog |
 | **Band properties in Builder (v0.3.1)** | ✅ | خصائص المستند تشمل كل أشرطة التقرير (ارتفاع، فصل صفحة قبل/بعد، تفعيل/إزالة اختيارية) + مجموعات (حقل التجميع، إعادة ترقيم صفحة، رأس/تذييل مجموعة)؛ `reports-builder-sections.test.ts` |
-| **Viewer zoom + section nav (v0.4.0)** | ✅ | شريط العارض: تصغير/تكبير (50٪–200٪)، عرض النسبة، ملء العرض، تنقل سابق/تالي بين `section.rw-section` مع عدّاد «i / n»؛ طباعة تعيد zoom=1؛ `hide-view-controls`؛ `viewer-view-controls.test.ts` |
+| **Viewer zoom + section nav** | ✅ | شريط العارض: تصغير/تكبير (50٪–200٪)، عرض النسبة، ملء العرض، تنقل سابق/تالي بين `section.rw-section` مع عدّاد «i / n»؛ طباعة تعيد zoom=1؛ `hide-view-controls`؛ `viewer-view-controls.test.ts` |
 
-**إجمالي الاختبارات: 118 (Pass) عبر 19 ملف اختبار، 4 حزم.**
+الاختبارات تُحسب بـ `pnpm test` على الحزم الأربع. لا يُثبَّت إجمالي هنا حتى لا يختلف عن الـ suite.
 
 ---
 
@@ -287,18 +287,11 @@ pnpm playground
 
 ---
 
-## [TESTS] — حصر فعلي
+## [TESTS]
 
-```
-@reports-web/shared    1 file   10 tests
-@reports-web/core     16 files 102 tests
-@reports-web/react     1 file    3 tests
-@reports-web/vue       1 file    3 tests
-──────────────────────────────────────
-Total                 19 files 118 tests       PASS
-```
+عدد الاختبارات الافتراضي يُقاس بـ `pnpm test` على `@reports-web/shared` و `@reports-web/core` و `@reports-web/react` و `@reports-web/vue`. لا يُكتب إجمالي ثابت في هذه الخريطة (رقم 118 القديم لم يعد مطابقاً).
 
-### تغطية بالميزة
+### تغطية بالميزة (فهرس، وليس جرداً حيّاً)
 
 | الميزة | ملف الاختبار | عدد |
 |---|---|---|
@@ -308,7 +301,7 @@ Total                 19 files 118 tests       PASS
 | **Watermark schema (v0.2)** | `schema/watermark.test.ts` | 8 |
 | **Toolbar UX (v0.3): actions filter + collapsible panels + a11y** | `components/toolbar.test.ts` | 8 |
 | **Builder: root + group band props UI (v0.3.1)** | `components/reports-builder-sections.test.ts` | 4 |
-| **Viewer: zoom + section toolbar (v0.4.0)** | `components/viewer-view-controls.test.ts` | 3 |
+| **Viewer: zoom + section toolbar** | `components/viewer-view-controls.test.ts` | 3 |
 | Expression evaluator | `engine/expression.test.ts` | 14 |
 | Aggregator + groupRows | `engine/aggregator.test.ts` | 6 |
 | Interpreter (bands, groups, visibleWhen, expr) | `engine/interpreter.test.ts` | 6 |
@@ -396,7 +389,7 @@ export function ViewerClient({ schema }) {
 - ✅ Async non-blocking Logger مع 4 مستويات + redaction
 - ✅ **Watermark (v0.2)**: text/image، نص ثابت أو expression محسوب، يُرسم على كل صفحة HTML + PDF
 - ✅ **Builder Property Editor كامل (v0.2)**: Document (description/locale/dir) + Page (size/orientation/margins) + Watermark + كل خصائص العنصر (style مع font/underline/padding/border-4-sides + visibleWhen + conditional rules editor + per-kind props كاملة)
-- ✅ **118 اختبار آلي**
+- ✅ اختبارات آلية (`pnpm test`)
 - ✅ 2 أمثلة تكامل واقعية (Laravel Blade + Next.js App Router)
 - ✅ Playground build جاهز للنشر
 
@@ -406,7 +399,9 @@ export function ViewerClient({ schema }) {
 
 ## [CHANGELOG]
 
-### v0.4.0 — 2026-05-12 (Viewer zoom + section navigation)
+إصدار `package.json` لكل الحزم هو 0.1.0 (pre-1.0). عناوين v0.2.0 و v0.3.0 أدناه معالم تطوير داخلية ولم تُنشر كإصدارات npm. لا يوجد إصدار منشور v0.4.0.
+
+### Viewer zoom + section navigation — 2026-05-12
 
 **Surgical changes** (+3 اختبارات):
 

@@ -244,7 +244,7 @@ export function renderHtml(
   if (!opts.visualPages) {
     // Continuous scroll: number each section by the visual page it would fall on.
     const sections = chunks
-      .flatMap((chunkSecs, i) => chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages })))
+      .flatMap((chunkSecs, i) => chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })))
       .join('');
     const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
     const html = `<article class="rw-report" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleScroll}">${watermark}${sections}</article>`;
@@ -253,7 +253,7 @@ export function renderHtml(
 
   const sheets = chunks
     .map((chunkSecs, i) => {
-      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages })).join('');
+      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })).join('');
       const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
       return `<div class="rw-page-visual-sheet"><article class="rw-report rw-report-page" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleSheet}">${watermark}${secHtml}</article></div>`;
     })

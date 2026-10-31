@@ -17,7 +17,8 @@
     "typecheck": "pnpm -r --workspace-concurrency=1 --filter=./packages/* run typecheck",
     "lint": "pnpm -r --if-present --filter=./packages/* run lint",
     "playground": "pnpm --filter=@reports-web/playground dev",
-    "clean": "pnpm -r exec rimraf dist .turbo node_modules/.vite"
+    "clean": "pnpm -r exec rimraf dist .turbo node_modules/.vite",
+    "test:qa": "pnpm --filter=@reports-web/core run test:qa"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

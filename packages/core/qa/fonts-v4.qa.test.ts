@@ -369,7 +369,7 @@ const FAMILIES_23 = [...SELECTABLE, undefined] as const;
  *  splits a line into one run per glyph (tashkeel) — the contiguous drawn sequence contains it. */
 const drawnVisual = (runs: string[], logical: string) =>
   drawnContainsVisual(runs, logical) || inkOnly(runs.join('')).includes(visualOrderRtl(logical));
-const BUG25 = (family: string | undefined) => family === 'Noto Naskh Arabic';
+const BUG25 = (_family: string | undefined) => false;
 const HAS_PDFTOTEXT = (() => { try { execFileSync('pdftotext', ['-v'], { stdio: 'ignore' }); return true; } catch { return false; } })();
 /** every char of `got` (multiset) occurs in `want` — "no junk", independent of completeness */
 const subBag = (got: string, want: string) => {
@@ -456,7 +456,7 @@ describe.skipIf(!HAS_API)('BUG-22 subset tags (ISO 32000-1 §9.6.4: distinct tag
 
 // ------------------------------------------------------------------------------------------
 type Warning = { code: string; message: string; family?: string; url?: string };
-const W = (code: string, family: string, url: string) => ({ code, family, url, message: expect.any(String) });
+const W = (code: string, family: string, url: string) => ({ code, family, url, weight: expect.any(Number), style: 'normal', message: expect.any(String) });
 
 describe.skipIf(!HAS_API)('FONTS-B fontsBaseUrl', () => {
   let dir: string;

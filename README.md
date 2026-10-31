@@ -72,6 +72,21 @@ import { ReportViewer } from '@reports-web/react';
 
 `ReportBuilder` is exported from the same package.
 
+## Fonts in bundled apps (offline)
+
+Fonts (`fonts.json`, WOFF2 for the UI, TTF for PDF) ship in `@reports-web/core/assets/fonts/`. The default `fontsBaseUrl` is resolved from the core module's URL, which is right in Node and when the package is served unbundled, but a bundler (Vite, webpack, …) moves that module. If your app bundles the library:
+
+1. Copy `node_modules/@reports-web/core/assets/fonts/` into your build output (e.g. `public/assets/fonts/` or a copy step), so it is served from your own origin.
+2. Pass that folder explicitly to `<reports-viewer>` and `<reports-builder>` (the viewer passes it on to PDF export; call `exportPdf({ …, fontsBaseUrl })` yourself if you use it directly):
+
+```ts
+const fontsBaseUrl = new URL('assets/fonts/', document.baseURI).href;
+viewer.fontsBaseUrl = fontsBaseUrl; // or the fonts-base-url attribute
+builder.fontsBaseUrl = fontsBaseUrl;
+```
+
+`apps/playground/vite.config.ts` shows a small Vite plugin that does the copy (and serves the folder in dev).
+
 ## Develop
 
 ```bash

@@ -23,7 +23,12 @@ const storage = createLocalStorageAdapter();
 viewer.dataAdapter = dataAdapter;
 builder.dataAdapter = dataAdapter;
 builder.storageAdapter = storage;
-viewer.fontsBaseUrl = builder.fontsBaseUrl;
+// Fonts copied/served by vite.config.ts at <base>/assets/fonts/ (BUG-35): pass the folder
+// explicitly instead of relying on the default derived from the bundled module's URL. The
+// viewer hands it to the PDF exporter too.
+const FONTS_BASE_URL = new URL('assets/fonts/', document.baseURI).href;
+builder.fontsBaseUrl = FONTS_BASE_URL;
+viewer.fontsBaseUrl = FONTS_BASE_URL;
 
 const state = {
   locale: 'en' as Locale,

@@ -204,7 +204,7 @@ export class CidFontWriter {
  * Whether text extractors give a glyph with this ToUnicode text no advance: pdf.js
  * (`buildTextContentItem`) skips format characters (\p{Cf}: ZWSP, ZWNJ, ZWJ, LRM, RLM...)
  * entirely and draws non-spacing marks (\p{Mn}) with width 0, whatever /W says; a leading
- * white-space character wins. Such glyphs are written with /W 0 (BUG-25).
+ * white-space character wins. Such glyphs get a small negative /W (BUG-25, BUG-26).
  */
 export function advancelessForExtractors(text: string): boolean {
   const m = /^(\s)|(\p{Mn})|(\p{Cf})$/u.exec(text || ZWSP);

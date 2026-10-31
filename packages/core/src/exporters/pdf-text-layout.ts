@@ -37,8 +37,14 @@ export interface ShapingFace {
   shape(text: string, start: number, end: number, rtl: boolean): readonly ShapedGlyph[];
 }
 
-/** Fallback chain: the first face is preferred for Arabic script, the rest for anything else. */
+/**
+ * Fallback chain. With a `primary` face (a family the report asked for) every code point it
+ * covers comes from it; the rest — and every code point when there is no primary — follows
+ * the Arabic/Latin rule below.
+ */
 export interface FaceChain {
+  /** Requested family; preferred for everything it has a glyph for. */
+  readonly primary?: ShapingFace;
   /** Face used for Arabic-script code points (letters, harakat, Arabic-Indic digits). */
   readonly arabic: ShapingFace;
   /** Face used for Latin letters, Western digits and general punctuation. */
@@ -87,6 +93,7 @@ interface Item {
 
 function pickFace(cp: number, ch: string, prev: ShapingFace | null, chain: FaceChain): ShapingFace {
   if (prev && MARK_OR_FORMAT_RE.test(ch)) return prev;
+  if (chain.primary?.hasCodePoint(cp)) return chain.primary;
   if (ARABIC_SCRIPT_RE.test(ch)) {
     return chain.arabic.hasCodePoint(cp) || !chain.latin.hasCodePoint(cp) ? chain.arabic : chain.latin;
   }
@@ -166,8 +173,14 @@ function clusterText(s: string, rtl: boolean): string {
 /**
  * Characters each glyph stands for (index-aligned with `shaped`). Inside a cluster, glyphs in
  * logical order take one character each and the last one takes the rest (so a ligature such
- * as lam-alef carries both letters); surplus glyphs of a decomposed cluster get ''.
+ * as lam-alef carries both letters). Surplus glyphs of a decomposed cluster (e.g. Noto Naskh
+ * draws ب as a skeleton glyph plus a separate dot glyph) get U+200B ZERO WIDTH SPACE: never
+ * an empty string, because an empty ToUnicode target makes pdf.js fall back to the raw CID
+ * as a character code (BUG-23: stray `#`, `%`, `Z`, U+0006 … in copied text).
  */
+/** ToUnicode text of a glyph that carries no character of its own (see {@link glyphTexts}). */
+export const GLYPH_WITHOUT_TEXT = '\u200B';
+
 function glyphTexts(
   shaped: readonly ShapedGlyph[],
   clusterEnd: ReadonlyMap<number, number>,
@@ -175,7 +188,7 @@ function glyphTexts(
   itemEnd: number,
   rtl: boolean,
 ): string[] {
-  const out: string[] = new Array<string>(shaped.length).fill('');
+  const out: string[] = new Array<string>(shaped.length).fill(GLYPH_WITHOUT_TEXT);
   const byCluster = new Map<number, number[]>();
   shaped.forEach((g, k) => {
     const list = byCluster.get(g.cluster) ?? [];

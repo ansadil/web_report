@@ -24,16 +24,21 @@ committed .ttf (same glyph set).
 
 Setup (pinned, see requirements in this docstring):
     python3 -m venv .venv-fonts
-    .venv-fonts/bin/pip install fonttools==4.68.0 brotli==1.2.1
+    .venv-fonts/bin/pip install fonttools==4.65.0 brotli==1.2.1
     .venv-fonts/bin/python scripts/subset-fonts.py            # download + build the TTFs
     .venv-fonts/bin/python scripts/subset-fonts.py --woff2    # … and the UI .woff2 files
     .venv-fonts/bin/python scripts/subset-fonts.py --check    # rebuild into a temp dir, diff
+
+fonttools is pinned to 4.65.0, the version the committed TTFs are verified against (`--check`
+in a fresh venv); QA saw different bytes with 4.68.0, so the script refuses any other version
+unless --any-fonttools is given.
 
 Options:
     --sources DIR   download cache (default: .cache/font-sources, git-ignored)
     --out DIR       output folder (default: packages/core/assets/fonts)
     --woff2         also write <Name>.woff2 (same subset, WOFF2 flavor)
     --check         build into a temp dir and fail if any output differs from --out
+    --any-fonttools skip the fonttools version check (outputs will likely differ)
 """
 from __future__ import annotations
 
@@ -48,11 +53,13 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
+import fontTools
 from fontTools import subset
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 
 ROOT = Path(__file__).resolve().parent.parent
+FONTTOOLS_VERSION = "4.65.0"  # the committed outputs are verified (--check) against this version
 GOOGLE_FONTS_COMMIT = "6c1dbe27dcf7d817d4b62cec033ba77fa8e2a5ec"  # google/fonts main, 2026-10-30
 RAW = f"https://raw.githubusercontent.com/google/fonts/{GOOGLE_FONTS_COMMIT}/"
 
@@ -211,7 +218,13 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=ROOT / "packages/core/assets/fonts")
     ap.add_argument("--woff2", action="store_true")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--any-fonttools", action="store_true")
     a = ap.parse_args()
+    if fontTools.version != FONTTOOLS_VERSION and not a.any_fonttools:
+        raise SystemExit(
+            f"fonttools {fontTools.version} found, {FONTTOOLS_VERSION} required "
+            f"(pip install fonttools=={FONTTOOLS_VERSION} brotli==1.2.1), or pass --any-fonttools"
+        )
     if not a.check:
         build(a.out, a.sources, a.woff2)
         for p in sorted(a.out.iterdir()):

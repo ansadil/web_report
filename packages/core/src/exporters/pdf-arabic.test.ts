@@ -65,7 +65,8 @@ async function readDrawnLines(bytes: Uint8Array): Promise<DrawnLine[]> {
         runs.push(cur);
       } else if (m[8] !== undefined && cur && font) {
         const hex = m[8]!.toUpperCase();
-        for (let i = 0; i < hex.length; i += 4) cur.text += font.uni.get(hex.slice(i, i + 4)) ?? '\uFFFD';
+        // U+200B is what text-less glyphs (e.g. Naskh's separate dots) map to (BUG-23): invisible.
+        for (let i = 0; i < hex.length; i += 4) cur.text += (font.uni.get(hex.slice(i, i + 4)) ?? '\uFFFD').replace(/\u200B/g, '');
       } else if (m[0] === 'ET') cur = null;
     }
     const byY = new Map<number, typeof runs>();
@@ -204,6 +205,25 @@ describe('BUG-21: explicit dir wins over the locale (PDF)', () => {
 
   it('English locale + dir rtl → RTL', async () => {
     expectDir(await draw({ name: 'T', locale: 'en', dir: 'rtl' }), 'rtl');
+  });
+});
+
+// Same corpus in each bundled family: the requested face draws what it covers, the Noto
+// fallback the rest (e.g. ٫ in Tajawal, ﷼ in Cairo), still one merged font per line.
+describe.each(['Cairo', 'Tajawal', 'Noto Naskh Arabic'])('PDF Arabic corpus in %s', (family) => {
+  let lines: DrawnLine[];
+  const corpus = [...CORPUS, 'الإجمالي ١٢٣٤٫٥٦ ﷼'];
+  beforeAll(async () => {
+    lines = await readDrawnLines(await pdfBytes(schema(corpus.map((t, i) => text(`c${i}`, t, i, { style: { font: family } })))));
+  });
+
+  it('every line is drawn in correct visual order with no missing ToUnicode entry', () => {
+    expect(lines.map((l) => l.visual)).toEqual(corpus.map((t) => expectedVisual(t, 'rtl')));
+  });
+
+  it('every line uses the one merged font led by the family', () => {
+    const stem = family.replace(/ /g, '');
+    for (const l of lines) expect(l.fonts, l.visual).toEqual([expect.stringMatching(new RegExp(`\\+${stem}-Regular$`))]);
   });
 });
 

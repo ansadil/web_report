@@ -54,6 +54,7 @@ export function createChartJsAdapter(): ChartAdapter {
     id: 'chartjs',
     render(host: HTMLCanvasElement, spec: ChartSpec): ChartHandle {
       ensureRegistered();
+      Chart.getChart(host)?.destroy();
       const isCircular = spec.type === 'pie' || spec.type === 'doughnut';
       const backgroundColor = isCircular
         ? spec.values.map((_, i) => DEFAULT_PALETTE[i % DEFAULT_PALETTE.length] as string)

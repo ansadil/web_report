@@ -19,24 +19,27 @@
         grid-template-rows: minmax(0, 1fr);
         height: 100vh;
       }
+      /* Column 1 is the inline-start side: right in Arabic, left in English. */
       #app.drawer-open { grid-template-columns: 280px minmax(0, 1fr); }
       #reports-list { display: block; }
       aside.sidebar {
         display: none;
-        grid-area: drawer;
-        position: static;
-        z-index: 1;
-        width: auto;
+        grid-column: 1;
+        grid-row: 1;
+        width: 280px;
+        min-width: 280px;
+        max-width: 280px;
         height: 100%;
         min-height: 0;
-        max-height: none;
         background: #fff;
         border-inline-end: 1px solid #e5e7eb;
         overflow: auto;
         padding: 16px;
-        box-shadow: none;
+        box-sizing: border-box;
       }
+      main.main { grid-column: 1; grid-row: 1; }
       #app.drawer-open aside.sidebar { display: block; }
+      #app.drawer-open main.main { grid-column: 2; }
       aside.sidebar h3 {
         font-size: 11px;
         text-transform: uppercase;

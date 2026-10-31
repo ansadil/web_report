@@ -529,6 +529,7 @@ export class ReportsViewerElement extends LitElement {
   }
 
   private _renderCharts(chartIds: readonly string[]): void {
+    this._destroyCharts();
     if (chartIds.length === 0) return;
     const adapter = this._resolveChartAdapter();
     const root = this._surface;

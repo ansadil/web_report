@@ -173,8 +173,14 @@ function clusterText(s: string, rtl: boolean): string {
 /**
  * Characters each glyph stands for (index-aligned with `shaped`). Inside a cluster, glyphs in
  * logical order take one character each and the last one takes the rest (so a ligature such
- * as lam-alef carries both letters); surplus glyphs of a decomposed cluster get ''.
+ * as lam-alef carries both letters). Surplus glyphs of a decomposed cluster (e.g. Noto Naskh
+ * draws ب as a skeleton glyph plus a separate dot glyph) get U+200B ZERO WIDTH SPACE: never
+ * an empty string, because an empty ToUnicode target makes pdf.js fall back to the raw CID
+ * as a character code (BUG-23: stray `#`, `%`, `Z`, U+0006 … in copied text).
  */
+/** ToUnicode text of a glyph that carries no character of its own (see {@link glyphTexts}). */
+export const GLYPH_WITHOUT_TEXT = '\u200B';
+
 function glyphTexts(
   shaped: readonly ShapedGlyph[],
   clusterEnd: ReadonlyMap<number, number>,
@@ -182,7 +188,7 @@ function glyphTexts(
   itemEnd: number,
   rtl: boolean,
 ): string[] {
-  const out: string[] = new Array<string>(shaped.length).fill('');
+  const out: string[] = new Array<string>(shaped.length).fill(GLYPH_WITHOUT_TEXT);
   const byCluster = new Map<number, number[]>();
   shaped.forEach((g, k) => {
     const list = byCluster.get(g.cluster) ?? [];

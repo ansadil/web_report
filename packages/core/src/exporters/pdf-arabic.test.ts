@@ -65,7 +65,8 @@ async function readDrawnLines(bytes: Uint8Array): Promise<DrawnLine[]> {
         runs.push(cur);
       } else if (m[8] !== undefined && cur && font) {
         const hex = m[8]!.toUpperCase();
-        for (let i = 0; i < hex.length; i += 4) cur.text += font.uni.get(hex.slice(i, i + 4)) ?? '\uFFFD';
+        // U+200B is what text-less glyphs (e.g. Naskh's separate dots) map to (BUG-23): invisible.
+        for (let i = 0; i < hex.length; i += 4) cur.text += (font.uni.get(hex.slice(i, i + 4)) ?? '\uFFFD').replace(/\u200B/g, '');
       } else if (m[0] === 'ET') cur = null;
     }
     const byY = new Map<number, typeof runs>();

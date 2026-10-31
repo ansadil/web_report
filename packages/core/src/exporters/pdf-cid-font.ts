@@ -119,7 +119,10 @@ export class CidFontWriter {
     });
     const program = mergeTrueType(parts, buildCmapFormat4(cmap));
 
-    const tag = subsetTag(this.entries.map((e) => `${e.src}:${e.gid}`).join(','));
+    const tag = uniqueSubsetTag(pdf, [
+      ...sources.map(({ font }) => `${font.postscriptName ?? ''}/${font.numGlyphs}/${font.unitsPerEm}`),
+      ...this.entries.map((e) => `${e.src}:${e.gid}`),
+    ].join(','));
     const baseName = `${tag}+${(primary.postscriptName ?? 'Font').replace(/[^A-Za-z0-9-]/g, '')}`;
     const s = 1000 / primary.unitsPerEm;
     const r = (n: number): number => Math.round(n * s);
@@ -214,6 +217,24 @@ function encodeSubset(subset: unknown): Promise<Uint8Array> {
   });
 }
 
+/** Subset tags already used per document: ISO 32000-1 §9.6.4 wants a distinct tag per subset. */
+const usedTags = new WeakMap<PDFDocument, Set<string>>();
+
+/**
+ * Subset tag (`ABCDEF`) for one embedded subset, unique within `pdf` (BUG-22). The seed holds
+ * the source fonts' identity (PostScript name, glyph count, units/em) and the used glyphs, so
+ * e.g. Cairo-Regular and Cairo-Bold drawing the same glyph ids no longer share a tag; a
+ * remaining collision in the same document is re-hashed.
+ */
+function uniqueSubsetTag(pdf: PDFDocument, seed: string): string {
+  let used = usedTags.get(pdf);
+  if (!used) usedTags.set(pdf, (used = new Set()));
+  let tag = subsetTag(seed);
+  for (let n = 1; used.has(tag); n++) tag = subsetTag(`${seed}#${n}`);
+  used.add(tag);
+  return tag;
+}
+
 function subsetTag(seed: string): string {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619) >>> 0;
@@ -225,6 +246,8 @@ function subsetTag(seed: string): string {
   return tag;
 }
 
+const ZWSP = '\u200B';
+
 function utf16Hex(text: string): string {
   let s = '';
   for (let i = 0; i < text.length; i++) s += text.charCodeAt(i).toString(16).padStart(4, '0');
@@ -235,9 +258,12 @@ function utf16Hex(text: string): string {
 export function buildToUnicode(texts: readonly string[]): string {
   const pairs: string[] = [];
   texts.forEach((t, cid) => {
-    // Glyphs that carry no characters of their own (e.g. the second glyph of a decomposed
-    // cluster) map to an empty string so extractors do not invent a character for them.
-    if (cid > 0 || t) pairs.push(`<${cid.toString(16).padStart(4, '0')}> <${utf16Hex(t)}>`);
+    // Never an empty target (BUG-23): pdf.js treats `<cid> <>` as "no mapping" and falls back
+    // to the CID as a character code. Glyphs without characters of their own (surplus glyphs
+    // of a decomposed cluster) map to U+200B ZERO WIDTH SPACE instead. CID 0 (.notdef) without
+    // text is left unmapped.
+    if (cid === 0 && !t) return;
+    pairs.push(`<${cid.toString(16).padStart(4, '0')}> <${utf16Hex(t || ZWSP)}>`);
   });
   const blocks: string[] = [];
   for (let i = 0; i < pairs.length; i += 100) {

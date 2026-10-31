@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { elementStatusName, formatCursorMm, formatPageIndicator, formatSelectionSummary, formatZoomPercent } from './status-bar.js';
+import { resolveIntlLocale } from '@reports-web/shared';
+import { elementStatusName, formatCursorMm, formatLocalizedNumber, formatPageIndicator, formatSelectionSummary, formatZoomPercent } from './status-bar.js';
 
 describe('designer status bar', () => {
   it('formats zoom as a whole percent', () => {
@@ -30,5 +31,18 @@ describe('designer status bar', () => {
   it('formats the page indicator as n / m', () => {
     expect(formatPageIndicator(1, 1)).toBe('1 / 1');
     expect(formatPageIndicator(2, 4)).toBe('2 / 4');
+  });
+
+  it('uses Intl digits for the report locale and مم in Arabic', () => {
+    const ar = { locale: 'ar', digits: 'locale' as const };
+    const latn = { locale: 'ar-SA', digits: 'latn' as const };
+    expect(formatLocalizedNumber(12, ar, 1)).toMatch(/[٠-٩]/);
+    expect(formatCursorMm({ x: 12, y: 3.26 }, ar)).toBe(
+      `${formatLocalizedNumber(12, ar, 1)} × ${formatLocalizedNumber(3.26, ar, 1)} مم`,
+    );
+    expect(formatCursorMm({ x: 12, y: 3.26 }, latn)).toBe('12.0 × 3.3 مم');
+    expect(formatZoomPercent(1, ar)).toBe(new Intl.NumberFormat(resolveIntlLocale('ar'), { style: 'percent', maximumFractionDigits: 0, useGrouping: false }).format(1));
+    expect(formatPageIndicator(2, 4, latn)).toBe('2 / 4');
+    expect(formatSelectionSummary({ name: 'عنوان', w: 10, h: 5 }, latn)).toBe('عنوان · 10.0 × 5.0 مم');
   });
 });

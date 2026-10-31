@@ -79,6 +79,12 @@ function renderMarquee(state: CanvasState, band: BandKey) {
   return html`<div class="marquee" data-testid="marquee" style="${style}"></div>`;
 }
 
+function kindLabel(el: ReportElement): 'text' | 'field' | 'image' | 'chart' | 'expression' | 'aggregate' | 'line' | 'box' | 'qr' | 'barcode' | 'html' | 'markdown' {
+  if (el.kind === 'expr') return 'expression';
+  if (el.kind === 'richtext') return el.mode === 'markdown' ? 'markdown' : 'html';
+  return el.kind;
+}
+
 function elementLabel(state: CanvasState, cb: CanvasCallbacks, el: Exclude<ReportElement, { kind: 'line' }>): string {
   switch (el.kind) {
     case 'text':
@@ -137,13 +143,14 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
       <div
         class="element line ${isSel ? 'selected' : ''}"
         data-testid=${`element-${el.id}`}
+        data-kind="line"
         data-orientation=${el.orientation}
         style=${boxStyle}
         @click=${(e: MouseEvent) => e.stopPropagation()}
         @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}
         @pointerdown=${onPointerDown}
       >
-        <span class="kind">${el.kind}</span>
+        <span class="kind">${t(state.locale, 'line')}</span>
         ${showHandles ? html`<span class="el-name" data-testid="element-name">${el.kind}</span>` : nothing}
         <div class="line-stroke" style=${strokeStyle}></div>
         ${showHandles
@@ -174,6 +181,7 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     ${el.style?.background ? `background:${el.style.background};` : ''}
     ${el.style?.bold ? 'font-weight:700;' : ''}
     ${el.style?.italic ? 'font-style:italic;' : ''}
+    ${el.style?.underline ? 'text-decoration:underline;' : ''}
     ${el.style?.align ? `text-align:${el.style.align === 'end' ? 'right' : el.style.align === 'center' ? 'center' : el.style.align === 'start' ? 'left' : 'justify'};` : ''}
     ${canvasDecor ? `;${canvasDecor}` : ''}
   `;
@@ -182,14 +190,15 @@ function renderElement(state: CanvasState, cb: CanvasCallbacks, band: BandKey, e
     <div
       class="element ${isSel ? 'selected' : ''} ${el.kind === 'richtext' ? 'richtext' : ''}"
       data-testid=${`element-${el.id}`}
+      data-kind=${el.kind}
       style="${style}"
       @click=${(e: MouseEvent) => e.stopPropagation()}
       @contextmenu=${(e: MouseEvent) => cb.onElementContextMenu(e, band, el.id)}
       @pointerdown=${onPointerDown}
     >
-      <span class="kind">${el.kind}</span>
+      <span class="kind">${t(state.locale, kindLabel(el))}</span>
       ${showHandles ? html`<span class="el-name" data-testid="element-name">${label}</span>` : nothing}
-      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''}">${label}</div>
+      <div class="el-body ${el.kind === 'richtext' ? 'element-preview' : ''} ${el.style?.valign ? `valign-${el.style.valign}` : ''}">${label}</div>
       ${showHandles
         ? html`<div class="resize-handles" aria-hidden="true">
             ${RESIZE_HANDLE_KINDS.map(

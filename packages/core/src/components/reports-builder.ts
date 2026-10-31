@@ -145,7 +145,10 @@ export class ReportsBuilderElement extends LitElement {
   private _paintCursor(): void {
     const node = this.renderRoot.querySelector('[data-testid="status-cursor-value"]');
     if (!node) return;
-    node.textContent = formatCursorMm(this._cursorMm);
+    node.textContent = formatCursorMm(this._cursorMm, {
+      locale: this._uiLocale,
+      digits: this._schema.meta.pageNumberDigits ?? 'locale',
+    });
   }
 
   private _queueCursor(point: { x: number; y: number } | null): void {

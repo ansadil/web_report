@@ -1,7 +1,9 @@
 import { createStaticAdapter, logger, resolveLabel, validateReport } from '../api.js';
 import type { ReportSchemaV1 } from '../api.js';
+import { emptySchema } from '../factory.js';
+import { newId } from '../ids.js';
 import type { BuilderSession } from '../session.js';
-import { replaceSchema } from './commands.js';
+import { clearSelection, replaceSchema } from './commands.js';
 
 export async function loadFields(session: BuilderSession): Promise<void> {
   if (session.schema.fields.length > 0) {
@@ -53,6 +55,45 @@ export async function saveReport(session: BuilderSession): Promise<void> {
     }
   }
   session.dispatchEvent(new CustomEvent('save', { detail: { schema: finalSchema } }));
+}
+
+export function newReport(session: BuilderSession): void {
+  const fresh = emptySchema();
+  fresh.meta = {
+    ...fresh.meta,
+    locale: session.schema.meta.locale,
+    dir: session.schema.meta.dir,
+    ...(session.schema.meta.pageNumberDigits ? { pageNumberDigits: session.schema.meta.pageNumberDigits } : {}),
+  };
+  clearSelection(session);
+  replaceSchema(session, fresh, { resetHistory: true });
+}
+
+export function openReportText(session: BuilderSession, text: string): void {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    session.dispatchEvent(new CustomEvent('save-error', { detail: { error: 'invalid JSON' } }));
+    return;
+  }
+  const validated = validateReport(parsed);
+  if (!validated.ok) {
+    session.dispatchEvent(new CustomEvent('save-error', { detail: { error: validated.error } }));
+    return;
+  }
+  clearSelection(session);
+  replaceSchema(session, validated.value, { resetHistory: true });
+}
+
+export function saveAsCopy(session: BuilderSession): void {
+  const next: ReportSchemaV1 = {
+    ...session.schema,
+    id: newId('report'),
+    meta: { ...session.schema.meta, name: `${session.schema.meta.name} (2)` },
+  };
+  replaceSchema(session, next);
+  void saveReport(session);
 }
 
 export function exportJson(session: BuilderSession): void {

@@ -103,7 +103,7 @@ describe('playground designer stays on the local origin', () => {
       const root = document.querySelector('reports-builder')!.shadowRoot!;
       const rows: { kind: string; text: string; w: number; h: number; overflow: number }[] = [];
       for (const el of root.querySelectorAll<HTMLElement>('.element')) {
-        const kind = el.querySelector('.kind')?.textContent ?? '';
+        const kind = el.getAttribute('data-kind') ?? '';
         if (kind !== 'text' && kind !== 'field') continue;
         const body = el.querySelector('.el-body');
         if (!body?.firstChild) {

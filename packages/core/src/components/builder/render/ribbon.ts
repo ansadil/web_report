@@ -1,8 +1,24 @@
 import type { LocaleTag } from '@reports-web/shared';
-import { html } from 'lit';
+import { html, type TemplateResult } from 'lit';
 import { icon, t, toolIconForKind } from '../api.js';
+import type { Style } from '../api.js';
+import type { ArrangeMode } from '../ops/arrange.js';
 import { TOOL_KINDS, type RibbonTab, type ToolKind } from '../types.js';
 import { renderActions, type ActionsCallbacks, type ActionsState } from './toolbar.js';
+
+const FONT_FAMILIES = ['Cairo', 'Tajawal', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Noto Sans'] as const;
+
+export interface RibbonFontState {
+  enabled: boolean;
+  family: string;
+  size: number;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  color: string;
+  align: Style['align'] | '';
+  valign: NonNullable<Style['valign']> | '';
+}
 
 export interface RibbonState {
   locale: LocaleTag;
@@ -14,6 +30,8 @@ export interface RibbonState {
   canBringForward: boolean;
   canSendToBack: boolean;
   canSendBackward: boolean;
+  selectionCount: number;
+  font: RibbonFontState;
 }
 
 export interface RibbonCallbacks {
@@ -30,17 +48,37 @@ export interface RibbonCallbacks {
   onInsertDragStart: (ev: DragEvent, kind: ToolKind) => void;
   onPortrait: () => void;
   onLandscape: () => void;
+  onNew: () => void;
+  onOpenText: (text: string) => void;
+  onSaveAs: () => void;
+  onArrange: (mode: ArrangeMode) => void;
+  onStyle: (patch: Partial<Style>) => void;
 }
 
-const TABS: { id: RibbonTab; label: 'ribbonHome' | 'ribbonInsert' | 'ribbonPage' | 'ribbonView' | 'preview' }[] = [
+const TABS: { id: RibbonTab; label: 'ribbonFile' | 'ribbonHome' | 'ribbonInsert' | 'ribbonLayout' | 'ribbonPage' | 'ribbonView' | 'preview' }[] = [
+  { id: 'file', label: 'ribbonFile' },
   { id: 'home', label: 'ribbonHome' },
   { id: 'insert', label: 'ribbonInsert' },
+  { id: 'layout', label: 'ribbonLayout' },
   { id: 'page', label: 'ribbonPage' },
   { id: 'view', label: 'ribbonView' },
   { id: 'preview', label: 'preview' },
 ];
 
+function colorInputValue(value: string): string {
+  const raw = value.trim();
+  const short = /^#([0-9a-fA-F]{3})$/.exec(raw);
+  if (short?.[1]) {
+    const [r, g, b] = short[1];
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : '#111111';
+}
+
 export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
+  const font = state.font;
+  const canAlign = state.selectionCount >= 2;
+  const canDistribute = state.selectionCount >= 3;
   return html`
     <div class="ribbon" data-testid="ribbon">
       <div class="ribbon-tabs" role="tablist">
@@ -58,45 +96,164 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
         )}
       </div>
       <div class="ribbon-body">
+        <div class="ribbon-pane" ?hidden=${state.tab !== 'file'}>
+          ${cluster(
+            state.locale,
+            'ribbonGroupFile',
+            html`
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-new" @click=${cb.onNew}>${icon('plus')}<span>${t(state.locale, 'newReport')}</span></button>
+              <label class="ribbon-cmd">
+                ${icon('download')}<span>${t(state.locale, 'open')}</span>
+                <input
+                  class="ribbon-file"
+                  type="file"
+                  accept="application/json,.json"
+                  data-testid="ribbon-open-file"
+                  @change=${(ev: Event) => readOpenFile(ev, cb.onOpenText)}
+                />
+              </label>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-save" @click=${cb.actions.onSave}>${icon('save')}<span>${t(state.locale, 'save')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-save-as" @click=${cb.onSaveAs}>${icon('copy')}<span>${t(state.locale, 'saveAs')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-file-export" @click=${cb.actions.onExportJson}>${icon('json')}<span>${t(state.locale, 'export')}</span></button>
+            `,
+          )}
+        </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'home'}>
           ${renderActions(state.actions, cb.actions)}
-          <div class="ribbon-group">
-            ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
-            ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
-            ${cmd(state.locale, 'paste', 'paste', 'paste', !state.canPaste, cb.onPaste)}
-            ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete)}
-            ${cmd(state.locale, 'bring-to-front', 'bringToFront', 'bringToFront', !state.canBringToFront, cb.onBringToFront)}
-            ${cmd(state.locale, 'bring-forward', 'bringForward', 'bringForward', !state.canBringForward, cb.onBringForward)}
-            ${cmd(state.locale, 'send-to-back', 'sendToBack', 'sendToBack', !state.canSendToBack, cb.onSendToBack)}
-            ${cmd(state.locale, 'send-backward', 'sendBackward', 'sendBackward', !state.canSendBackward, cb.onSendBackward)}
-          </div>
+          ${cluster(
+            state.locale,
+            'ribbonGroupClipboard',
+            html`
+              ${cmd(state.locale, 'cut', 'cut', 'cut', !state.canCut, cb.onCut)}
+              ${cmd(state.locale, 'copy', 'copy', 'copy', !state.canCut, cb.onCopy)}
+              ${cmd(state.locale, 'paste', 'paste', 'paste', !state.canPaste, cb.onPaste)}
+              ${cmd(state.locale, 'delete', 'trash', 'delete', !state.canCut, cb.onDelete)}
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'ribbonGroupFont',
+            html`
+              <select
+                data-testid="ribbon-font-family"
+                ?disabled=${!font.enabled}
+                @change=${(ev: Event) => cb.onStyle({ font: (ev.target as HTMLSelectElement).value || undefined })}
+              >
+                <option value="" ?selected=${font.family === ''}>—</option>
+                ${FONT_FAMILIES.map((family) => html`<option value=${family} ?selected=${font.family === family}>${family}</option>`)}
+              </select>
+              <input
+                data-testid="ribbon-font-size"
+                type="number"
+                min="4"
+                max="96"
+                ?disabled=${!font.enabled}
+                .value=${String(font.size)}
+                @change=${(ev: Event) => cb.onStyle({ fontSize: Number((ev.target as HTMLInputElement).value) })}
+              />
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-font-bold" aria-pressed=${font.bold ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ bold: !font.bold })}><span>${t(state.locale, 'bold')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-font-italic" aria-pressed=${font.italic ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ italic: !font.italic })}><span>${t(state.locale, 'italic')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-font-underline" aria-pressed=${font.underline ? 'true' : 'false'} ?disabled=${!font.enabled} @click=${() => cb.onStyle({ underline: !font.underline })}><span>${t(state.locale, 'underline')}</span></button>
+              <input data-testid="ribbon-font-color" type="color" ?disabled=${!font.enabled} .value=${colorInputValue(font.color)} @input=${(ev: Event) => cb.onStyle({ color: (ev.target as HTMLInputElement).value })} />
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'ribbonGroupAlign',
+            html`
+              ${alignBtn(state, 'alignStart', 'start', font.align === 'start', cb)}
+              ${alignBtn(state, 'alignCenter', 'center', font.align === 'center', cb)}
+              ${alignBtn(state, 'alignEnd', 'end', font.align === 'end', cb)}
+              ${alignBtn(state, 'alignJustify', 'justify', font.align === 'justify', cb)}
+              ${valignBtn(state, 'valignStart', 'start', font.valign === 'start', cb)}
+              ${valignBtn(state, 'valignCenter', 'center', font.valign === 'center', cb)}
+              ${valignBtn(state, 'valignEnd', 'end', font.valign === 'end', cb)}
+            `,
+          )}
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'insert'}>
-          <div class="ribbon-insert">
-            ${TOOL_KINDS.map((tool) => {
-              const label = t(state.locale, tool.labelKey);
-              return html`
-                <button
-                  type="button"
-                  class="ribbon-insert-btn"
-                  draggable="true"
-                  data-testid=${`ribbon-btn-insert-${tool.kind}`}
-                  title=${label}
-                  aria-label=${label}
-                  @dragstart=${(e: DragEvent) => cb.onInsertDragStart(e, tool.kind)}
-                >${toolIconForKind(tool.kind)}<span>${label}</span></button>
-              `;
-            })}
-          </div>
+          ${cluster(
+            state.locale,
+            'ribbonGroupInsert',
+            html`<div class="ribbon-insert">
+              ${TOOL_KINDS.map((tool) => {
+                const label = t(state.locale, tool.labelKey);
+                return html`
+                  <button
+                    type="button"
+                    class="ribbon-insert-btn"
+                    draggable="true"
+                    data-testid=${`ribbon-btn-insert-${tool.kind}`}
+                    title=${label}
+                    aria-label=${label}
+                    @dragstart=${(e: DragEvent) => cb.onInsertDragStart(e, tool.kind)}
+                  >${toolIconForKind(tool.kind)}<span>${label}</span></button>
+                `;
+              })}
+            </div>`,
+          )}
+        </div>
+        <div class="ribbon-pane" ?hidden=${state.tab !== 'layout'}>
+          ${cluster(
+            state.locale,
+            'ribbonGroupArrange',
+            html`
+              ${arrange(state.locale, 'align-start', 'alignStart', !canAlign, () => cb.onArrange('start'))}
+              ${arrange(state.locale, 'align-center', 'alignCenter', !canAlign, () => cb.onArrange('center'))}
+              ${arrange(state.locale, 'align-end', 'alignEnd', !canAlign, () => cb.onArrange('end'))}
+              ${arrange(state.locale, 'align-top', 'alignTop', !canAlign, () => cb.onArrange('top'))}
+              ${arrange(state.locale, 'align-middle', 'alignMiddle', !canAlign, () => cb.onArrange('middle'))}
+              ${arrange(state.locale, 'align-bottom', 'alignBottom', !canAlign, () => cb.onArrange('bottom'))}
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'ribbonGroupDistribute',
+            html`
+              ${arrange(state.locale, 'distribute-h', 'distributeH', !canDistribute, () => cb.onArrange('distribute-h'))}
+              ${arrange(state.locale, 'distribute-v', 'distributeV', !canDistribute, () => cb.onArrange('distribute-v'))}
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'ribbonGroupSize',
+            html`
+              ${arrange(state.locale, 'same-width', 'sameWidth', !canAlign, () => cb.onArrange('same-width'))}
+              ${arrange(state.locale, 'same-height', 'sameHeight', !canAlign, () => cb.onArrange('same-height'))}
+              ${arrange(state.locale, 'same-size', 'sameSize', !canAlign, () => cb.onArrange('same-size'))}
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'ribbonGroupOrder',
+            html`
+              ${cmd(state.locale, 'bring-to-front', 'bringToFront', 'bringToFront', !state.canBringToFront, cb.onBringToFront)}
+              ${cmd(state.locale, 'bring-forward', 'bringForward', 'bringForward', !state.canBringForward, cb.onBringForward)}
+              ${cmd(state.locale, 'send-to-back', 'sendToBack', 'sendToBack', !state.canSendToBack, cb.onSendToBack)}
+              ${cmd(state.locale, 'send-backward', 'sendBackward', 'sendBackward', !state.canSendBackward, cb.onSendBackward)}
+            `,
+          )}
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'page'}>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-portrait" @click=${cb.onPortrait}>${icon('portrait')}<span>${t(state.locale, 'portrait')}</span></button>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-landscape" @click=${cb.onLandscape}>${icon('landscape')}<span>${t(state.locale, 'landscape')}</span></button>
+          ${cluster(
+            state.locale,
+            'ribbonGroupPage',
+            html`
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-portrait" @click=${cb.onPortrait}>${icon('portrait')}<span>${t(state.locale, 'portrait')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-landscape" @click=${cb.onLandscape}>${icon('landscape')}<span>${t(state.locale, 'landscape')}</span></button>
+            `,
+          )}
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'view'}>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-out" @click=${cb.actions.onZoomOut}>${icon('zoomOut')}<span>${t(state.locale, 'zoomOut')}</span></button>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-in" @click=${cb.actions.onZoomIn}>${icon('zoomIn')}<span>${t(state.locale, 'zoomIn')}</span></button>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-reset" @click=${cb.actions.onZoomReset}>${icon('fitWidth')}<span>${t(state.locale, 'zoomReset')}</span></button>
+          ${cluster(
+            state.locale,
+            'ribbonGroupZoom',
+            html`
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-out" @click=${cb.actions.onZoomOut}>${icon('zoomOut')}<span>${t(state.locale, 'zoomOut')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-in" @click=${cb.actions.onZoomIn}>${icon('zoomIn')}<span>${t(state.locale, 'zoomIn')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-view-zoom-reset" @click=${cb.actions.onZoomReset}>${icon('fitWidth')}<span>${t(state.locale, 'zoomReset')}</span></button>
+            `,
+          )}
         </div>
         <div class="ribbon-pane" ?hidden=${state.tab !== 'preview'}>
           <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-tab" @click=${cb.actions.onPreview}>${icon('eye')}<span>${t(state.locale, 'preview')}</span></button>
@@ -104,6 +261,34 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
       </div>
     </div>
   `;
+}
+
+function cluster(locale: LocaleTag, caption: Parameters<typeof t>[1], body: TemplateResult) {
+  return html`<div class="ribbon-cluster"><div class="ribbon-group">${body}</div><span class="ribbon-caption">${t(locale, caption)}</span></div>`;
+}
+
+function alignBtn(
+  state: RibbonState,
+  label: 'alignStart' | 'alignCenter' | 'alignJustify' | 'alignEnd',
+  value: NonNullable<Style['align']>,
+  pressed: boolean,
+  cb: RibbonCallbacks,
+) {
+  return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-align-${value}`} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ align: value })}><span>${t(state.locale, label)}</span></button>`;
+}
+
+function valignBtn(
+  state: RibbonState,
+  label: 'valignStart' | 'valignCenter' | 'valignEnd',
+  value: NonNullable<Style['valign']>,
+  pressed: boolean,
+  cb: RibbonCallbacks,
+) {
+  return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-valign-${value}`} aria-pressed=${pressed ? 'true' : 'false'} ?disabled=${!state.font.enabled} @click=${() => cb.onStyle({ valign: value })}><span>${t(state.locale, label)}</span></button>`;
+}
+
+function arrange(locale: LocaleTag, id: string, label: Parameters<typeof t>[1], disabled: boolean, action: () => void) {
+  return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-btn-${id}`} ?disabled=${disabled} @click=${action}><span>${t(locale, label)}</span></button>`;
 }
 
 function cmd(
@@ -115,4 +300,12 @@ function cmd(
   action: () => void,
 ) {
   return html`<button type="button" class="ribbon-cmd" data-testid=${`ribbon-btn-${id}`} ?disabled=${disabled} @click=${action}>${icon(iconName)}<span>${t(locale, labelKey)}</span></button>`;
+}
+
+async function readOpenFile(ev: Event, onOpenText: (text: string) => void): Promise<void> {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  onOpenText(await file.text());
 }

@@ -116,7 +116,44 @@ type StringKey =
   | 'comingLater'
   | 'statusCursor'
   | 'statusSelection'
-  | 'statusPage';
+  | 'statusPage'
+  | 'ribbonFile'
+  | 'ribbonLayout'
+  | 'ribbonGroupFile'
+  | 'ribbonGroupClipboard'
+  | 'ribbonGroupFont'
+  | 'ribbonGroupAlign'
+  | 'ribbonGroupInsert'
+  | 'ribbonGroupPage'
+  | 'ribbonGroupZoom'
+  | 'ribbonGroupArrange'
+  | 'ribbonGroupDistribute'
+  | 'ribbonGroupSize'
+  | 'ribbonGroupOrder'
+  | 'newReport'
+  | 'open'
+  | 'saveAs'
+  | 'alignStart'
+  | 'alignCenter'
+  | 'alignEnd'
+  | 'alignJustify'
+  | 'alignTop'
+  | 'alignMiddle'
+  | 'alignBottom'
+  | 'distributeH'
+  | 'distributeV'
+  | 'sameWidth'
+  | 'sameHeight'
+  | 'sameSize'
+  | 'valignStart'
+  | 'valignCenter'
+  | 'valignEnd'
+  | 'typeString'
+  | 'typeNumber'
+  | 'typeDate'
+  | 'typeBool'
+  | 'typeImage'
+  | 'unitMm';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -236,6 +273,43 @@ const en: Record<StringKey, string> = {
   bringForward: 'Bring forward',
   sendToBack: 'Send to back',
   sendBackward: 'Send backward',
+  ribbonFile: 'File',
+  ribbonLayout: 'Layout',
+  ribbonGroupFile: 'File',
+  ribbonGroupClipboard: 'Clipboard',
+  ribbonGroupFont: 'Font',
+  ribbonGroupAlign: 'Alignment',
+  ribbonGroupInsert: 'Insert',
+  ribbonGroupPage: 'Page setup',
+  ribbonGroupZoom: 'Zoom',
+  ribbonGroupArrange: 'Align',
+  ribbonGroupDistribute: 'Distribute',
+  ribbonGroupSize: 'Size',
+  ribbonGroupOrder: 'Order',
+  newReport: 'New',
+  open: 'Open',
+  saveAs: 'Save as',
+  alignStart: 'Start',
+  alignCenter: 'Center',
+  alignEnd: 'End',
+  alignJustify: 'Justify',
+  alignTop: 'Top',
+  alignMiddle: 'Middle',
+  alignBottom: 'Bottom',
+  distributeH: 'Horizontal',
+  distributeV: 'Vertical',
+  sameWidth: 'Width',
+  sameHeight: 'Height',
+  sameSize: 'Both',
+  valignStart: 'Top',
+  valignCenter: 'Middle',
+  valignEnd: 'Bottom',
+  typeString: 'string',
+  typeNumber: 'number',
+  typeDate: 'date',
+  typeBool: 'bool',
+  typeImage: 'image',
+  unitMm: 'mm',
 };
 
 const ar: Record<StringKey, string> = {
@@ -250,7 +324,7 @@ const ar: Record<StringKey, string> = {
   fields: 'الحقول',
   toolbox: 'الأدوات',
   properties: 'الخصائص',
-  preview: 'معاينة',
+  preview: 'المعاينة',
   ribbonHome: 'الرئيسية',
   ribbonInsert: 'إدراج',
   ribbonPage: 'الصفحة',
@@ -356,6 +430,43 @@ const ar: Record<StringKey, string> = {
   bringForward: 'تقديم',
   sendToBack: 'إرسال للخلف',
   sendBackward: 'تأخير',
+  ribbonFile: 'ملف',
+  ribbonLayout: 'التخطيط',
+  ribbonGroupFile: 'ملف',
+  ribbonGroupClipboard: 'الحافظة',
+  ribbonGroupFont: 'الخط',
+  ribbonGroupAlign: 'المحاذاة',
+  ribbonGroupInsert: 'إدراج',
+  ribbonGroupPage: 'إعداد الصفحة',
+  ribbonGroupZoom: 'التكبير',
+  ribbonGroupArrange: 'محاذاة',
+  ribbonGroupDistribute: 'توزيع',
+  ribbonGroupSize: 'الحجم',
+  ribbonGroupOrder: 'الترتيب',
+  newReport: 'جديد',
+  open: 'فتح',
+  saveAs: 'حفظ باسم',
+  alignStart: 'البداية',
+  alignCenter: 'الوسط',
+  alignEnd: 'النهاية',
+  alignJustify: 'ضبط',
+  alignTop: 'أعلى',
+  alignMiddle: 'منتصف',
+  alignBottom: 'أسفل',
+  distributeH: 'أفقي',
+  distributeV: 'رأسي',
+  sameWidth: 'العرض',
+  sameHeight: 'الارتفاع',
+  sameSize: 'الاثنان',
+  valignStart: 'أعلى',
+  valignCenter: 'منتصف',
+  valignEnd: 'أسفل',
+  typeString: 'نص',
+  typeNumber: 'رقم',
+  typeDate: 'تاريخ',
+  typeBool: 'منطقي',
+  typeImage: 'صورة',
+  unitMm: 'مم',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

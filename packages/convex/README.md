@@ -91,7 +91,7 @@ try {
 ```ts
 import { createConvexDataAdapter } from '@reports-web/convex';
 
-// A query taking { source: string, params: any }, returning rows (or { rows }).
+// A query taking `reportDataArgs` ({ source, params }), returning rows (or { rows }).
 const data = createConvexDataAdapter({ client, query: api.reports.rows });
 // ...or an HTTP action that receives a JSON POST { source, params }
 const http = createConvexDataAdapter({ httpUrl: 'https://<deployment>.convex.site/reports/data', headers: async () => ({ authorization: `Bearer ${await getToken()}` }) });
@@ -101,6 +101,14 @@ The adapter sends the report's resolved parameters. `Date`s become ISO strings a
 dropped. Failures come back as `Error('Convex data source "<source>" failed: …')`, with the original error
 as `cause`. An aborted `AbortSignal` rejects right away. A Convex one-shot query cannot be cancelled, so its
 result is simply ignored. `describe` (a static object or an async function) is optional.
+
+`reportDataArgs` (from `@reports-web/convex/server`) checks the **shape** only: `params` must be an object whose
+values are strings, numbers, booleans, `null`, arrays of those, or a dateRange `{ from?, to? }` with at least one
+end. A string, `null` or nested objects are rejected. It does not know the report's parameter definitions
+(required, `min`/`max`, options), so re-check anything security-relevant in your handler.
+
+Dates are calendar dates in the viewer's `timeZone` (IANA name, default `Asia/Riyadh`, never the browser's zone).
+Relative presets such as `thisMonth` use the Gregorian calendar only; Hijri (Umm al-Qura) periods are not supported.
 
 ## Example: Nuxt 3 + Convex (Madar)
 

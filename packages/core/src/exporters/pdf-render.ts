@@ -685,9 +685,15 @@ async function usesBundledFamily(tree: RenderTree, fonts: FontSession): Promise<
   }
 }
 
-export async function renderPdf({ schema, rows, fontsBaseUrl, onWarning }: PdfExportInput): Promise<Blob> {
+export async function renderPdf({ schema, rows, fontsBaseUrl, onWarning, params, timeZone, printedAt }: PdfExportInput): Promise<Blob> {
   const pdf = await PDFDocument.create();
-  const tree = interpret({ schema, rows });
+  const tree = interpret({
+    schema,
+    rows,
+    ...(params ? { params } : {}),
+    ...(timeZone ? { timeZone } : {}),
+    ...(printedAt !== undefined ? { printedAt } : {}),
+  });
   const fonts = new FontSession(fontLibrary(fontsBaseUrl), onWarning ?? defaultPdfWarning);
   const useUnicode = needsUnicodePdfFont(tree, schema) || (await usesBundledFamily(tree, fonts));
   /**

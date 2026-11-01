@@ -28,6 +28,15 @@ export interface PdfExportInput {
    * `console.error` and the export continues.
    */
   readonly onWarning?: (warning: PdfWarning) => void;
+  /**
+   * Resolved report parameter values (see `resolveParameterValues`), as on screen: `{المعاملات.الفترة}`,
+   * `{المعاملات.الفرع}` and `params.<name>` expressions read them. Omitted -> parameter tokens print the placeholder.
+   */
+  readonly params?: Readonly<Record<string, unknown>>;
+  /** IANA zone for `{التاريخ}` / `{التاريخ.هجري}` and `now()`. Default `Asia/Riyadh`. */
+  readonly timeZone?: string;
+  /** When the report is printed; default now. Pass the on-screen value so the PDF matches the viewer. */
+  readonly printedAt?: Date | string | number;
 }
 
 /**

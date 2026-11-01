@@ -185,6 +185,9 @@ viewer.addEventListener('report-rendered', () => {
   if (!builder.previewing) return;
   requestAnimationFrame(() => requestAnimationFrame(() => viewer.fitSheet()));
 });
+builder.addEventListener('request-print', () => {
+  void viewer.exportTo('print');
+});
 builder.addEventListener('ribbon-tab', (event) => {
   const tab = (event as CustomEvent<{ tab: string }>).detail.tab;
   if (tab !== 'preview') builder.previewing = false;

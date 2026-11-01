@@ -251,6 +251,9 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
           session.dispatchEvent(new CustomEvent('request-preview'));
         },
       },
+      onPreviewPrint: () => {
+        session.dispatchEvent(new CustomEvent('request-print', { bubbles: true, composed: true }));
+      },
       onCut: () => {
         cutSelected(session);
       },

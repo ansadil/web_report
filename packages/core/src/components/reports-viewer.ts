@@ -360,6 +360,8 @@ export class ReportsViewerElement extends LitElement {
   @state() private _fieldErrors: Record<string, string> = {};
   @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
   @state() private _rowCount = 0;
+  private _lastRows: readonly Row[] | null = null;
+  private _placeholderParams = false;
 
   @query('.surface') private _surface!: HTMLDivElement;
 
@@ -411,6 +413,7 @@ export class ReportsViewerElement extends LitElement {
         });
       });
     }
+    if (changed.has('_error') && this._error) queueMicrotask(() => this.fitSheet());
     if ((changed.has('_html') || changed.has('_phase')) && this._phase === 'ready') {
       queueMicrotask(() => this._syncPageNavState());
     }
@@ -456,12 +459,16 @@ export class ReportsViewerElement extends LitElement {
     };
 
     this._phase = 'loading';
+    const placeholder = this._placeholderParams;
+    this._placeholderParams = false;
     try {
       let rows: readonly Row[];
       // Resolved parameter values for `params.<name>` in expressions (only for templates that declare parameters).
       let params: Readonly<Record<string, unknown>> | undefined;
       const paramOptions = this._paramOptions;
-      if (this.rows) {
+      if (placeholder && this._lastRows) {
+        rows = this._lastRows;
+      } else if (this.rows) {
         rows = this.rows;
         if (finalSchema.parameters?.length) {
           const resolved = resolveParameterValues(finalSchema.parameters, this.params, paramOptions);
@@ -475,14 +482,17 @@ export class ReportsViewerElement extends LitElement {
         // a newer render (e.g. parameter change) superseded this one
         if (abort.signal.aborted) return;
       }
-      const tree = interpret({ schema: finalSchema, rows, ...(params ? { params } : {}) });
+      const tree = interpret({ schema: finalSchema, rows, printedAt: new Date(), timeZone: paramOptions.timeZone, ...(params ? { params } : {}) });
       const rendered = renderHtml(tree, { idPrefix: 'rw-v', visualPages: !this.hidePageBoundaries });
       this._html = rendered.html;
       this._chartIds = [...rendered.chartIds];
       this._codeIds = [...rendered.codeIds];
       this._rowCount = rows.length;
-      this._error = '';
-      this._fieldErrors = {};
+      this._lastRows = rows;
+      if (!placeholder) {
+        this._error = '';
+        this._fieldErrors = {};
+      }
       this._phase = 'ready';
       await this.updateComplete;
       this._renderCharts(this._chartIds);
@@ -835,6 +845,8 @@ export class ReportsViewerElement extends LitElement {
     this._fieldErrors = { ...result.fieldErrors };
     if (!result.ok) {
       this._error = parametersBannerText(result.errors, this._locale);
+      this._placeholderParams = true;
+      if (this._lastRows) void this._renderReport();
       this.dispatchEvent(new CustomEvent('parameters-error', {
         detail: { error: this._error, issues: result.errors, fieldErrors: result.fieldErrors },
         bubbles: true,

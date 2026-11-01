@@ -11,6 +11,8 @@ import type { AggregateRequest } from './aggregator.js';
 import { computeAggregates, groupRows } from './aggregator.js';
 import { resolveCodePayload } from './code-payload.js';
 import { tryEvaluate } from './expression.js';
+import { replaceReportTokens, type ReportTokenContext } from './report-tokens.js';
+import { DEFAULT_TIME_ZONE } from './time-zone.js';
 import { markdownToHtml } from './markdown-html.js';
 import { substituteFieldPlaceholders } from './template-fields.js';
 import { logger } from '../logging/logger.js';
@@ -142,14 +144,14 @@ function applyConditional(el: ReportElement, ctx: { row?: Row; aggregates?: Reco
 
 function renderElement(
   el: ReportElement,
-  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag; groupRows?: readonly Row[] },
+  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag; groupRows?: readonly Row[]; tokens: ReportTokenContext },
 ): RenderElement | null {
   if (!evalCondition(el.visibleWhen, ctx)) return null;
   const style = applyConditional(el, ctx);
   const base: RenderElement = { kind: el.kind, id: el.id, pos: el.pos, style };
   switch (el.kind) {
     case 'text':
-      return { ...base, text: el.value };
+      return { ...base, text: replaceReportTokens(el.value, ctx.tokens) };
     case 'field': {
       const v = ctx.row?.[el.field];
       return { ...base, text: applyPattern(v, el.format, ctx.locale, el.formatOptions) };
@@ -229,7 +231,7 @@ function renderElement(
 function renderBand(
   band: Band | undefined,
   kind: BandKind,
-  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag; groupRows?: readonly Row[] },
+  ctx: { row?: Row; aggregates?: Record<string, unknown>; vars?: Record<string, unknown>; locale: LocaleTag; groupRows?: readonly Row[]; tokens: ReportTokenContext },
   groupInfo?: { key: string; value: unknown },
 ): RenderSection | null {
   if (!band) return null;
@@ -259,6 +261,8 @@ export interface InterpretInput {
    * `params.<name>` (e.g. `params.period.from`, `params.branch`). Omitted -> no `params` variable (unchanged behavior).
    */
   readonly params?: Readonly<Record<string, unknown>>;
+  /** IANA zone for `{التاريخ}` / `{التاريخ.هجري}`. Default `Asia/Riyadh`. */
+  readonly timeZone?: string;
 }
 
 function resolvePrintedAt(input?: Date | string | number): Date {
@@ -305,14 +309,27 @@ function resolveWatermark(
   return { kind: 'text', text, fontSize: wm.fontSize, color: wm.color, opacity: wm.opacity, rotation: wm.rotation };
 }
 
-export function interpret({ schema, rows, printedAt, params }: InterpretInput): RenderTree {
+export function interpret({ schema, rows, printedAt, params, timeZone }: InterpretInput): RenderTree {
   const t0 = performance.now();
   const aggRequests = collectAggregateRequests(schema);
   const aggregates = computeAggregates(rows, aggRequests);
   const dims = pageDims(schema.page.size, schema.page.orientation);
   const sections: RenderSection[] = [];
   const reportVars = buildReportEvalVars(schema, rows, printedAt, params);
-  const baseCtx = { aggregates, vars: reportVars, locale: schema.meta.locale };
+  const printed = resolvePrintedAt(printedAt);
+  const baseCtx = {
+    aggregates,
+    vars: reportVars,
+    locale: schema.meta.locale,
+    tokens: {
+      locale: schema.meta.locale,
+      timeZone: timeZone || DEFAULT_TIME_ZONE,
+      now: printed,
+      ...(params ? { params } : {}),
+      parameters: schema.parameters,
+      paramsResolved: params !== undefined,
+    },
+  };
   const watermark = resolveWatermark(schema.watermark, { schema, aggregates, printedAt, params });
 
   const reportHeader = renderBand(schema.bands.reportHeader, 'reportHeader', baseCtx);

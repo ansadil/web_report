@@ -127,6 +127,9 @@ type StringKey =
   | 'ribbonGroupInsert'
   | 'ribbonGroupPage'
   | 'ribbonGroupZoom'
+  | 'ribbonGroupPreview'
+  | 'ribbonGroupOutput'
+  | 'backToDesigner'
   | 'ribbonGroupArrange'
   | 'ribbonGroupDistribute'
   | 'ribbonGroupSize'
@@ -366,6 +369,9 @@ const en: Record<StringKey, string> = {
   ribbonGroupInsert: 'Insert',
   ribbonGroupPage: 'Page setup',
   ribbonGroupZoom: 'Zoom',
+  ribbonGroupPreview: 'Preview',
+  ribbonGroupOutput: 'Output',
+  backToDesigner: 'Back to designer',
   ribbonGroupArrange: 'Align',
   ribbonGroupDistribute: 'Distribute',
   ribbonGroupSize: 'Size',
@@ -606,6 +612,9 @@ const ar: Record<StringKey, string> = {
   ribbonGroupInsert: 'إدراج',
   ribbonGroupPage: 'إعداد الصفحة',
   ribbonGroupZoom: 'التكبير',
+  ribbonGroupPreview: 'المعاينة',
+  ribbonGroupOutput: 'الإخراج',
+  backToDesigner: 'العودة للمصمم',
   ribbonGroupArrange: 'محاذاة',
   ribbonGroupDistribute: 'توزيع',
   ribbonGroupSize: 'الحجم',

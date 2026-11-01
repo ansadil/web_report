@@ -33,6 +33,9 @@ export interface BuilderSession {
   readonly history: HistoryStore;
   readonly shadowRoot: ShadowRoot | null;
 
+  marginFeedback: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string }>>;
+  setMarginFeedback(next: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string }>>): void;
+
   touchHistory(): void;
   focus(): void;
   dispatchEvent(event: Event): boolean;

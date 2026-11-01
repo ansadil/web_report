@@ -1,7 +1,7 @@
 import type { LocaleTag } from '@reports-web/shared';
 import { html, nothing, type TemplateResult } from 'lit';
 import { icon, t } from '../../api.js';
-import { formatLocalizedNumber, parseLocalizedNumber } from '../../status-bar.js';
+import { formatLocalizedNumber } from '../../status-bar.js';
 import type { ReportSchemaV1 } from '../../api.js';
 import { renderGroupsBandsEditor, renderReportBandsEditor, type BandsCallbacks } from './bands.js';
 import { renderWatermarkEditor, type WatermarkCallbacks } from './watermark.js';
@@ -9,12 +9,13 @@ import { renderWatermarkEditor, type WatermarkCallbacks } from './watermark.js';
 export interface DocumentState {
   locale: LocaleTag;
   schema: ReportSchemaV1;
+  marginFeedback?: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string }>>;
 }
 
 export interface DocumentCallbacks extends BandsCallbacks, WatermarkCallbacks {
   updateMeta: (patch: Partial<ReportSchemaV1['meta']>) => void;
   updatePage: (patch: Partial<ReportSchemaV1['page']>) => void;
-  updateMargins: (patch: Partial<ReportSchemaV1['page']['margins']>) => void;
+  onMarginInput: (side: 'top' | 'right' | 'bottom' | 'left', raw: string) => void;
 }
 
 export function renderInspectorChrome(locale: DocumentState['locale'], onFilter: (event: Event) => void) {
@@ -65,9 +66,26 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
   const page = state.schema.page;
   const fmt = { locale: state.locale, digits: state.schema.meta.pageNumberDigits ?? ('locale' as const) };
   const cm = (mm: number) => formatLocalizedNumber(mm / 10, fmt, 2);
-  const readCm = (raw: string) => {
-    const n = parseLocalizedNumber(raw);
-    return Number.isFinite(n) ? n * 10 : 0;
+  const marginRow = (side: 'top' | 'right' | 'bottom' | 'left', label: string) => {
+    const feedback = state.marginFeedback?.[side];
+    const error = feedback?.error ?? '';
+    const errorId = `prop-margin-${side}-error`;
+    return html`
+      <div class="prow margin-row">
+        <span class="k" title=${label}>${label}</span>
+        <span class="v margin-v">
+          <input
+            data-testid=${`prop-margin-${side}`}
+            .value=${feedback ? feedback.raw : cm(page.margins[side])}
+            aria-invalid=${error ? 'true' : 'false'}
+            aria-describedby=${error ? errorId : nothing}
+            @input=${(e: Event) => cb.onMarginInput(side, (e.target as HTMLInputElement).value)}
+          />
+          <span class="u">${t(state.locale, 'unitCm')}</span>
+          ${error ? html`<p class="margin-error" id=${errorId} role="alert">${error}</p>` : nothing}
+        </span>
+      </div>
+    `;
   };
   return html`
     <div class="prop-grid" data-testid="property-grid">
@@ -77,21 +95,21 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
       </div>
       <div class="ptoggle"><button type="button" class="on">${t(state.locale, 'properties')}</button><button type="button">${t(state.locale, 'events')}</button></div>
       ${renderInspectorChrome(state.locale, filterPropRows)}
-      ${renderCategory(t(state.locale, 'page'), 6, html`
-        <div class="prow"><span class="k" title=${t(state.locale, 'paperSize')}>${t(state.locale, 'paperSize')}</span><span class="v"><select data-testid="prop-paper-size" @change=${(e: Event) => cb.updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>
+      ${renderCategory(t(state.locale, 'page'), 6, [
+        html`<div class="prow"><span class="k" title=${t(state.locale, 'paperSize')}>${t(state.locale, 'paperSize')}</span><span class="v"><select data-testid="prop-paper-size" @change=${(e: Event) => cb.updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>
           <option value="A4" ?selected=${page.size === 'A4'}>A4</option>
           <option value="A5" ?selected=${page.size === 'A5'}>A5</option>
           <option value="Letter" ?selected=${page.size === 'Letter'}>Letter</option>
-        </select></span></div>
-        <div class="prow"><span class="k" title=${t(state.locale, 'orientation')}>${t(state.locale, 'orientation')}</span><span class="v"><select data-testid="prop-page-orientation" @change=${(e: Event) => cb.updatePage({ orientation: (e.target as HTMLSelectElement).value as 'portrait' | 'landscape' })}>
+        </select></span></div>`,
+        html`<div class="prow"><span class="k" title=${t(state.locale, 'orientation')}>${t(state.locale, 'orientation')}</span><span class="v"><select data-testid="prop-page-orientation" @change=${(e: Event) => cb.updatePage({ orientation: (e.target as HTMLSelectElement).value as 'portrait' | 'landscape' })}>
           <option value="portrait" ?selected=${page.orientation === 'portrait'}>${t(state.locale, 'portrait')}</option>
           <option value="landscape" ?selected=${page.orientation === 'landscape'}>${t(state.locale, 'landscape')}</option>
-        </select></span></div>
-        <div class="prow"><span class="k" title=${t(state.locale, 'top')}>${t(state.locale, 'top')}</span><span class="v"><input data-testid="prop-margin-top" .value=${cm(page.margins.top)} @input=${(e: Event) => cb.updateMargins({ top: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-        <div class="prow"><span class="k" title=${t(state.locale, 'right')}>${t(state.locale, 'right')}</span><span class="v"><input data-testid="prop-margin-right" .value=${cm(page.margins.right)} @input=${(e: Event) => cb.updateMargins({ right: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-        <div class="prow"><span class="k" title=${t(state.locale, 'bottom')}>${t(state.locale, 'bottom')}</span><span class="v"><input data-testid="prop-margin-bottom" .value=${cm(page.margins.bottom)} @input=${(e: Event) => cb.updateMargins({ bottom: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-        <div class="prow"><span class="k" title=${t(state.locale, 'left')}>${t(state.locale, 'left')}</span><span class="v"><input data-testid="prop-margin-left" .value=${cm(page.margins.left)} @input=${(e: Event) => cb.updateMargins({ left: readCm((e.target as HTMLInputElement).value) })} /><span class="u">${t(state.locale, 'unitCm')}</span></span></div>
-      `, { testId: 'cat-page' })}
+        </select></span></div>`,
+        marginRow('top', t(state.locale, 'top')),
+        marginRow('right', t(state.locale, 'right')),
+        marginRow('bottom', t(state.locale, 'bottom')),
+        marginRow('left', t(state.locale, 'left')),
+      ], { testId: 'cat-page' })}
       ${renderCategory(t(state.locale, 'document'), 3, html`
         <div class="prow"><span class="k" title=${t(state.locale, 'description')}>${t(state.locale, 'description')}</span><span class="v"><input data-testid="prop-description" .value=${meta.description ?? ''} @input=${(e: Event) => cb.updateMeta({ description: (e.target as HTMLInputElement).value || undefined })} /></span></div>
         <div class="prow"><span class="k" title=${t(state.locale, 'locale')}>${t(state.locale, 'locale')}</span><span class="v"><select data-testid="prop-locale" @change=${(e: Event) => cb.updateMeta({ locale: (e.target as HTMLSelectElement).value })}>

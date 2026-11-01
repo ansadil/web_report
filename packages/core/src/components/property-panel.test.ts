@@ -78,4 +78,32 @@ describe('property panel details', () => {
     expect(getComputedStyle(label!).whiteSpace).not.toBe('nowrap');
     expect(label!.textContent).toBe('Horizontal alignment');
   });
+
+  it('BUG-57 rejects a 40cm left margin on A4 and still applies a valid margin', async () => {
+    builder = document.createElement('reports-builder');
+    document.body.appendChild(builder);
+    builder.locale = 'ar';
+    builder.dir = 'rtl';
+    builder.schema = schema();
+    await flush(builder);
+
+    const left = builder.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="prop-margin-left"]')!;
+    left.value = '40';
+    left.dispatchEvent(new Event('input', { bubbles: true }));
+    await flush(builder);
+
+    expect(builder.getSchema().page.margins.left).toBe(10);
+    const rejected = builder.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="prop-margin-left"]')!;
+    expect(rejected.getAttribute('aria-invalid')).toBe('true');
+    const error = builder.shadowRoot!.querySelector('#prop-margin-left-error')!;
+    expect(error.textContent).toContain('عرض الورقة');
+    expect(rejected.getAttribute('aria-describedby')).toBe('prop-margin-left-error');
+
+    rejected.value = '2';
+    rejected.dispatchEvent(new Event('input', { bubbles: true }));
+    await flush(builder);
+    expect(builder.getSchema().page.margins.left).toBe(20);
+    expect(builder.shadowRoot!.querySelector('[data-testid="prop-margin-left"]')!.getAttribute('aria-invalid')).toBe('false');
+    expect(builder.shadowRoot!.querySelector('#prop-margin-left-error')).toBeNull();
+  });
 });

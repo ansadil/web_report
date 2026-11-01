@@ -1,3 +1,4 @@
+import { applyPageSetup } from '../../../engine/page-setup.js';
 import { createStaticAdapter, logger, resolveLabel, t, validateReport } from '../api.js';
 import type { ReportSchemaV1 } from '../api.js';
 import { emptySchema } from '../factory.js';
@@ -88,7 +89,8 @@ export function openReportText(session: BuilderSession, text: string): void {
     return;
   }
   clearSelection(session);
-  replaceSchema(session, validated.value, { resetHistory: true });
+  const page = applyPageSetup(validated.value.page);
+  replaceSchema(session, page === validated.value.page ? validated.value : { ...validated.value, page }, { resetHistory: true });
 }
 
 export function saveAsCopy(session: BuilderSession): void {

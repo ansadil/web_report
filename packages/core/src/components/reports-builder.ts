@@ -17,6 +17,7 @@ import {
   replaceSchema,
   validateReport,
 } from './builder/index.js';
+import { applyPageSetup } from '../engine/page-setup.js';
 import type {
   BandKey,
   BuilderAction,
@@ -73,6 +74,7 @@ export class ReportsBuilderElement extends LitElement {
     reportTree: false,
   };
   @state() private _contextMenu: ContextMenuState | null = null;
+  @state() private _marginFeedback: BuilderSession['marginFeedback'] = {};
   @state() private _ribbonTab: RibbonTab = 'home';
   /** Painted into the status bar directly so a pointer move does not re-render the designer. */
   private _cursorMm: { x: number; y: number } | null = null;
@@ -134,7 +136,9 @@ export class ReportsBuilderElement extends LitElement {
     if (changed.has('schema') && this.schema) {
       const v = validateReport(this.schema);
       if (v.ok) {
-        replaceSchema(this.session, v.value, { resetHistory: true });
+        const page = applyPageSetup(v.value.page);
+        replaceSchema(this.session, page === v.value.page ? v.value : { ...v.value, page }, { resetHistory: true });
+        this._marginFeedback = {};
         schemaChanged = true;
       } else {
         logger.error('reports-builder', 'invalid initial schema', { error: v.error });
@@ -284,6 +288,7 @@ export class ReportsBuilderElement extends LitElement {
       this.focus();
     };
     const dispatchEvent = (event: Event) => this.dispatchEvent(event);
+    const readMarginFeedback = () => this._marginFeedback;
     return {
       get schema() {
         return schema();
@@ -410,6 +415,12 @@ export class ReportsBuilderElement extends LitElement {
       },
       get shadowRoot() {
         return shadowRoot();
+      },
+      get marginFeedback() {
+        return readMarginFeedback();
+      },
+      setMarginFeedback: (next) => {
+        this._marginFeedback = next;
       },
       touchHistory,
       focus,

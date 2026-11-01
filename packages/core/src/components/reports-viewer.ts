@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import { escapeHtml, type LocaleTag, type Row } from '@reports-web/shared';
+import { escapeHtml, uiLanguage, type LocaleTag, type Row } from '@reports-web/shared';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { validateReport } from '../schema/report-schema.js';
 import type { DataAdapter } from '../adapters/data/index.js';
@@ -23,6 +23,7 @@ import {
   type ParameterValues,
 } from '../engine/parameters.js';
 import { t } from '../i18n/strings.js';
+import { DEFAULT_TIME_ZONE, isValidTimeZone, resolveTimeZone } from '../engine/time-zone.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
@@ -302,6 +303,15 @@ export class ReportsViewerElement extends LitElement {
     }
   }
 
+  /** Options for parameter resolution: the host's time zone when valid, else the default (Asia/Riyadh). */
+  private get _paramOptions(): { timeZone: string } {
+    if (this.timeZone && !isValidTimeZone(this.timeZone)) {
+      logger.warn('reports-viewer', 'unknown time zone, using default', { timeZone: this.timeZone, default: DEFAULT_TIME_ZONE });
+      return { timeZone: DEFAULT_TIME_ZONE };
+    }
+    return { timeZone: resolveTimeZone(this.timeZone) };
+  }
+
   private get _locale(): LocaleTag {
     return resolveLocale(this.locale, this.schema?.meta);
   }
@@ -321,6 +331,12 @@ export class ReportsViewerElement extends LitElement {
    */
   @property({ attribute: false, hasChanged: (a: ParameterValues | null, b: ParameterValues | null) => !parameterValuesEqual(a, b) })
   params: ParameterValues | null = null;
+  /**
+   * IANA time zone for relative parameter presets (`today`, `thisMonth`, ...), for the calendar date of `Date` /
+   * zoned values given to date parameters, and for date-time bounds in messages. Attribute `time-zone`.
+   * Default `'Asia/Riyadh'` (not the browser's zone); an unknown zone falls back to the default with a warning.
+   */
+  @property({ type: String, attribute: 'time-zone' }) timeZone: string | undefined = undefined;
 
   @state() private _phase: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
   @state() private _error = '';
@@ -362,6 +378,7 @@ export class ReportsViewerElement extends LitElement {
       changed.has('rows') ||
       changed.has('dataAdapter') ||
       changed.has('params') ||
+      changed.has('timeZone') ||
       changed.has('locale') ||
       changed.has('dir') ||
       changed.has('hidePageBoundaries') ||
@@ -431,14 +448,15 @@ export class ReportsViewerElement extends LitElement {
       let rows: readonly Row[];
       // Resolved parameter values for `params.<name>` in expressions (only for templates that declare parameters).
       let params: Readonly<Record<string, unknown>> | undefined;
+      const paramOptions = this._paramOptions;
       if (this.rows) {
         rows = this.rows;
         if (finalSchema.parameters?.length) {
-          const resolved = resolveParameterValues(finalSchema.parameters, this.params);
+          const resolved = resolveParameterValues(finalSchema.parameters, this.params, paramOptions);
           if (resolved.ok) params = { ...(finalSchema.dataset.params ?? {}), ...resolved.values };
         }
       } else {
-        const query = buildDataQuery(finalSchema, this.params);
+        const query = buildDataQuery(finalSchema, this.params, paramOptions);
         if (finalSchema.parameters?.length) params = query.params;
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
         rows = await adapter.fetch(query, abort.signal);
@@ -462,9 +480,13 @@ export class ReportsViewerElement extends LitElement {
       this._error = e instanceof Error ? e.message : String(e);
       if (e instanceof ParameterValidationError) {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
-        // Show each localized message under its field. The summary banner is owned by the parameters fix.
-        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: this._locale });
-        this._fieldErrors = { ...fieldErrors };
+        // `fieldErrors` on the event stay in the report locale. The banner and the fields use the viewer locale.
+        const paramOptions = this._paramOptions;
+        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale, ...paramOptions });
+        const ui = this._locale;
+        const uiChecked = validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions });
+        this._fieldErrors = { ...uiChecked.fieldErrors };
+        this._error = parametersBannerText(uiChecked.errors, ui);
         this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
       } else {
         logger.error('reports-viewer', 'render failed', { error: this._error });
@@ -736,7 +758,7 @@ export class ReportsViewerElement extends LitElement {
       let rows = this.rows;
       if (!rows) {
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
-        rows = await adapter.fetch(buildDataQuery(finalSchema, this.params));
+        rows = await adapter.fetch(buildDataQuery(finalSchema, this.params, this._paramOptions));
       }
       if (kind === 'pdf') {
         const { exportPdf } = await import('../exporters/pdf.js');
@@ -911,6 +933,16 @@ export class ReportsViewerElement extends LitElement {
       </div>
     `;
   }
+}
+
+/**
+ * Error banner text for invalid parameters, built from the localized field errors (report / viewer locale), e.g.
+ * `قيم معاملات التقرير غير صالحة — الفرع: يجب إدخال الفرع؛ top: يجب ألا تزيد القيمة عن ٥٠` (labels bidi-isolated in Arabic).
+ */
+export function parametersBannerText(errors: readonly { readonly label: string; readonly message: string }[], locale: LocaleTag): string {
+  const ar = uiLanguage(locale) === 'ar';
+  const list = errors.map((e) => `${ar ? `\u2068${e.label}\u2069` : e.label}: ${e.message}`).join(ar ? '؛ ' : '; ');
+  return list ? `${t(locale, 'invalidParameters')} — ${list}` : t(locale, 'invalidParameters');
 }
 
 installDirOverride(ReportsViewerElement.prototype);

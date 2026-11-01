@@ -9,7 +9,8 @@ export interface ConvexDataRequest {
   /**
    * Resolved report parameters (`DataQuery.params`: `dataset.params` merged with the values from core's
    * `resolveParameterValues`, e.g. `{ period: { from: '2026-10-01', to: '2026-10-31' }, branch: 'riyadh' }`);
-   * `Date`s are ISO strings, `undefined` values are dropped. Validate with `reportDataArgs` from `@reports-web/convex/server`.
+   * `Date`s are ISO strings, `undefined` values are dropped. Check the shape with `reportDataArgs` from
+   * `@reports-web/convex/server` (scalars, arrays of scalars and `{ from?, to? }` only).
    */
   readonly params: Record<string, unknown>;
 }

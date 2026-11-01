@@ -11,7 +11,7 @@ import {
 import { validateReport } from '../schema/report-schema.js';
 import type { DataAdapter } from '../adapters/data/types.js';
 
-const now = new Date(2026, 9, 14, 12, 0, 0); // Wed 2026-10-14 local
+const now = new Date('2026-10-14T12:00:00+03:00'); // Wed 2026-10-14, noon in the default zone Asia/Riyadh
 
 const defs: ParameterDef[] = [
   { name: 'period', type: 'dateRange', label: { ar: 'الفترة', en: 'Period' }, required: true, default: 'thisMonth' },
@@ -171,7 +171,8 @@ describe('validateParameterValues', () => {
 
   it('localizes date digits for Arabic and number digits via formatNumber', () => {
     const r = validateParameterValues(report(), { branch: 'ruh', asOf: '2019-01-01', minTotal: -3 }, { locale: 'ar', now });
-    expect(r.fieldErrors.asOf).toBe('يجب ألا يكون التاريخ قبل ٢٠٢٠-٠١-٠١');
+    // date bound isolated (U+2068 ... U+2069) so it is not reordered inside the RTL sentence (BUG-54)
+    expect(r.fieldErrors.asOf).toBe('يجب ألا يكون التاريخ قبل \u2068٢٠٢٠-٠١-٠١\u2069');
     expect(r.fieldErrors.minTotal).toBe('يجب ألا تقل القيمة عن ٠');
   });
 

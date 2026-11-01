@@ -13,9 +13,15 @@ const issues = (defs: ParameterDef[], values?: Record<string, unknown>) => {
   return r.issues;
 };
 
-const localYmd = (ms: number) => {
-  const t = new Date(ms);
-  return `${String(t.getFullYear()).padStart(4, '0')}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+// Calendar dates are taken in the default time zone Asia/Riyadh (UTC+3, no DST), never the process zone (BUG-52).
+const RIYADH_MS = 3 * 3600_000;
+/** Calendar date of an instant in Asia/Riyadh. */
+const localYmd = (ms: number) => new Date(ms + RIYADH_MS).toISOString().slice(0, 10);
+/** Instant of a Riyadh wall-clock time (month 0-based, like `new Date(y, m, d, ...)`). */
+const riy = (y: number, m: number, d: number, h = 0, mi = 0, s = 0, ms = 0) => {
+  const t = new Date(Date.UTC(2000, m, d, h, mi, s, ms) - RIYADH_MS);
+  t.setUTCFullYear(t.getUTCFullYear() + y - 2000);
+  return t;
 };
 
 describe('resolveParameterValues: resolution', () => {
@@ -94,15 +100,15 @@ describe('resolveParameterValues: coercion', () => {
     expect(issues(d, { b: 'yes' })[0]!.message).toBe('expected a boolean');
   });
 
-  it('date -> local calendar date YYYY-MM-DD (TZ-independent: built from local components)', () => {
+  it('date -> calendar date YYYY-MM-DD in the default time zone Asia/Riyadh (process TZ-independent)', () => {
     const d: ParameterDef[] = [{ name: 'd', type: 'date' }];
     expect(ok(d, { d: '2026-10-01' })).toEqual({ d: '2026-10-01' });
     expect(ok(d, { d: ' 2026-10-01 ' })).toEqual({ d: '2026-10-01' });
-    expect(ok(d, { d: new Date(2026, 9, 1) })).toEqual({ d: '2026-10-01' }); // local midnight, any TZ
-    expect(ok(d, { d: new Date(2026, 9, 1, 23, 59, 59, 999) })).toEqual({ d: '2026-10-01' });
-    expect(ok(d, { d: new Date(2026, 0, 2).getTime() })).toEqual({ d: '2026-01-02' }); // epoch ms
-    expect(ok(d, { d: new Date(999, 0, 5) })).toEqual({ d: '0999-01-05' }); // zero-padded year
-    // ISO date-time with an offset -> local calendar date of that instant (TZ-independent expectation)
+    expect(ok(d, { d: riy(2026, 9, 1) })).toEqual({ d: '2026-10-01' }); // Riyadh midnight, any process TZ
+    expect(ok(d, { d: riy(2026, 9, 1, 23, 59, 59, 999) })).toEqual({ d: '2026-10-01' });
+    expect(ok(d, { d: riy(2026, 0, 2).getTime() })).toEqual({ d: '2026-01-02' }); // epoch ms
+    expect(ok(d, { d: riy(999, 0, 5) })).toEqual({ d: '0999-01-05' }); // zero-padded year
+    // ISO date-time with an offset -> Riyadh calendar date of that instant
     expect(ok(d, { d: '2026-10-01T00:00:00+03:00' })).toEqual({ d: localYmd(Date.UTC(2026, 8, 30, 21)) });
     expect(issues(d, { d: 'not a date' })[0]!.code).toBe('invalid');
     expect(issues(d, { d: '2026-13-01' })[0]!.code).toBe('invalid');
@@ -120,14 +126,14 @@ describe('resolveParameterValues: coercion', () => {
     expect(issues(d, { t: new Date('x') })[0]!.code).toBe('invalid');
   });
 
-  it('dateRange -> { from, to } as local calendar dates, boundaries included', () => {
+  it('dateRange -> { from, to } as Asia/Riyadh calendar dates, boundaries included', () => {
     const d: ParameterDef[] = [{ name: 'p', type: 'dateRange' }];
-    expect(ok(d, { p: { from: new Date(2026, 9, 1), to: new Date(2026, 9, 31, 23, 59, 59, 999) } })).toEqual({
+    expect(ok(d, { p: { from: riy(2026, 9, 1), to: riy(2026, 9, 31, 23, 59, 59, 999) } })).toEqual({
       p: { from: '2026-10-01', to: '2026-10-31' },
     });
-    expect(ok(d, { p: { from: '2026-01-01', to: new Date(2026, 0, 31) } })).toEqual({ p: { from: '2026-01-01', to: '2026-01-31' } });
-    expect(ok(d, { p: [new Date(2026, 0, 1).getTime(), '2026-02-01'] })).toEqual({ p: { from: '2026-01-01', to: '2026-02-01' } });
-    expect(ok(d, { p: { from: new Date(2026, 4, 5), to: new Date(2026, 4, 5, 18) } })).toEqual({ p: { from: '2026-05-05', to: '2026-05-05' } });
+    expect(ok(d, { p: { from: '2026-01-01', to: riy(2026, 0, 31) } })).toEqual({ p: { from: '2026-01-01', to: '2026-01-31' } });
+    expect(ok(d, { p: [riy(2026, 0, 1).getTime(), '2026-02-01'] })).toEqual({ p: { from: '2026-01-01', to: '2026-02-01' } });
+    expect(ok(d, { p: { from: riy(2026, 4, 5), to: riy(2026, 4, 5, 18) } })).toEqual({ p: { from: '2026-05-05', to: '2026-05-05' } });
     expect(issues(d, { p: { from: '2026-02-01', to: '2026-01-01' } })[0]!.message).toBe('from must not be after to');
     expect(issues(d, { p: '2026-01-01' })[0]!.code).toBe('invalid');
   });
@@ -135,13 +141,13 @@ describe('resolveParameterValues: coercion', () => {
   it('dateRange: required rejects a missing end; optional accepts an open-ended range', () => {
     const req: ParameterDef[] = [{ name: 'p', type: 'dateRange', required: true }];
     expect(issues(req, { p: { from: '2026-01-01' } })[0]!.message).toBe('dateRange requires both from and to');
-    expect(issues(req, { p: { to: new Date(2026, 0, 1) } })[0]!.message).toBe('dateRange requires both from and to');
+    expect(issues(req, { p: { to: riy(2026, 0, 1) } })[0]!.message).toBe('dateRange requires both from and to');
     expect(issues(req, { p: { from: '', to: null } })[0]!.message).toBe('dateRange requires both from and to');
     expect(issues(req, {})[0]!.code).toBe('required');
 
     const opt: ParameterDef[] = [{ name: 'p', type: 'dateRange' }];
-    expect(ok(opt, { p: { from: new Date(2026, 9, 1) } })).toEqual({ p: { from: '2026-10-01' } });
-    expect(ok(opt, { p: { to: new Date(2026, 9, 31) } })).toEqual({ p: { to: '2026-10-31' } });
+    expect(ok(opt, { p: { from: riy(2026, 9, 1) } })).toEqual({ p: { from: '2026-10-01' } });
+    expect(ok(opt, { p: { to: riy(2026, 9, 31) } })).toEqual({ p: { to: '2026-10-31' } });
     expect(ok(opt, { p: [null, '2026-10-31'] })).toEqual({ p: { to: '2026-10-31' } });
     expect(Object.keys((ok(opt, { p: { from: '2026-10-01', to: '' } }) as { p: object }).p)).toEqual(['from']);
     expect(ok(opt, { p: { from: null, to: null } })).toEqual({});
@@ -241,7 +247,7 @@ describe('BUG-20: strict date / datetime string validation', () => {
     expect(ok(d, { day: '2026-04-30' })).toEqual({ day: '2026-04-30' });
   });
 
-  it('ISO date-time strings with Z / offset become the local calendar date of the instant', () => {
+  it('ISO date-time strings with Z / offset become the Asia/Riyadh calendar date of the instant', () => {
     expect(ok(d, { day: '2026-10-01T12:00:00Z' })).toEqual({ day: localYmd(Date.UTC(2026, 9, 1, 12)) });
     expect(ok(d, { day: '2026-09-30T21:00:00.000Z' })).toEqual({ day: localYmd(Date.UTC(2026, 8, 30, 21)) });
     expect(ok(d, { day: '2026-10-01T08:30+0300' })).toEqual({ day: localYmd(Date.UTC(2026, 9, 1, 5, 30)) });

@@ -10,7 +10,14 @@ import type { ChartAdapter, ChartHandle } from '../adapters/chart/index.js';
 import { createChartJsAdapter } from '../adapters/chart/index.js';
 import { interpret } from '../engine/interpreter.js';
 import { renderHtml } from '../engine/renderer-html.js';
-import { buildDataQuery, ParameterValidationError, parameterValuesEqual, type ParameterValues } from '../engine/parameters.js';
+import {
+  buildDataQuery,
+  ParameterValidationError,
+  parameterValuesEqual,
+  resolveParameterValues,
+  validateParameterValues,
+  type ParameterValues,
+} from '../engine/parameters.js';
 import { t } from '../i18n/strings.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
@@ -343,16 +350,23 @@ export class ReportsViewerElement extends LitElement {
     this._phase = 'loading';
     try {
       let rows: readonly Row[];
+      // Resolved parameter values for `params.<name>` in expressions (only for templates that declare parameters).
+      let params: Readonly<Record<string, unknown>> | undefined;
       if (this.rows) {
         rows = this.rows;
+        if (finalSchema.parameters?.length) {
+          const resolved = resolveParameterValues(finalSchema.parameters, this.params);
+          if (resolved.ok) params = { ...(finalSchema.dataset.params ?? {}), ...resolved.values };
+        }
       } else {
         const query = buildDataQuery(finalSchema, this.params);
+        if (finalSchema.parameters?.length) params = query.params;
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
         rows = await adapter.fetch(query, abort.signal);
         // a newer render (e.g. parameter change) superseded this one
         if (abort.signal.aborted) return;
       }
-      const tree = interpret({ schema: finalSchema, rows });
+      const tree = interpret({ schema: finalSchema, rows, ...(params ? { params } : {}) });
       const rendered = renderHtml(tree, { idPrefix: 'rw-v', visualPages: !this.hidePageBoundaries });
       this._html = rendered.html;
       this._chartIds = [...rendered.chartIds];
@@ -368,7 +382,9 @@ export class ReportsViewerElement extends LitElement {
       this._error = e instanceof Error ? e.message : String(e);
       if (e instanceof ParameterValidationError) {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
-        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues } }));
+        // `fieldErrors`: name -> message in the report locale, for showing each error next to its field.
+        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale });
+        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
       } else {
         logger.error('reports-viewer', 'render failed', { error: this._error });
       }

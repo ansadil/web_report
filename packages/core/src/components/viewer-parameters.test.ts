@@ -222,6 +222,45 @@ describe('reports-viewer parameters: Arabic banner and time zone (BUG-52, BUG-53
     expect(calls.length).toBe(0);
   });
 
+  it('shows the full Arabic banner at 900px, wrapping, with a tooltip and per-field errors', async () => {
+    v.style.width = '900px';
+    v.style.height = '640px';
+    v.locale = 'ar';
+    v.dirOverride = 'rtl';
+    const err = nextEvent(v, 'parameters-error');
+    v.dataAdapter = adapter;
+    v.params = { top: 80 };
+    v.schema = arabicReport();
+    await err;
+    await v.updateComplete;
+    const banner = v.shadowRoot!.querySelector<HTMLElement>('[data-testid="error-banner"]')!;
+    const full = banner.textContent ?? '';
+    expect(full).toContain('قيم معاملات التقرير غير صالحة');
+    expect(full).toContain('\u2068الفرع\u2069: يجب إدخال الفرع');
+    expect(full).toContain('\u2068top\u2069: يجب ألا تزيد القيمة عن ٥٠');
+    expect(banner.getAttribute('title')).toBe(full);
+    expect(banner.getAttribute('dir')).toBe('rtl');
+    expect(banner.parentElement).toBe(v.shadowRoot!.querySelector('.viewer-main'));
+    expect(v.style.width).toBe('900px');
+    const css = getComputedStyle(banner);
+    expect(css.whiteSpace).toBe('normal');
+    expect(css.overflow).toBe('visible');
+    expect(css.textOverflow).not.toBe('ellipsis');
+    expect(css.maxWidth).toBe('none');
+    expect(css.width === '100%' || banner.clientWidth > 280).toBe(true);
+    if (banner.clientWidth > 0) {
+      expect(banner.clientWidth).toBeGreaterThan(280);
+      expect(banner.clientWidth).toBeLessThanOrEqual(900);
+      expect(banner.scrollWidth).toBeLessThanOrEqual(banner.clientWidth + 1);
+    }
+    const branch = v.shadowRoot!.querySelector<HTMLElement>('[data-testid="param-branch"]')!;
+    const top = v.shadowRoot!.querySelector<HTMLElement>('[data-testid="param-top"]')!;
+    expect(branch.getAttribute('aria-invalid')).toBe('true');
+    expect(top.getAttribute('aria-invalid')).toBe('true');
+    expect(v.shadowRoot!.getElementById(branch.getAttribute('aria-describedby')!)?.textContent).toContain('يجب إدخال الفرع');
+    expect(v.shadowRoot!.getElementById(top.getAttribute('aria-describedby')!)?.textContent).toContain('٥٠');
+  });
+
   it('uses the viewer locale for the banner when it overrides the report locale', async () => {
     v.locale = 'en';
     const err = nextEvent(v, 'parameters-error');

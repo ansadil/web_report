@@ -226,4 +226,72 @@ describe('playground designer stays on the local origin', () => {
     expect(icons).toEqual({ bold: true, align: true });
     await page.close();
   });
+
+  it('BUG-58: the Arabic parameter banner is fully visible at 900px', async () => {
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.goto(ORIGIN);
+    await page.waitForSelector('reports-viewer');
+    const box = await page.evaluate(async () => {
+      const viewer = document.createElement('reports-viewer') as HTMLElement & {
+        locale: string;
+        dirOverride: string;
+        dataAdapter: { id: string; fetch: () => Promise<unknown[]> };
+        params: Record<string, unknown>;
+        schema: unknown;
+        updateComplete: Promise<unknown>;
+      };
+      viewer.style.width = '900px';
+      viewer.style.height = '640px';
+      viewer.style.display = 'block';
+      viewer.locale = 'ar';
+      viewer.dirOverride = 'rtl';
+      document.body.appendChild(viewer);
+      const err = new Promise((resolve) => viewer.addEventListener('parameters-error', () => resolve(true), { once: true }));
+      viewer.dataAdapter = { id: 'spy', fetch: async () => [] };
+      viewer.params = { top: 80 };
+      viewer.schema = {
+        version: '1',
+        id: 'ar',
+        meta: { name: 'تقرير', locale: 'ar-SA', dir: 'rtl' },
+        dataset: { adapter: 'custom', source: 'sales' },
+        fields: [],
+        parameters: [
+          { name: 'branch', type: 'string', label: { ar: 'الفرع', en: 'Branch' }, required: true },
+          { name: 'top', type: 'number', min: 1, max: 50 },
+        ],
+        bands: { detail: { height: 5 } },
+      };
+      await err;
+      await viewer.updateComplete;
+      const banner = viewer.shadowRoot?.querySelector<HTMLElement>('[data-testid="error-banner"]');
+      if (!banner) return { text: '', title: '', dir: '', width: 0, scroll: 0, client: 0, whiteSpace: '', maxWidth: '', aria: '', field: '' };
+      const branch = viewer.shadowRoot?.querySelector<HTMLElement>('[data-testid="param-branch"]');
+      return {
+        text: banner.textContent ?? '',
+        title: banner.title,
+        dir: banner.getAttribute('dir') ?? '',
+        width: banner.getBoundingClientRect().width,
+        scroll: banner.scrollWidth,
+        client: banner.clientWidth,
+        whiteSpace: getComputedStyle(banner).whiteSpace,
+        maxWidth: getComputedStyle(banner).maxWidth,
+        aria: branch?.getAttribute('aria-invalid') ?? '',
+        field: viewer.shadowRoot?.getElementById(branch?.getAttribute('aria-describedby') ?? '')?.textContent ?? '',
+      };
+    });
+    expect(box.text).toContain('قيم معاملات التقرير غير صالحة');
+    expect(box.text).toContain('يجب إدخال الفرع');
+    expect(box.text).toContain('٥٠');
+    expect(box.title).toBe(box.text);
+    expect(box.dir).toBe('rtl');
+    expect(box.whiteSpace).toBe('normal');
+    expect(box.maxWidth).toBe('none');
+    expect(box.width).toBeGreaterThan(280);
+    expect(box.width).toBeLessThanOrEqual(900);
+    expect(box.scroll).toBeLessThanOrEqual(box.client + 1);
+    expect(box.aria).toBe('true');
+    expect(box.field).toContain('يجب إدخال الفرع');
+    await page.close();
+  });
 });

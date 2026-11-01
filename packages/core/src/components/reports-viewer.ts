@@ -203,15 +203,27 @@ export class ReportsViewerElement extends LitElement {
     .toolbar button.view-tool .label {
       display: inline;
     }
-    .status {
+    .status-note {
       font-size: 11px;
       color: var(--rw-muted);
-      max-width: min(40vw, 280px);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      flex: none;
     }
-    .status.error { color: var(--rw-error); }
+    .status.error {
+      flex: none;
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+      text-align: start;
+      background: #fef2f2;
+      color: var(--rw-error);
+      border-bottom: 1px solid #fecaca;
+    }
     .surface {
       flex: 1 1 auto;
       min-height: 0;
@@ -373,6 +385,7 @@ export class ReportsViewerElement extends LitElement {
 
   override updated(changed: Map<PropertyKey, unknown>): void {
     this._syncHostDir(this._dir);
+    if (changed.has('schema') || changed.has('locale')) this._resetParameterDraft();
     if (
       changed.has('schema') ||
       changed.has('rows') ||
@@ -387,7 +400,6 @@ export class ReportsViewerElement extends LitElement {
       if (changed.has('fontsBaseUrl') || changed.has('schema')) void ensureReportFonts(this.schema, this.fontsBaseUrl);
       void this._renderReport();
     }
-    if (changed.has('schema') || changed.has('locale')) this._resetParameterDraft();
     this._paintParameterFields();
     if (changed.has('_zoom')) {
       queueMicrotask(() => {
@@ -469,6 +481,8 @@ export class ReportsViewerElement extends LitElement {
       this._chartIds = [...rendered.chartIds];
       this._codeIds = [...rendered.codeIds];
       this._rowCount = rows.length;
+      this._error = '';
+      this._fieldErrors = {};
       this._phase = 'ready';
       await this.updateComplete;
       this._renderCharts(this._chartIds);
@@ -785,7 +799,7 @@ export class ReportsViewerElement extends LitElement {
   }
 
   private _definitions(): ParameterDefinition[] {
-    return getParameterDefinitions(this.schema, { locale: this._locale });
+    return getParameterDefinitions(this.schema, { locale: this._locale, ...this._paramOptions });
   }
 
   private _resetParameterDraft(): void {
@@ -795,6 +809,7 @@ export class ReportsViewerElement extends LitElement {
     }
     this._draft = draft;
     this._fieldErrors = {};
+    this._error = '';
     void this._loadParamOptions();
   }
 
@@ -816,16 +831,18 @@ export class ReportsViewerElement extends LitElement {
   }
 
   private _applyParameters(): void {
-    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale });
+    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale, ...this._paramOptions });
     this._fieldErrors = { ...result.fieldErrors };
     if (!result.ok) {
+      this._error = parametersBannerText(result.errors, this._locale);
       this.dispatchEvent(new CustomEvent('parameters-error', {
-        detail: { error: result.errors[0]?.message ?? '', issues: result.errors, fieldErrors: result.fieldErrors },
+        detail: { error: this._error, issues: result.errors, fieldErrors: result.fieldErrors },
         bubbles: true,
         composed: true,
       }));
       return;
     }
+    this._error = '';
     this.params = { ...result.values };
   }
 
@@ -841,17 +858,19 @@ export class ReportsViewerElement extends LitElement {
   private _parameterFieldsHtml(): string {
     return this._definitions().map((def) => {
       const error = this._fieldErrors[def.name] ?? '';
+      const errId = `param-error-${escapeHtml(def.name)}`;
       const value = this._draft[def.name] ?? def.defaultValue ?? '';
       const required = def.required ? ` <small>(${escapeHtml(t(this._locale, 'paramRequired'))})</small>` : '';
-      return `<label class="fld-l">${escapeHtml(def.label)}${required}</label>${this._parameterControlHtml(def, value)}<p class="field-error">${escapeHtml(error)}</p>`;
+      return `<label class="fld-l">${escapeHtml(def.label)}${required}</label>${this._parameterControlHtml(def, value, error ? errId : '')}<p id="${errId}" class="field-error">${escapeHtml(error)}</p>`;
     }).join('');
   }
 
-  private _parameterControlHtml(def: ParameterDefinition, value: unknown): string {
+  private _parameterControlHtml(def: ParameterDefinition, value: unknown, errorId: string): string {
     const name = escapeHtml(def.name);
+    const aria = errorId ? ` aria-invalid="true" aria-describedby="${errorId}"` : '';
     if (def.type === 'dateRange') {
       const range = value && typeof value === 'object' ? value as { from?: string; to?: string } : {};
-      return `<div class="range"><input data-testid="param-${name}-from" data-param="${name}" data-part="from" type="date" value="${escapeHtml(range.from ?? '')}"><input data-testid="param-${name}-to" data-param="${name}" data-part="to" type="date" value="${escapeHtml(range.to ?? '')}"></div>`;
+      return `<div class="range"><input data-testid="param-${name}-from" data-param="${name}" data-part="from" type="date" value="${escapeHtml(range.from ?? '')}"${aria}><input data-testid="param-${name}-to" data-param="${name}" data-part="to" type="date" value="${escapeHtml(range.to ?? '')}"${aria}></div>`;
     }
     if (def.type === 'select' || def.type === 'bool') {
       const options = def.type === 'bool'
@@ -863,10 +882,10 @@ export class ReportsViewerElement extends LitElement {
         const selected = raw === current ? ' selected' : '';
         return `<option value="${escapeHtml(raw)}"${selected}>${escapeHtml(option.label)}</option>`;
       }).join('');
-      return `<select data-testid="param-${name}" data-param="${name}">${opts}</select>`;
+      return `<select data-testid="param-${name}" data-param="${name}"${aria}>${opts}</select>`;
     }
     const type = def.type === 'number' ? 'number' : def.type === 'date' ? 'date' : def.type === 'datetime' ? 'datetime-local' : 'text';
-    return `<input data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}">`;
+    return `<input data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}"${aria}>`;
   }
 
   private _onParamInput(event: Event): void {
@@ -923,11 +942,9 @@ export class ReportsViewerElement extends LitElement {
             ${this.hideViewControls ? nothing : html`<span class="toolbar-sep" role="separator" aria-hidden="true"></span>`}
             ${this._renderViewToolbarControls(disabled)}
             <span class="toolbar-spacer" aria-hidden="true"></span>
-            <span class="status ${this._phase === 'error' ? 'error' : ''}">
-              ${this._phase === 'loading' ? t(this._locale, 'loading') : ''}
-              ${this._phase === 'error' ? `${t(this._locale, 'error')}: ${this._error}` : ''}
-            </span>
+            <span class="status-note">${this._phase === 'loading' ? t(this._locale, 'loading') : ''}</span>
           </div>
+          ${this._error ? html`<div class="status error" data-testid="error-banner" dir=${this._dir} title=${this._error} role="alert">${this._error}</div>` : nothing}
           <div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>
         </div>
       </div>

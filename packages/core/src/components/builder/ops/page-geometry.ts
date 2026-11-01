@@ -1,24 +1,9 @@
-import {
-  MIN_CONTENT_MM,
-  adjustPage,
-  applyPageSetup,
-  marginClampNotice,
-  mmToLength,
-  type MarginSide,
-} from '../../../engine/page-setup.js';
+import { adjustPage, applyPageSetup, type MarginSide } from '../../../engine/page-setup.js';
 import type { Page } from '../../../schema/report-schema.js';
-import { formatLocalizedNumber } from '../status-bar.js';
 import type { BuilderSession } from '../session.js';
 import { commitSchema, reclampAllRootBandElements } from './commands.js';
 
 const SIDES: readonly MarginSide[] = ['top', 'right', 'bottom', 'left'];
-
-function cmLabel(session: BuilderSession, mm: number): string {
-  const locale = session.uiLocale;
-  const digits = session.schema.meta.pageNumberDigits ?? 'locale';
-  const unit = locale.toLowerCase().startsWith('ar') ? 'سم' : 'cm';
-  return `${formatLocalizedNumber(mmToLength(mm, 'cm'), { locale, digits }, 2)} ${unit}`;
-}
 
 function dropClamped(session: BuilderSession): BuilderSession['marginFeedback'] {
   const next = { ...session.marginFeedback };
@@ -36,17 +21,11 @@ function recordClamp(session: BuilderSession, before: Page['margins'], after: Pa
     else session.setMarginFeedback(dropClamped(session));
     return;
   }
-  const notice = marginClampNotice(cmLabel(session, MIN_CONTENT_MM), session.uiLocale);
   const feedback = replace ? {} : dropClamped(session);
-  const digits = session.schema.meta.pageNumberDigits ?? 'locale';
   for (const side of changed) {
-    feedback[side] = {
-      raw: formatLocalizedNumber(after.margins[side] / 10, { locale: session.uiLocale, digits }, 2),
-      error: notice,
-      kind: 'clamped',
-    };
+    feedback[side] = { raw: '', error: '', kind: 'clamped', reason: 'clamped' };
   }
-  session.setMarginNotice(notice);
+  session.setMarginNotice('clamped');
   session.setMarginFeedback(feedback);
 }
 

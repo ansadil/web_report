@@ -25,6 +25,9 @@ const PORTRAIT_MM = {
 /** Minimum content width and height that must remain after margins, in millimetres. */
 export const MIN_CONTENT_MM = 50;
 
+/** Float noise below this, in millimetres, still counts as meeting {@link MIN_CONTENT_MM}. */
+export const MARGIN_EPSILON_MM = 0.01;
+
 const MM_PER_UNIT: Record<LengthUnit, number> = { mm: 1, cm: 10, in: 25.4 };
 
 export function paperSizeMm(size: Page['size'], orientation: Page['orientation']): { width: number; height: number } {
@@ -46,9 +49,13 @@ export function pageMarginViolation(page: Pick<Page, 'size' | 'orientation' | 'm
   const { top, right, bottom, left } = page.margins;
   if ([top, right, bottom, left].some((n) => !Number.isFinite(n) || n < 0)) return 'negative';
   const paper = paperSizeMm(page.size, page.orientation);
-  if (paper.width - left - right < MIN_CONTENT_MM) return 'width';
-  if (paper.height - top - bottom < MIN_CONTENT_MM) return 'height';
+  if (!fitsContent(paper.width, left, right)) return 'width';
+  if (!fitsContent(paper.height, top, bottom)) return 'height';
   return null;
+}
+
+function fitsContent(paperMm: number, a: number, b: number): boolean {
+  return paperMm - a - b >= MIN_CONTENT_MM - MARGIN_EPSILON_MM;
 }
 
 function roundMm(value: number): number {
@@ -59,17 +66,13 @@ function clampPair(a: number, b: number, paperMm: number): [number, number] {
   a = Math.max(0, Number.isFinite(a) ? a : 0);
   b = Math.max(0, Number.isFinite(b) ? b : 0);
   const maxSum = Math.max(0, paperMm - MIN_CONTENT_MM);
-  if (a + b <= maxSum) return [roundMm(a), roundMm(b)];
-  if (a + b === 0) return [0, 0];
-  const scale = maxSum / (a + b);
-  let nextA = roundMm(a * scale);
-  let nextB = roundMm(b * scale);
-  if (nextA + nextB > maxSum) {
-    const overflow = nextA + nextB - maxSum;
-    if (nextA >= nextB) nextA = roundMm(Math.max(0, nextA - overflow));
-    else nextB = roundMm(Math.max(0, nextB - overflow));
-  }
-  return [nextA, nextB];
+  if (fitsContent(paperMm, a, b)) return [roundMm(a), roundMm(b)];
+  // Shrink only the larger margin. A margin that already fits on its own stays as it is.
+  const shrinkA = a >= b;
+  const keep = Math.min(shrinkA ? b : a, maxSum);
+  const reduced = roundMm(Math.max(0, maxSum - keep));
+  const kept = roundMm(keep);
+  return shrinkA ? [reduced, kept] : [kept, reduced];
 }
 
 export function normalizePageSetup(page: Page): { page: Page; clamped: boolean } {

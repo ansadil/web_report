@@ -1,6 +1,6 @@
 import { linePosForOrientationChange } from '../api.js';
 import type { Band, ReportElement, ReportSchemaV1 } from '../api.js';
-import { bandBounds, clampElementPos, clampLinePos } from '../geometry.js';
+import { bandBounds, clampElementPos, clampLinePos, pageContentWidthMm } from '../geometry.js';
 import { BAND_KEYS, type BandKey } from '../types.js';
 
 /** Clamp line elements of `next` using the page and band sizes of `current` (the schema still on screen). */
@@ -65,22 +65,33 @@ export function applyElementPatch(
   return { ...schema, bands: { ...schema.bands, [band]: { ...current, elements } } };
 }
 
+function reclampBand(band: Band, maxW: number): Band {
+  const bounds = { maxW, maxH: band.height };
+  return {
+    ...band,
+    elements: band.elements.map((e) => {
+      let pos = clampElementPos(e.pos, bounds);
+      if (e.kind === 'line') pos = clampLinePos(e, pos, bounds);
+      return { ...e, pos };
+    }),
+  };
+}
+
 export function withReclampedRootElements(schema: ReportSchemaV1): ReportSchemaV1 {
   const bands = { ...schema.bands } as typeof schema.bands;
   for (const key of BAND_KEYS) {
     const b = bands[key];
     if (!b) continue;
-    const bounds = bandBounds(schema, key);
-    bands[key] = {
-      ...b,
-      elements: b.elements.map((e) => {
-        let pos = clampElementPos(e.pos, bounds);
-        if (e.kind === 'line') pos = clampLinePos(e, pos, bounds);
-        return { ...e, pos };
-      }),
-    };
+    bands[key] = reclampBand(b, bandBounds(schema, key).maxW);
   }
-  return { ...schema, bands };
+  const width = pageContentWidthMm(schema.page);
+  const groups = schema.groups.map((group) => {
+    const header = group.header ? reclampBand(group.header, width) : group.header;
+    const footer = group.footer ? reclampBand(group.footer, width) : group.footer;
+    if (header === group.header && footer === group.footer) return group;
+    return { ...group, ...(header ? { header } : {}), ...(footer ? { footer } : {}) };
+  });
+  return { ...schema, bands, groups };
 }
 
 /** Clamp moved elements against the band size from before the patch is stored. */

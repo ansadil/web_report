@@ -15,3 +15,5 @@ coverage
 visual-out/
 .cache/
 pnpm-lock.yaml
+# CI example smoke screenshots (.github/workflows/examples.yml)
+artifacts/

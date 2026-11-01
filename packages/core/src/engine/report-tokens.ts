@@ -102,11 +102,22 @@ export function parseReportDate(raw: string): string | undefined {
   return calendarDay(`${match[3]}-${month}-${day}`);
 }
 
+/** English Hijri line is day, month, year: `20 Rabiʻ II 1448 AH`. */
+function formatEnglishHijriLine(iso: string): string {
+  const [year, month, date] = iso.split('-') as [string, string, string];
+  const when = new Date(Number(year), Number(month) - 1, Number(date), 12);
+  return new Intl.DateTimeFormat('en-GB-u-ca-islamic-umalqura', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(when);
+}
+
 export function formatReportHijri(iso: string, locale: LocaleTag): string {
   const day = calendarDay(iso);
   if (!day) return '';
-  const hijri = formatHijri(day, locale);
-  return isArabic(locale) ? `الموافق ${hijri}` : hijri;
+  if (!isArabic(locale)) return formatEnglishHijriLine(day);
+  return `الموافق ${formatHijri(day, locale)}`;
 }
 
 function formatCalendar(value: unknown, locale: LocaleTag): string | undefined {

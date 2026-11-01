@@ -137,6 +137,7 @@ describe('viewer preview layout', () => {
     const input = viewer.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="param-from"]')!;
     expect(input.value).toBe('2026-10-01');
     expect(input.getAttribute('aria-label')).toBe('From');
+    expect(viewer.shadowRoot!.querySelector('.hj')?.textContent).toBe('20 Rabi\u02bb II 1448 AH');
     input.value = '2026-10-15';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     viewer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="run-report"]')!.click();

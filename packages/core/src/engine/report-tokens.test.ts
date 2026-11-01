@@ -38,6 +38,11 @@ describe('report locale dates', () => {
     expect(hijri.startsWith('الموافق ')).toBe(true);
     expect(hijri).not.toContain('2026');
   });
+
+  it('BUG-70 formats the English Hijri line as day, month, year', () => {
+    expect(formatReportHijri('2026-10-01', 'en')).toBe('20 Rabi\u02bb II 1448 AH');
+    expect(formatReportHijri('2026-10-31', 'en')).toBe('20 Jumada I 1448 AH');
+  });
 });
 
 describe('replaceReportTokens', () => {

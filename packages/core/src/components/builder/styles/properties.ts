@@ -22,11 +22,11 @@ export const propertiesStyles = css`
     .cat.closed .cat-h svg { transform: rotate(90deg); }
     .cat.closed .cat-b { display: none; }
     .cat-h .cnt { margin-inline-start: auto; color: var(--rb-muted); font-weight: 500; font-size: 10.5px; }
-    .prow { display: grid; grid-template-columns: 44% 56%; border-top: 1px solid #eef1f6; min-height: 27px; }
+    .prow { display: grid; grid-template-columns: minmax(0, 44%) minmax(0, 56%); border-top: 1px solid #eef1f6; min-height: 27px; }
     /* Author display beats the UA [hidden] rule, so a search hit never hid the row. */
     .prow[hidden] { display: none !important; }
     .prow.hl { background: #fff8f2; }
-    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
     .bool { display: flex; align-items: center; gap: 4px; }
     .bool input { accent-color: #1f5fa8; width: auto; }
     .prow .v { position: relative; padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%; }

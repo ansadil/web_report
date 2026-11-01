@@ -24,7 +24,10 @@ export interface ReportViewerProps {
   hidePageBoundaries?: boolean;
   /** Report parameter values (by `ParameterDef.name`), merged into `DataQuery.params`; changes trigger a refetch. */
   params?: ParameterValues;
-  /** IANA time zone for relative parameter presets and date coercion (default `'Asia/Riyadh'`). */
+  /**
+   * IANA time zone for relative parameter presets and date coercion (default `'Asia/Riyadh'`). An unknown zone falls
+   * back to the default and calls `onTimeZoneInvalid`.
+   */
   timeZone?: string;
   /** Base URL for the woff2 faces. Omitted leaves the element's default. */
   fontsBaseUrl?: string;
@@ -35,6 +38,8 @@ export interface ReportViewerProps {
   onExportError?: (error: { kind: ExportKind; error: string }) => void;
   /** Required/invalid parameter values; no fetch is made. */
   onParametersError?: (detail: { error: string; issues: readonly ParameterIssue[] }) => void;
+  /** `timeZone` is not a known IANA zone; the viewer renders in `fallback` (`'Asia/Riyadh'`). Element event `time-zone-invalid`. */
+  onTimeZoneInvalid?: (detail: { timeZone: string; fallback: string }) => void;
 }
 
 export interface ReportBuilderProps {

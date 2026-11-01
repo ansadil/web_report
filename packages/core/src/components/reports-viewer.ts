@@ -45,6 +45,12 @@ function supportsCssZoom(): boolean {
   return typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('zoom', '1');
 }
 
+/**
+ * `<reports-viewer>`. Events: `report-rendered` `{ sections, rows }`, `export` `{ kind, blob?, filename? }`,
+ * `export-error` `{ kind, error }`, `parameters-error` `{ error, issues, fieldErrors }` (invalid parameter values),
+ * `time-zone-invalid` `{ timeZone, fallback }` (unknown `time-zone`; the viewer keeps rendering in `fallback`,
+ * `'Asia/Riyadh'`).
+ */
 export class ReportsViewerElement extends LitElement {
   static override styles = css`
     :host {
@@ -233,11 +239,19 @@ export class ReportsViewerElement extends LitElement {
 
   /** Options for parameter resolution: the host's time zone when valid, else the default (Asia/Riyadh). */
   private get _paramOptions(): { timeZone: string } {
-    if (this.timeZone && !isValidTimeZone(this.timeZone)) {
-      logger.warn('reports-viewer', 'unknown time zone, using default', { timeZone: this.timeZone, default: DEFAULT_TIME_ZONE });
-      return { timeZone: DEFAULT_TIME_ZONE };
-    }
+    if (this.timeZone && !isValidTimeZone(this.timeZone)) return { timeZone: DEFAULT_TIME_ZONE };
     return { timeZone: resolveTimeZone(this.timeZone) };
+  }
+
+  /**
+   * BUG-59: an unknown `timeZone` is reported once per value (not on every render) with a warning and a
+   * `time-zone-invalid` event (`{ timeZone, fallback }`); rendering continues in the fallback zone.
+   */
+  private _checkTimeZone(): void {
+    if (!this.timeZone || isValidTimeZone(this.timeZone)) return;
+    const detail = { timeZone: this.timeZone, fallback: DEFAULT_TIME_ZONE };
+    logger.warn('reports-viewer', 'unknown time zone, using default', { timeZone: this.timeZone, default: DEFAULT_TIME_ZONE });
+    this.dispatchEvent(new CustomEvent('time-zone-invalid', { detail }));
   }
 
   private get _locale(): LocaleTag {
@@ -262,7 +276,9 @@ export class ReportsViewerElement extends LitElement {
   /**
    * IANA time zone for relative parameter presets (`today`, `thisMonth`, ...), for the calendar date of `Date` /
    * zoned values given to date parameters, and for date-time bounds in messages. Attribute `time-zone`.
-   * Default `'Asia/Riyadh'` (not the browser's zone); an unknown zone falls back to the default with a warning.
+   * Default `'Asia/Riyadh'` (not the browser's zone). An unknown zone falls back to the default, logs a warning and
+   * dispatches `time-zone-invalid` with `detail: { timeZone, fallback }` (once per value set; `parameters-error` is not
+   * involved).
    */
   @property({ type: String, attribute: 'time-zone' }) timeZone: string | undefined = undefined;
 
@@ -297,6 +313,7 @@ export class ReportsViewerElement extends LitElement {
 
   override updated(changed: Map<PropertyKey, unknown>): void {
     this._syncHostDir(this._dir);
+    if (changed.has('timeZone')) this._checkTimeZone();
     if (
       changed.has('schema') ||
       changed.has('rows') ||

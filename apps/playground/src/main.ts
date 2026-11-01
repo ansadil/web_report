@@ -2,6 +2,7 @@ import '@reports-web/core';
 import {
   createStaticAdapter,
   createLocalStorageAdapter,
+  dateFormatHintFor,
   t,
   type ReportSchemaV1,
   type ReportsViewerElement,
@@ -51,7 +52,17 @@ function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** QA: `ar_SA` is the English hint until the underscore is a hyphen (BUG-76). */
+function hintForReportLocale(locale: string | undefined): string {
+  return dateFormatHintFor((locale ?? 'en').replace(/_/g, '-'));
+}
+
+function syncDateFormatHint(schema: { meta?: { locale?: string } } | null | undefined): void {
+  viewer.dateFormatHint = hintForReportLocale(schema?.meta?.locale);
+}
+
 function applySchema(schema: ReportSchemaV1): void {
+  syncDateFormatHint(schema);
   viewer.schema = schema;
   builder.schema = schema;
 }
@@ -176,7 +187,9 @@ viewer.addEventListener('export-error', (e) => {
 
 builder.addEventListener('request-preview', () => {
   viewer.fontsBaseUrl = builder.fontsBaseUrl;
-  viewer.schema = builder.getSchema();
+  const schema = builder.getSchema();
+  syncDateFormatHint(schema);
+  viewer.schema = schema;
   viewer.locale = state.locale;
   viewer.dirOverride = state.locale === 'ar' ? 'rtl' : 'ltr';
   builder.previewing = true;
@@ -195,6 +208,7 @@ builder.addEventListener('ribbon-tab', (event) => {
 
 builder.addEventListener('save', (e) => {
   const schema = (e as CustomEvent<{ schema: ReportSchemaV1 }>).detail.schema;
+  syncDateFormatHint(schema);
   viewer.schema = schema;
   state.activeReportId = schema.id;
   void renderSavedList();

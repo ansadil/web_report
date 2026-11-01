@@ -6,6 +6,7 @@ export * from './engine/aggregator.js';
 export * from './engine/expression.js';
 export * from './engine/dictionary.js';
 export * from './engine/parameters.js';
+export * from './engine/relative-dates.js';
 export { Logger, ConsoleSink, MemorySink, logger } from './logging/logger.js';
 export type { LogLevel, LogEntry, LogSink } from './logging/logger.js';
 export * from './adapters/data/index.js';

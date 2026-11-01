@@ -1,6 +1,15 @@
-import type { ParameterDef, ParameterOption } from '@reports-web/shared';
-import type { DataQuery } from '../adapters/data/types.js';
+import type { LocaleTag, LocalizedText, ParameterDef, ParameterOption, ParameterOptionsSource, ParameterType, Row } from '@reports-web/shared';
+import { formatNumber, isArabicLocale, uiLanguage } from '@reports-web/shared';
+import type { DataAdapter, DataQuery } from '../adapters/data/types.js';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
+import { resolveLabel } from './dictionary.js';
+import {
+  isRelativeDatePreset,
+  isRelativeDateRangePreset,
+  resolveRelativeDate,
+  resolveRelativeDateRange,
+  type WeekStart,
+} from './relative-dates.js';
 
 /** Parameter values supplied by the host, keyed by `ParameterDef.name`. */
 export type ParameterValues = Readonly<Record<string, unknown>>;
@@ -19,6 +28,21 @@ export interface ParameterIssue {
   readonly name: string;
   readonly code: 'required' | 'invalid';
   readonly message: string;
+}
+
+/**
+ * Which rule an issue broke (finer than `ParameterIssue.code`, which stays `'required' | 'invalid'`):
+ * `required` (no value), `type` (cannot be coerced to the declared type), `option` (not an allowed select option),
+ * `incomplete` (required dateRange with one end), `range` (dateRange from > to), `min` / `max` (out of bounds).
+ */
+export type ParameterRule = 'required' | 'type' | 'option' | 'incomplete' | 'range' | 'min' | 'max';
+
+/** Options for resolving / validating parameter values. */
+export interface ResolveParametersOptions {
+  /** Reference instant for relative defaults and bounds (`today`, `thisMonth`, `now`, ...). Default: current time. */
+  readonly now?: Date | number;
+  /** First day of the week for week presets; default 0 (Sunday). */
+  readonly weekStartsOn?: WeekStart;
 }
 
 export type ResolveParametersResult =
@@ -42,7 +66,15 @@ function formatIssues(issues: readonly ParameterIssue[]): string {
 const MISSING = Symbol('missing');
 type Coerced = unknown | typeof MISSING;
 
-class InvalidValue extends Error {}
+class InvalidValue extends Error {
+  constructor(
+    message: string,
+    readonly rule: Exclude<ParameterRule, 'required'> = 'type',
+    readonly args: Readonly<Record<string, unknown>> = {},
+  ) {
+    super(message);
+  }
+}
 
 function isBlank(v: unknown): boolean {
   return v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
@@ -157,13 +189,13 @@ function coerceDateRange(def: ParameterDef, v: unknown): DateRangeValue | typeof
   else throw new InvalidValue('expected { from, to }');
   const hasFrom = !isBlank(from);
   const hasTo = !isBlank(to);
-  if ((!hasFrom || !hasTo) && def.required) throw new InvalidValue('dateRange requires both from and to');
+  if ((!hasFrom || !hasTo) && def.required) throw new InvalidValue('dateRange requires both from and to', 'incomplete');
   if (!hasFrom && !hasTo) return MISSING; // optional range with neither end: omitted like any absent optional value
   const r: DateRangeValue = {};
   if (hasFrom) r.from = coerceDate(from);
   if (hasTo) r.to = coerceDate(to);
   if (r.from !== undefined && r.to !== undefined && Date.parse(r.from) > Date.parse(r.to)) {
-    throw new InvalidValue('from must not be after to');
+    throw new InvalidValue('from must not be after to', 'range');
   }
   return r;
 }
@@ -176,7 +208,7 @@ function coerceSelect(def: ParameterDef, v: unknown): unknown {
   // tolerate string form of a non-string option value (e.g. "2" from a <select> for value 2)
   const loose = options.find((o) => String(o.value) === String(v));
   if (loose && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) return loose.value;
-  throw new InvalidValue('value is not one of the allowed options');
+  throw new InvalidValue('value is not one of the allowed options', 'option');
 }
 
 function coerce(def: ParameterDef, v: unknown): Coerced {
@@ -209,40 +241,147 @@ function coerce(def: ParameterDef, v: unknown): Coerced {
   }
 }
 
-/**
- * Resolves effective parameter values: explicit value (blank = absent) ?? `ParameterDef.default`, coerced to the declared type
- * (number, bool, date -> local `YYYY-MM-DD` (Date, epoch ms, strict YYYY-MM-DD or ISO 8601 date-time; anything else invalid), datetime -> ISO via toISOString() or a validated ISO string, dateRange -> `{ from, to }` local dates (optional ranges may be open-ended), select -> matching option value).
- * Required parameters without a value produce a `required` issue. Optional parameters without a value are omitted.
- * Values for names that are not declared are passed through unchanged.
- */
-export function resolveParameterValues(
+/** Replaces relative presets in a `default` (`thisMonth`, `{ from: 'startOfMonth', to: 'today' }`, `'now'`) by concrete values. */
+function resolveDefault(def: ParameterDef, v: unknown, opts?: ResolveParametersOptions): unknown {
+  switch (def.type) {
+    case 'date':
+      return isRelativeDatePreset(v) ? resolveRelativeDate(v, opts) : v;
+    case 'datetime':
+      return v === 'now' ? nowDate(opts).toISOString() : v;
+    case 'dateRange': {
+      if (isRelativeDateRangePreset(v)) return resolveRelativeDateRange(v, opts);
+      const end = (e: unknown) => (isRelativeDatePreset(e) ? resolveRelativeDate(e, opts) : e);
+      if (Array.isArray(v) && v.length === 2) return [end(v[0]), end(v[1])];
+      if (v && typeof v === 'object' && !(v instanceof Date)) {
+        const r = v as { from?: unknown; to?: unknown };
+        return { from: end(r.from), to: end(r.to) };
+      }
+      return v;
+    }
+    default:
+      return v;
+  }
+}
+
+function nowDate(opts?: ResolveParametersOptions): Date {
+  return opts?.now === undefined ? new Date() : new Date(opts.now);
+}
+
+/** Concrete `min` / `max` for a parameter (presets resolved), or undefined when absent / not applicable. */
+function resolveBound(def: ParameterDef, b: number | string | undefined, opts?: ResolveParametersOptions): number | string | undefined {
+  if (b === undefined) return undefined;
+  switch (def.type) {
+    case 'number':
+      return typeof b === 'number' && Number.isFinite(b) ? b : undefined;
+    case 'date':
+    case 'dateRange':
+      if (isRelativeDatePreset(b)) return resolveRelativeDate(b, opts);
+      return typeof b === 'string' && ISO_DATE_ONLY.test(b) ? b : undefined;
+    case 'datetime':
+      if (b === 'now') return nowDate(opts).toISOString();
+      return typeof b === 'string' && parseIsoDateString(b) ? b : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** Epoch ms of a validated ISO date / date-time string (date-only and zone-less values are local time). */
+function instantOf(s: string): number {
+  const p = parseIsoDateString(s)!;
+  if (p.instant !== undefined) return p.instant;
+  const m = ISO_DATE_TIME.exec(s);
+  const [y, mo, d] = p.ymd.split('-').map(Number) as [number, number, number];
+  const t = new Date(2000, mo - 1, d, m ? +m[4]! : 0, m ? +m[5]! : 0, m?.[6] ? +m[6] : 0, m?.[7] ? Math.floor(+`0.${m[7]}` * 1000) : 0);
+  t.setFullYear(y);
+  return t.getTime();
+}
+
+function checkBounds(def: ParameterDef, v: unknown, opts?: ResolveParametersOptions): void {
+  const min = resolveBound(def, def.min, opts);
+  const max = resolveBound(def, def.max, opts);
+  if (min === undefined && max === undefined) return;
+  if (def.type === 'number') {
+    const n = v as number;
+    if (min !== undefined && n < (min as number)) throw new InvalidValue(`must be at least ${min}`, 'min', { min });
+    if (max !== undefined && n > (max as number)) throw new InvalidValue(`must be at most ${max}`, 'max', { max });
+    return;
+  }
+  if (def.type === 'datetime') {
+    const t = instantOf(v as string);
+    if (min !== undefined && t < instantOf(min as string)) throw new InvalidValue(`must not be before ${min}`, 'min', { min });
+    if (max !== undefined && t > instantOf(max as string)) throw new InvalidValue(`must not be after ${max}`, 'max', { max });
+    return;
+  }
+  const ends = def.type === 'dateRange' ? [(v as DateRangeValue).from, (v as DateRangeValue).to] : [v as string];
+  for (const e of ends) {
+    if (e === undefined) continue;
+    if (min !== undefined && e < (min as string)) throw new InvalidValue(`must not be before ${min}`, 'min', { min });
+    if (max !== undefined && e > (max as string)) throw new InvalidValue(`must not be after ${max}`, 'max', { max });
+  }
+}
+
+/** An issue with the rule it broke and the values its message refers to (e.g. `{ min }`). */
+export interface ParameterIssueDetail extends ParameterIssue {
+  readonly rule: ParameterRule;
+  readonly args: Readonly<Record<string, unknown>>;
+}
+
+interface DetailedResolution {
+  readonly values: Record<string, unknown>;
+  readonly issues: ParameterIssueDetail[];
+}
+
+function resolveDetailed(
   defs: readonly ParameterDef[] | undefined,
-  values?: ParameterValues | null,
-): ResolveParametersResult {
+  values: ParameterValues | null | undefined,
+  opts: ResolveParametersOptions | undefined,
+): DetailedResolution {
   const out: Record<string, unknown> = {};
-  const issues: ParameterIssue[] = [];
+  const issues: ParameterIssueDetail[] = [];
   const declared = new Set<string>();
   for (const def of defs ?? []) {
     declared.add(def.name);
     const explicit = values?.[def.name];
-    const raw = isBlank(explicit) ? def.default : explicit;
+    const raw = isBlank(explicit) ? resolveDefault(def, def.default, opts) : explicit;
     try {
       const v = coerce(def, raw);
       if (v === MISSING) {
-        if (def.required) issues.push({ name: def.name, code: 'required', message: 'value is required' });
+        if (def.required) issues.push({ name: def.name, code: 'required', message: 'value is required', rule: 'required', args: {} });
       } else {
+        checkBounds(def, v, opts);
         out[def.name] = v;
       }
     } catch (e) {
       if (!(e instanceof InvalidValue)) throw e;
-      issues.push({ name: def.name, code: 'invalid', message: e.message });
+      issues.push({ name: def.name, code: 'invalid', message: e.message, rule: e.rule, args: e.args });
     }
   }
   for (const [k, v] of Object.entries(values ?? {})) {
     if (!declared.has(k) && v !== undefined) out[k] = v;
   }
-  if (issues.length) return { ok: false, issues, error: formatIssues(issues) };
-  return { ok: true, values: out };
+  return { values: out, issues };
+}
+
+/**
+ * Resolves effective parameter values: explicit value (blank = absent) ?? `ParameterDef.default` (relative presets such
+ * as `thisMonth` / `today` / `now` resolved against `options.now`), coerced to the declared type
+ * (number, bool, date -> local `YYYY-MM-DD` (Date, epoch ms, strict YYYY-MM-DD or ISO 8601 date-time; anything else invalid), datetime -> ISO via toISOString() or a validated ISO string, dateRange -> `{ from, to }` local dates (optional ranges may be open-ended), select -> matching option value)
+ * and checked against `min` / `max`.
+ * Required parameters without a value produce a `required` issue. Optional parameters without a value are omitted.
+ * Values for names that are not declared are passed through unchanged.
+ * These are exactly the values `buildDataQuery` hands to data adapters (`DataQuery.params`).
+ */
+export function resolveParameterValues(
+  defs: readonly ParameterDef[] | undefined,
+  values?: ParameterValues | null,
+  options?: ResolveParametersOptions,
+): ResolveParametersResult {
+  const r = resolveDetailed(defs, values, options);
+  if (r.issues.length) {
+    const issues = r.issues.map(({ name, code, message }) => ({ name, code, message }));
+    return { ok: false, issues, error: formatIssues(issues) };
+  }
+  return { ok: true, values: r.values };
 }
 
 /**
@@ -252,8 +391,9 @@ export function resolveParameterValues(
 export function buildDataQuery(
   schema: Pick<ReportSchemaV1, 'dataset'> & Partial<Pick<ReportSchemaV1, 'parameters'>>,
   values?: ParameterValues | null,
+  options?: ResolveParametersOptions,
 ): DataQuery {
-  const resolved = resolveParameterValues(schema.parameters, values);
+  const resolved = resolveParameterValues(schema.parameters, values, options);
   if (!resolved.ok) throw new ParameterValidationError(resolved.issues);
   return { source: schema.dataset.source, params: { ...(schema.dataset.params ?? {}), ...resolved.values } };
 }
@@ -278,4 +418,290 @@ export function parameterValuesEqual(a: ParameterValues | null | undefined, b: P
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Parameters panel API: normalized definitions, localized validation, option loading.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Anything that carries parameter definitions: a `ReportSchemaV1`, `{ parameters, meta }`, or a plain `ParameterDef[]`. */
+export type ParametersSource =
+  | readonly ParameterDef[]
+  | { readonly parameters?: readonly ParameterDef[]; readonly meta?: { readonly locale?: string } };
+
+export interface ParameterPanelOptions extends ResolveParametersOptions {
+  /** UI / message locale (`ar`, `ar-SA`, `en`, ...). Default: `report.meta.locale`, else `en`. */
+  readonly locale?: LocaleTag;
+}
+
+export interface ParameterOptionItem {
+  readonly value: unknown;
+  /** Label resolved for the requested locale. */
+  readonly label: string;
+}
+
+/** A `ParameterDef` normalized for rendering one field of a parameters panel. */
+export interface ParameterDefinition {
+  readonly name: string;
+  readonly type: ParameterType;
+  /** Label for the locale (falls back to `en`, any label, then `name`). */
+  readonly label: string;
+  /** Description for the locale, when the template has one. */
+  readonly description?: string;
+  readonly required: boolean;
+  /**
+   * The default, resolved (relative presets applied against `now`) and coerced like an input value, e.g.
+   * `{ from: '2026-10-01', to: '2026-10-31' }` for `default: 'thisMonth'`. Undefined when there is no usable default.
+   */
+  readonly defaultValue?: unknown;
+  /** The relative preset the default came from (`'thisMonth'`, `'today'`, `'now'`, ...), if any. */
+  readonly defaultPreset?: string;
+  /** Bounds with presets resolved (`number` for number params, `YYYY-MM-DD` for date/dateRange, ISO for datetime). */
+  readonly min?: number | string;
+  readonly max?: number | string;
+  /** Static select options with labels for the locale. */
+  readonly options?: readonly ParameterOptionItem[];
+  /** Dynamic select options: load them with `loadParameterOptions`. */
+  readonly optionsSource?: ParameterOptionsSource;
+  /** The original definition from the template. */
+  readonly def: ParameterDef;
+}
+
+function sourceDefs(report: ParametersSource | null | undefined): readonly ParameterDef[] {
+  if (!report) return [];
+  if (Array.isArray(report)) return report as readonly ParameterDef[];
+  return (report as { parameters?: readonly ParameterDef[] }).parameters ?? [];
+}
+
+function sourceLocale(report: ParametersSource | null | undefined, opts?: ParameterPanelOptions): string {
+  if (opts?.locale) return opts.locale;
+  if (report && !Array.isArray(report)) {
+    const l = (report as { meta?: { locale?: string } }).meta?.locale;
+    if (l) return l;
+  }
+  return 'en';
+}
+
+/** Label of a parameter for `locale` (`label` -> `name`); `ar-SA` falls back to `ar` labels. */
+export function parameterLabel(def: Pick<ParameterDef, 'name' | 'label'>, locale: LocaleTag = 'en'): string {
+  return localized(def.label, locale, def.name);
+}
+
+function localized(text: LocalizedText | undefined, locale: string, fallback: string): string {
+  if (text && typeof text === 'object' && !text[locale]) {
+    const lang = uiLanguage(locale);
+    if (text[lang]) return text[lang]!;
+  }
+  return resolveLabel(text, locale, fallback);
+}
+
+function presetOf(def: ParameterDef): string | undefined {
+  const d = def.default;
+  if (def.type === 'date' && isRelativeDatePreset(d)) return d;
+  if (def.type === 'dateRange' && isRelativeDateRangePreset(d)) return d;
+  if (def.type === 'datetime' && d === 'now') return d;
+  return undefined;
+}
+
+/**
+ * Normalized parameter definitions of a report, in template order, ready for a parameters panel: localized label and
+ * description, `required` as a boolean, the default resolved (relative presets applied) and coerced, resolved
+ * `min` / `max`, and localized static options (or the `optionsSource` to load). Old templates without parameters -> `[]`.
+ */
+export function getParameterDefinitions(report: ParametersSource | null | undefined, options?: ParameterPanelOptions): ParameterDefinition[] {
+  const locale = sourceLocale(report, options);
+  return sourceDefs(report).map((def) => {
+    let defaultValue: unknown;
+    if (!isBlank(def.default)) {
+      const r = resolveDetailed([{ ...def, required: false }], null, options);
+      if (r.issues.length === 0) defaultValue = r.values[def.name];
+    }
+    const min = resolveBound(def, def.min, options);
+    const max = resolveBound(def, def.max, options);
+    const preset = presetOf(def);
+    const description = def.description !== undefined ? localized(def.description, locale, '') : '';
+    return {
+      name: def.name,
+      type: def.type,
+      label: parameterLabel(def, locale),
+      ...(description ? { description } : {}),
+      required: def.required === true,
+      ...(defaultValue !== undefined ? { defaultValue } : {}),
+      ...(preset ? { defaultPreset: preset } : {}),
+      ...(min !== undefined ? { min } : {}),
+      ...(max !== undefined ? { max } : {}),
+      ...(Array.isArray(def.options)
+        ? { options: (def.options as readonly ParameterOption[]).map((o) => ({ value: o.value, label: localized(o.label, locale, String(o.value)) })) }
+        : {}),
+      ...(def.options && !Array.isArray(def.options) ? { optionsSource: def.options as ParameterOptionsSource } : {}),
+      def,
+    };
+  });
+}
+
+/** One field error of `validateParameterValues`, with a message in the requested locale. */
+export interface ParameterFieldError extends ParameterIssueDetail {
+  /** Localized label of the parameter. */
+  readonly label: string;
+}
+
+export interface ParameterValidationResult {
+  readonly ok: boolean;
+  /**
+   * Resolved values (defaults applied, coerced) for every parameter that is valid, plus undeclared values passed
+   * through. When `ok` these are exactly the values sent to the data adapter.
+   */
+  readonly values: Readonly<Record<string, unknown>>;
+  /** Errors in template order (at most one per parameter). */
+  readonly errors: readonly ParameterFieldError[];
+  /** `name -> localized message`, for showing each error next to its field. */
+  readonly fieldErrors: Readonly<Record<string, string>>;
+}
+
+type Lang = 'ar' | 'en';
+type MessageFn = (a: { label: string; type: ParameterType; min?: string; max?: string }) => string;
+
+const DATE_TYPES: ReadonlySet<ParameterType> = new Set(['date', 'datetime', 'dateRange']);
+
+const MESSAGES: Record<Lang, Record<ParameterRule, MessageFn>> = {
+  en: {
+    required: ({ label }) => `${label} is required`,
+    type: ({ type }) =>
+      ({
+        number: 'Enter a valid number',
+        date: 'Enter a valid date (YYYY-MM-DD)',
+        datetime: 'Enter a valid date and time',
+        dateRange: 'Enter a valid date range',
+        bool: 'Choose yes or no',
+        string: 'Enter a text value',
+        select: 'Choose one of the available options',
+      })[type],
+    option: () => 'Choose one of the available options',
+    incomplete: () => 'Enter both the start and the end date',
+    range: () => 'The start date must not be after the end date',
+    min: ({ type, min }) => (DATE_TYPES.has(type) ? `Must not be before ${min}` : `Must be at least ${min}`),
+    max: ({ type, max }) => (DATE_TYPES.has(type) ? `Must not be after ${max}` : `Must be at most ${max}`),
+  },
+  ar: {
+    required: ({ label }) => `يجب إدخال ${label}`,
+    type: ({ type }) =>
+      ({
+        number: 'أدخل رقمًا صالحًا',
+        date: 'أدخل تاريخًا صالحًا (YYYY-MM-DD)',
+        datetime: 'أدخل تاريخًا ووقتًا صالحين',
+        dateRange: 'أدخل فترة صالحة',
+        bool: 'اختر نعم أو لا',
+        string: 'أدخل قيمة نصية',
+        select: 'اختر إحدى القيم المتاحة',
+      })[type],
+    option: () => 'اختر إحدى القيم المتاحة',
+    incomplete: () => 'أدخل تاريخ البداية وتاريخ النهاية',
+    range: () => 'يجب ألا يكون تاريخ البداية بعد تاريخ النهاية',
+    min: ({ type, min }) => (DATE_TYPES.has(type) ? `يجب ألا يكون التاريخ قبل ${min}` : `يجب ألا تقل القيمة عن ${min}`),
+    max: ({ type, max }) => (DATE_TYPES.has(type) ? `يجب ألا يكون التاريخ بعد ${max}` : `يجب ألا تزيد القيمة عن ${max}`),
+  },
+};
+
+const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩';
+
+/** Bound for a message: numbers via `formatNumber` (Arabic-Indic digits for `ar*`), dates with localized digits. */
+function formatBound(v: unknown, locale: string): string | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v === 'number') return formatNumber(v, locale);
+  const s = String(v);
+  return isArabicLocale(locale) ? s.replace(/[0-9]/g, (d) => ARABIC_INDIC[+d]!) : s;
+}
+
+/**
+ * Localized (ar / en; `ar-*` -> Arabic, anything else -> English) message for an issue, e.g. `يجب إدخال الفرع` /
+ * `Branch is required`. Numbers in the message follow the locale's digits (Arabic-Indic for Arabic).
+ */
+export function formatParameterIssue(
+  issue: Pick<ParameterIssueDetail, 'rule'> & Partial<Pick<ParameterIssueDetail, 'args'>>,
+  def: Pick<ParameterDef, 'name' | 'label' | 'type'>,
+  locale: LocaleTag = 'en',
+): string {
+  const lang: Lang = uiLanguage(locale);
+  const args = issue.args ?? {};
+  return MESSAGES[lang][issue.rule]({
+    label: parameterLabel(def, locale),
+    type: def.type,
+    min: formatBound(args.min, locale),
+    max: formatBound(args.max, locale),
+  });
+}
+
+/**
+ * Validates host / panel values against the report's parameters exactly like the data fetch does (same coercion,
+ * defaults, relative presets, `required`, select options, dateRange from <= to, `min` / `max`) and returns per-field
+ * errors with messages in `options.locale` (default `report.meta.locale`). Never throws for invalid values.
+ */
+export function validateParameterValues(
+  report: ParametersSource | null | undefined,
+  values?: ParameterValues | null,
+  options?: ParameterPanelOptions,
+): ParameterValidationResult {
+  const defs = sourceDefs(report);
+  const locale = sourceLocale(report, options);
+  const r = resolveDetailed(defs, values, options);
+  const byName = new Map(defs.map((d) => [d.name, d]));
+  const errors: ParameterFieldError[] = r.issues.map((i) => {
+    const def = byName.get(i.name)!;
+    return { ...i, label: parameterLabel(def, locale), message: formatParameterIssue(i, def, locale) };
+  });
+  const fieldErrors: Record<string, string> = {};
+  for (const e of errors) fieldErrors[e.name] = e.message;
+  return { ok: errors.length === 0, values: r.values, errors, fieldErrors };
+}
+
+export interface LoadParameterOptionsOptions {
+  readonly locale?: LocaleTag;
+  readonly signal?: AbortSignal;
+  /** Extra params for the options query (e.g. a tenant id); sent as `DataQuery.params`. */
+  readonly params?: Readonly<Record<string, unknown>>;
+}
+
+function readPath(row: Row, path: string): unknown {
+  if (path in row) return row[path];
+  let cur: unknown = row;
+  for (const k of path.split('.')) {
+    if (cur == null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[k];
+  }
+  return cur;
+}
+
+/**
+ * Options of a `select` parameter for the panel. Static options are returned with localized labels; for
+ * `options: { source, valueField, labelField }` the rows of `source` are fetched through `adapter`
+ * (`adapter.fetch({ source, params })`) and mapped to `{ value: row[valueField], label: row[labelField] }`
+ * (dotted paths allowed; `LocalizedText` labels resolved; rows without a value and duplicate values skipped).
+ */
+export async function loadParameterOptions(
+  def: Pick<ParameterDef, 'name' | 'options'>,
+  adapter: DataAdapter | null | undefined,
+  options?: LoadParameterOptionsOptions,
+): Promise<ParameterOptionItem[]> {
+  const locale = options?.locale ?? 'en';
+  if (!def.options) return [];
+  if (Array.isArray(def.options)) {
+    return (def.options as readonly ParameterOption[]).map((o) => ({ value: o.value, label: localized(o.label, locale, String(o.value)) }));
+  }
+  const src = def.options as ParameterOptionsSource;
+  if (!adapter) throw new Error(`parameter "${def.name}": options source "${src.source}" needs a data adapter`);
+  const rows = await adapter.fetch({ source: src.source, ...(options?.params ? { params: options.params } : {}) }, options?.signal);
+  const seen = new Set<string>();
+  const out: ParameterOptionItem[] = [];
+  for (const row of rows) {
+    const value = readPath(row, src.valueField);
+    if (value === undefined || value === null) continue;
+    const key = typeof value === 'object' ? JSON.stringify(value) : `${typeof value}:${String(value)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const raw = readPath(row, src.labelField);
+    const label =
+      raw && typeof raw === 'object' ? localized(raw as LocalizedText, locale, String(value)) : raw == null || raw === '' ? String(value) : String(raw);
+    out.push({ value, label });
+  }
+  return out;
 }

@@ -254,6 +254,11 @@ export interface InterpretInput {
   readonly rows: readonly Row[];
   /** When the report is rendered; defaults to current time. Used by `now()` / `printedAt`. */
   readonly printedAt?: Date | string | number;
+  /**
+   * Resolved report parameter values (see `resolveParameterValues`). When given, expressions can read them as
+   * `params.<name>` (e.g. `params.period.from`, `params.branch`). Omitted -> no `params` variable (unchanged behavior).
+   */
+  readonly params?: Readonly<Record<string, unknown>>;
 }
 
 function resolvePrintedAt(input?: Date | string | number): Date {
@@ -267,6 +272,7 @@ export function buildReportEvalVars(
   schema: ReportSchemaV1,
   rows: readonly Row[],
   printedAt?: Date | string | number,
+  params?: Readonly<Record<string, unknown>>,
 ): Record<string, unknown> {
   return {
     __rows__: rows,
@@ -274,12 +280,13 @@ export function buildReportEvalVars(
     dataset: schema.dataset,
     page: schema.page,
     printedAt: resolvePrintedAt(printedAt),
+    ...(params ? { params } : {}),
   };
 }
 
 function resolveWatermark(
   wm: Watermark | undefined,
-  ctx: { schema: ReportSchemaV1; aggregates: Record<string, unknown>; printedAt?: Date | string | number },
+  ctx: { schema: ReportSchemaV1; aggregates: Record<string, unknown>; printedAt?: Date | string | number; params?: Readonly<Record<string, unknown>> },
 ): RenderWatermark | undefined {
   if (!wm) return undefined;
   if (wm.kind === 'image') {
@@ -288,7 +295,7 @@ function resolveWatermark(
   let text = wm.text;
   if (wm.expression && wm.expression.trim().length > 0) {
     const evalCtx = {
-      vars: buildReportEvalVars(ctx.schema, [], ctx.printedAt),
+      vars: buildReportEvalVars(ctx.schema, [], ctx.printedAt, ctx.params),
       aggregates: ctx.aggregates,
     };
     const r = tryEvaluate(wm.expression, evalCtx);
@@ -298,15 +305,15 @@ function resolveWatermark(
   return { kind: 'text', text, fontSize: wm.fontSize, color: wm.color, opacity: wm.opacity, rotation: wm.rotation };
 }
 
-export function interpret({ schema, rows, printedAt }: InterpretInput): RenderTree {
+export function interpret({ schema, rows, printedAt, params }: InterpretInput): RenderTree {
   const t0 = performance.now();
   const aggRequests = collectAggregateRequests(schema);
   const aggregates = computeAggregates(rows, aggRequests);
   const dims = pageDims(schema.page.size, schema.page.orientation);
   const sections: RenderSection[] = [];
-  const reportVars = buildReportEvalVars(schema, rows, printedAt);
+  const reportVars = buildReportEvalVars(schema, rows, printedAt, params);
   const baseCtx = { aggregates, vars: reportVars, locale: schema.meta.locale };
-  const watermark = resolveWatermark(schema.watermark, { schema, aggregates, printedAt });
+  const watermark = resolveWatermark(schema.watermark, { schema, aggregates, printedAt, params });
 
   const reportHeader = renderBand(schema.bands.reportHeader, 'reportHeader', baseCtx);
   if (reportHeader) sections.push(reportHeader);

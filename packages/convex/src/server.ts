@@ -40,6 +40,16 @@ export const templateArgs = {
 };
 
 /**
+ * Args validator for the host's report data query / HTTP action that `ConvexDataAdapter` calls. `params` are the
+ * report parameter values resolved and validated by core (`resolveParameterValues` / `buildDataQuery`) merged over
+ * `dataset.params`: dates as `YYYY-MM-DD`, dateRanges as `{ from?, to? }`, datetimes as ISO strings, select values as
+ * the option value. Re-check anything security-relevant (e.g. which branches the caller may see) on the server.
+ *
+ *   export const rows = query({ args: reportDataArgs, handler: async (ctx, { source, params }) => ... });
+ */
+export const reportDataArgs = { source: v.string(), params: v.any() };
+
+/**
  * Builds the public Convex functions `list`, `get`, `listVersions` (queries) and `save`, `remove`
  * (mutations). Export them from one module in `convex/` and hand their `api.<module>.*` references
  * to `ConvexTemplateStore`. Use `queryGeneric`-style internal wrappers yourself if you need

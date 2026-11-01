@@ -67,13 +67,65 @@ export interface ParameterOptionsSource {
   readonly labelField: string;
 }
 
+/**
+ * Relative date presets for `date` parameters (`default`, `min`, `max`), resolved against "now" in local calendar
+ * days when the report runs: e.g. `startOfMonth` on 2026-10-15 -> `2026-10-01`.
+ */
+export type RelativeDatePreset =
+  | 'today'
+  | 'yesterday'
+  | 'tomorrow'
+  | 'startOfWeek'
+  | 'endOfWeek'
+  | 'startOfMonth'
+  | 'endOfMonth'
+  | 'startOfQuarter'
+  | 'endOfQuarter'
+  | 'startOfYear'
+  | 'endOfYear';
+
+/**
+ * Relative presets for `dateRange` parameter defaults, e.g. `thisMonth` on 2026-10-15 -> `{ from: '2026-10-01', to: '2026-10-31' }`.
+ * A `dateRange` default may also be `{ from, to }` whose ends are dates or {@link RelativeDatePreset}s.
+ */
+export type RelativeDateRangePreset =
+  | 'today'
+  | 'yesterday'
+  | 'thisWeek'
+  | 'lastWeek'
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'thisQuarter'
+  | 'lastQuarter'
+  | 'thisYear'
+  | 'lastYear'
+  | 'last7Days'
+  | 'last30Days'
+  | 'monthToDate'
+  | 'yearToDate';
+
 export interface ParameterDef {
   readonly name: string;
   readonly label?: LocalizedText;
   readonly type: ParameterType;
   readonly required?: boolean;
+  /**
+   * Value used when the host supplies none. Besides a literal value of the parameter's type:
+   * `date` accepts a {@link RelativeDatePreset}, `dateRange` a {@link RelativeDateRangePreset} or `{ from, to }` with
+   * relative ends, `datetime` accepts `'now'`. Presets are only recognized here (and in `min` / `max`), never in
+   * host-supplied values.
+   */
   readonly default?: unknown;
   readonly options?: readonly ParameterOption[] | ParameterOptionsSource;
+  /** Help text for the parameters panel. */
+  readonly description?: LocalizedText;
+  /**
+   * Inclusive lower bound: a number for `number`; a `YYYY-MM-DD` date or {@link RelativeDatePreset} for `date` /
+   * `dateRange` (both ends); an ISO date-time (or `'now'`) for `datetime`. Ignored for other types.
+   */
+  readonly min?: number | string;
+  /** Inclusive upper bound; same forms as `min`. */
+  readonly max?: number | string;
 }
 
 export interface SystemVar {

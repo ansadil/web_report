@@ -12,10 +12,10 @@ function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: nu
     text ? `min-height:${pos.h}mm` : `height:${pos.h}mm`,
     text ? 'height:auto' : 'overflow:hidden',
     'box-sizing:border-box',
-    'display:flex',
-    'align-items:center',
+    text ? 'display:block' : 'display:flex',
+    text ? 'line-height:1.35' : 'align-items:center',
   ];
-  if (text) css.push('overflow:visible', 'line-height:1.35', 'white-space:normal');
+  if (text) css.push('overflow:visible', 'white-space:normal');
   if (style) {
     if (style.font) css.push(`font-family:${style.font}`);
     if (style.fontSize) css.push(`font-size:${style.fontSize}pt`);
@@ -24,7 +24,10 @@ function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: nu
     if (style.underline) css.push('text-decoration:underline');
     if (style.color) css.push(`color:${style.color}`);
     if (style.background) css.push(`background:${style.background}`);
-    if (style.align) css.push(`justify-content:${style.align === 'end' ? 'flex-end' : style.align === 'center' ? 'center' : style.align === 'justify' ? 'space-between' : 'flex-start'}`);
+    if (style.align) {
+      const align = style.align === 'end' ? 'end' : style.align === 'center' ? 'center' : style.align === 'justify' ? 'justify' : 'start';
+      css.push(text ? `text-align:${align}` : `justify-content:${style.align === 'end' ? 'flex-end' : style.align === 'center' ? 'center' : style.align === 'justify' ? 'space-between' : 'flex-start'}`);
+    }
     if (style.padding != null) css.push(`padding:${style.padding}mm`);
     if (style.border) {
       const b = style.border;

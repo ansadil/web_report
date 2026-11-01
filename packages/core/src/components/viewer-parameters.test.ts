@@ -118,6 +118,20 @@ describe('reports-viewer parameters', () => {
     expect(calls.at(-1)!.params).toMatchObject({ day: '2026-10-01' });
   });
 
+  it('BUG-68: date-format-hint names the field format in the invalid-date message (31/02/2026)', async () => {
+    const base = schemaWithParams();
+    const s = { ...base, meta: { ...base.meta, locale: 'ar', dir: 'rtl' as const }, parameters: [{ name: 'day', type: 'date' as const, required: true }] };
+    v.setAttribute('date-format-hint', 'يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م');
+    expect(v.dateFormatHint).toBe('يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م');
+    const err = nextEvent(v, 'parameters-error');
+    v.dataAdapter = adapter;
+    v.params = { day: '31/02/2026' };
+    v.schema = s;
+    const e = await err;
+    expect(e.detail.fieldErrors.day).toBe('أدخل تاريخًا صالحًا (\u2068يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م\u2069)');
+    expect(calls.length).toBe(0);
+  });
+
   it('ignores a stale response superseded by a newer parameter change', async () => {
     const resolvers: Array<(rows: { x: number }[]) => void> = [];
     const slow: DataAdapter = { id: 'slow', fetch: (q) => { calls.push(q); return new Promise((r) => resolvers.push(r)); } };

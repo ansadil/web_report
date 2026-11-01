@@ -459,6 +459,23 @@ export type ParametersSource =
 export interface ParameterPanelOptions extends ResolveParametersOptions {
   /** UI / message locale (`ar`, `ar-SA`, `en`, ...). Default: `report.meta.locale`, else `en`. */
   readonly locale?: LocaleTag;
+  /**
+   * Input format shown in the "invalid date" message of `date` parameters, matching how the host's date field is
+   * displayed (BUG-68). Default `'YYYY-MM-DD'`. Use {@link dateFormatHintFor} for the report locale's field format,
+   * e.g. `يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م` for Arabic.
+   */
+  readonly dateFormatHint?: string;
+}
+
+/** Default `dateFormatHint`: the canonical ISO calendar date. */
+export const DEFAULT_DATE_FORMAT_HINT = 'YYYY-MM-DD';
+
+/**
+ * `dateFormatHint` matching the viewer's date field for `locale`: `يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م` for Arabic (`ar`,
+ * `ar-*`), `YYYY-MM-DD` otherwise.
+ */
+export function dateFormatHintFor(locale: LocaleTag = 'en'): string {
+  return uiLanguage(locale) === 'ar' ? 'يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م' : DEFAULT_DATE_FORMAT_HINT;
 }
 
 export interface ParameterOptionItem {
@@ -594,17 +611,17 @@ export interface ParameterValidationResult {
 }
 
 type Lang = 'ar' | 'en';
-type MessageFn = (a: { label: string; type: ParameterType; min?: string; max?: string }) => string;
+type MessageFn = (a: { label: string; type: ParameterType; min?: string; max?: string; hint: string }) => string;
 
 const DATE_TYPES: ReadonlySet<ParameterType> = new Set(['date', 'datetime', 'dateRange']);
 
 const MESSAGES: Record<Lang, Record<ParameterRule, MessageFn>> = {
   en: {
     required: ({ label }) => `${label} is required`,
-    type: ({ type }) =>
+    type: ({ type, hint }) =>
       ({
         number: 'Enter a valid number',
-        date: 'Enter a valid date (YYYY-MM-DD)',
+        date: `Enter a valid date (${hint})`,
         datetime: 'Enter a valid date and time',
         dateRange: 'Enter a valid date range',
         bool: 'Choose yes or no',
@@ -623,10 +640,10 @@ const MESSAGES: Record<Lang, Record<ParameterRule, MessageFn>> = {
   },
   ar: {
     required: ({ label }) => `يجب إدخال ${label}`,
-    type: ({ type }) =>
+    type: ({ type, hint }) =>
       ({
         number: 'أدخل رقمًا صالحًا',
-        date: 'أدخل تاريخًا صالحًا (YYYY-MM-DD)',
+        date: `أدخل تاريخًا صالحًا (${hint})`,
         datetime: 'أدخل تاريخًا ووقتًا صالحين',
         dateRange: 'أدخل فترة صالحة',
         bool: 'اختر نعم أو لا',
@@ -715,12 +732,15 @@ export function formatParameterIssue(
   issue: Pick<ParameterIssueDetail, 'rule'> & Partial<Pick<ParameterIssueDetail, 'args'>>,
   def: Pick<ParameterDef, 'name' | 'label' | 'type'>,
   locale: LocaleTag = 'en',
-  options?: Pick<ResolveParametersOptions, 'timeZone'>,
+  options?: Pick<ParameterPanelOptions, 'timeZone' | 'dateFormatHint'>,
 ): string {
   const lang: Lang = uiLanguage(locale);
   const args = issue.args ?? {};
   const tz = tzOf(options);
+  const rawHint = options?.dateFormatHint?.trim() || DEFAULT_DATE_FORMAT_HINT;
   return MESSAGES[lang][issue.rule]({
+    // A host hint is bidi-isolated in Arabic so `/` and digits keep their order; the default text is unchanged.
+    hint: lang === 'ar' && rawHint !== DEFAULT_DATE_FORMAT_HINT ? `${FSI}${rawHint}${PDI}` : rawHint,
     label: parameterLabel(def, locale),
     type: def.type,
     min: formatBound(args.min, locale, def.type, tz),

@@ -327,6 +327,11 @@ export class ReportsViewerElement extends LitElement {
     return { timeZone: resolveTimeZone(this.timeZone) };
   }
 
+  /** `dateFormatHint` for parameter messages, when the host set one. */
+  private get _hintOption(): { dateFormatHint?: string } {
+    return this.dateFormatHint ? { dateFormatHint: this.dateFormatHint } : {};
+  }
+
   /**
    * BUG-59: an unknown `timeZone` is reported once per value (not on every render) with a warning and a
    * `time-zone-invalid` event (`{ timeZone, fallback }`); rendering continues in the fallback zone.
@@ -365,6 +370,13 @@ export class ReportsViewerElement extends LitElement {
    * involved).
    */
   @property({ type: String, attribute: 'time-zone' }) timeZone: string | undefined = undefined;
+
+  /**
+   * Format shown in the "invalid date" parameter message, matching how the host's date field is displayed (BUG-68).
+   * Attribute `date-format-hint`. Default `'YYYY-MM-DD'`; `dateFormatHintFor(locale)` gives the report locale's
+   * field format (`يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م` for Arabic).
+   */
+  @property({ type: String, attribute: 'date-format-hint' }) dateFormatHint: string | undefined = undefined;
 
   @state() private _phase: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
   @state() private _error = '';
@@ -523,9 +535,9 @@ export class ReportsViewerElement extends LitElement {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
         // `fieldErrors` on the event stay in the report locale. The banner and the fields use the viewer locale.
         const paramOptions = this._paramOptions;
-        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale, ...paramOptions });
+        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale, ...paramOptions, ...this._hintOption });
         const ui = this._locale;
-        const uiChecked = validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions });
+        const uiChecked = validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions, ...this._hintOption });
         this._fieldErrors = { ...uiChecked.fieldErrors };
         this._error = parametersBannerText(uiChecked.errors, ui);
         this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
@@ -826,7 +838,7 @@ export class ReportsViewerElement extends LitElement {
   }
 
   private _definitions(): ParameterDefinition[] {
-    return getParameterDefinitions(this.schema, { locale: this._locale, ...this._paramOptions });
+    return getParameterDefinitions(this.schema, { locale: this._locale, ...this._paramOptions, ...this._hintOption });
   }
 
   private _resetParameterDraft(): void {
@@ -858,7 +870,7 @@ export class ReportsViewerElement extends LitElement {
   }
 
   private _applyParameters(): void {
-    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale, ...this._paramOptions });
+    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale, ...this._paramOptions, ...this._hintOption });
     this._fieldErrors = { ...result.fieldErrors };
     if (!result.ok) {
       this._error = parametersBannerText(result.errors, this._locale);

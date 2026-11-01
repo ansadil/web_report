@@ -104,11 +104,11 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
           <option value="rtl" ?selected=${meta.dir === 'rtl'}>${t(state.locale, 'dirRtl')}</option>
         </select></span></div>
       `)}
-      ${renderCategory(t(state.locale, 'reportBands'), 3, html`
-        ${renderReportBandsEditor(state, cb)}
-        ${renderGroupsBandsEditor(state, cb)}
-        ${renderWatermarkEditor({ locale: state.locale, watermark: state.schema.watermark }, cb)}
-      `)}
+      ${renderCategory(t(state.locale, 'reportBands'), 3, [
+        renderReportBandsEditor(state, cb),
+        renderGroupsBandsEditor(state, cb),
+        renderWatermarkEditor({ locale: state.locale, watermark: state.schema.watermark }, cb),
+      ])}
     </div>
   `;
 }

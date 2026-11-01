@@ -1,0 +1,87 @@
+name: Examples
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: examples-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: Detect example apps
+    runs-on: ubuntu-latest
+    outputs:
+      examples: ${{ steps.list.outputs.examples }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: List existing examples
+        id: list
+        run: |
+          found=()
+          for name in vanilla next nuxt; do
+            if [ -f "examples/$name/package.json" ]; then
+              found+=("\"$name\"")
+            else
+              echo "::notice title=Examples::examples/$name is missing (no package.json), skipped."
+            fi
+          done
+          json="[$(IFS=,; echo "${found[*]}")]"
+          echo "examples=$json" >> "$GITHUB_OUTPUT"
+          echo "Examples to check: $json"
+
+  smoke:
+    name: Build and screenshot (${{ matrix.example }})
+    needs: detect
+    if: needs.detect.outputs.examples != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: ${{ fromJSON(needs.detect.outputs.examples) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Build example
+        run: pnpm --dir examples/${{ matrix.example }} run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter=@reports-web/core exec playwright install --with-deps chromium
+
+      - name: Screenshot and check <reports-viewer>
+        env:
+          EXAMPLE: ${{ matrix.example }}
+        run: node .github/scripts/examples-smoke.mjs
+
+      - name: Upload screenshot and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-${{ matrix.example }}
+          path: artifacts/examples/
+          if-no-files-found: ignore

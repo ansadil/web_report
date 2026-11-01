@@ -9,7 +9,7 @@ if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer
 
 export function ReportViewer(props: ReportViewerProps) {
   const ref = useRef<ReportsViewerElement | null>(null);
-  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, fontsBaseUrl, onRendered, onExport, onExportError, onParametersError, onTimeZoneInvalid, className, style } = props;
+  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, dateFormatHint, fontsBaseUrl, onRendered, onExport, onExportError, onParametersError, onTimeZoneInvalid, className, style } = props;
 
   useEffect(() => {
     const el = ref.current;
@@ -25,9 +25,9 @@ export function ReportViewer(props: ReportViewerProps) {
     el.hidePageBoundaries = !!hidePageBoundaries;
     el.params = params ?? null;
     el.timeZone = timeZone;
-    el.dateFormatHint = dateFormatHintFor((schema?.meta?.locale ?? locale ?? 'en').replace(/_/g, '-'));
+    el.dateFormatHint = dateFormatHint ?? dateFormatHintFor((schema?.meta?.locale ?? locale ?? 'en').replace(/_/g, '-'));
     if (fontsBaseUrl !== undefined) el.fontsBaseUrl = fontsBaseUrl;
-  }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, fontsBaseUrl]);
+  }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, dateFormatHint, fontsBaseUrl]);
 
   useEffect(() => {
     const el = ref.current;

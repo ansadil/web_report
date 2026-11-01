@@ -58,7 +58,7 @@ function hintForReportLocale(locale: string | undefined): string {
 }
 
 function syncDateFormatHint(schema: { meta?: { locale?: string } } | null | undefined): void {
-  viewer.dateFormatHint = hintForReportLocale(schema?.meta?.locale);
+  viewer.dateFormatHint = hintForReportLocale(viewer.locale ?? schema?.meta?.locale);
 }
 
 function applySchema(schema: ReportSchemaV1): void {
@@ -251,6 +251,7 @@ builder.addEventListener('locale-change', (event) => {
   state.locale = detail.locale;
   viewer.locale = detail.locale;
   viewer.dirOverride = detail.dir;
+  syncDateFormatHint(builder.getSchema());
   document.documentElement.setAttribute('dir', detail.dir);
   document.documentElement.setAttribute('lang', detail.locale);
   paintChrome();

@@ -329,6 +329,11 @@ export class ReportsViewerElement extends LitElement {
     return { timeZone: resolveTimeZone(this.timeZone) };
   }
 
+  /** `dateFormatHint` for parameter messages, when the host set one. */
+  private get _hintOption(): { dateFormatHint?: string } {
+    return this.dateFormatHint ? { dateFormatHint: this.dateFormatHint } : {};
+  }
+
   /**
    * BUG-59: an unknown `timeZone` is reported once per value (not on every render) with a warning and a
    * `time-zone-invalid` event (`{ timeZone, fallback }`); rendering continues in the fallback zone.
@@ -368,6 +373,13 @@ export class ReportsViewerElement extends LitElement {
    */
   @property({ type: String, attribute: 'time-zone' }) timeZone: string | undefined = undefined;
 
+  /**
+   * Format shown in the "invalid date" parameter message, matching how the host's date field is displayed (BUG-68).
+   * Attribute `date-format-hint`. Default `'YYYY-MM-DD'`; `dateFormatHintFor(locale)` gives the report locale's
+   * field format (`يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م` for Arabic).
+   */
+  @property({ type: String, attribute: 'date-format-hint' }) dateFormatHint: string | undefined = undefined;
+
   @state() private _phase: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
   @state() private _error = '';
   @state() private _html = '';
@@ -376,6 +388,8 @@ export class ReportsViewerElement extends LitElement {
   @state() private _pageCount = 0;
   @state() private _draft: Record<string, unknown> = {};
   @state() private _fieldErrors: Record<string, string> = {};
+  /** Which values produced the shown parameter errors (host `params` or the panel draft), to re-word them (BUG-74). */
+  private _errorSource: 'params' | 'draft' | null = null;
   @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
   @state() private _rowCount = 0;
   @state() private _generatedAt: Date | null = null;
@@ -412,6 +426,7 @@ export class ReportsViewerElement extends LitElement {
       this._generatedAt = null;
       this._refreshedAt = null;
     }
+    if (changed.has('dateFormatHint') && !changed.has('schema') && !changed.has('locale')) this._relocalizeParameterErrors();
     if (changed.has('schema') || changed.has('locale')) this._resetParameterDraft();
     if (
       changed.has('schema') ||
@@ -520,6 +535,7 @@ export class ReportsViewerElement extends LitElement {
         this._refreshedAt = stamped;
         this._error = '';
         this._fieldErrors = {};
+        this._errorSource = null;
       }
       this._phase = 'ready';
       await this.updateComplete;
@@ -534,10 +550,11 @@ export class ReportsViewerElement extends LitElement {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
         // `fieldErrors` on the event stay in the report locale. The banner and the fields use the viewer locale.
         const paramOptions = this._paramOptions;
-        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale, ...paramOptions });
+        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale, ...paramOptions, ...this._hintOption });
         const ui = this._locale;
-        const uiChecked = validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions });
+        const uiChecked = validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions, ...this._hintOption });
         this._fieldErrors = { ...uiChecked.fieldErrors };
+        this._errorSource = 'params';
         this._error = parametersBannerText(uiChecked.errors, ui);
         this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
       } else {
@@ -837,7 +854,7 @@ export class ReportsViewerElement extends LitElement {
   }
 
   private _definitions(): ParameterDefinition[] {
-    return getParameterDefinitions(this.schema, { locale: this._locale, ...this._paramOptions });
+    return getParameterDefinitions(this.schema, { locale: this._locale, ...this._paramOptions, ...this._hintOption });
   }
 
   private _resetParameterDraft(): void {
@@ -847,6 +864,7 @@ export class ReportsViewerElement extends LitElement {
     }
     this._draft = draft;
     this._fieldErrors = {};
+    this._errorSource = null;
     this._error = '';
     void this._loadParamOptions();
   }
@@ -868,9 +886,23 @@ export class ReportsViewerElement extends LitElement {
     this._draft = { ...this._draft, [name]: value };
   }
 
+  /**
+   * BUG-74: re-words the parameter errors already shown (field messages and banner) after `dateFormatHint` changes,
+   * without refetching or dispatching events.
+   */
+  private _relocalizeParameterErrors(): void {
+    if (!this._errorSource || !this.schema) return;
+    const values = this._errorSource === 'draft' ? this._draft : this.params;
+    const r = validateParameterValues(this.schema, values, { locale: this._locale, ...this._paramOptions, ...this._hintOption });
+    if (r.ok) return;
+    this._fieldErrors = { ...r.fieldErrors };
+    this._error = parametersBannerText(r.errors, this._locale);
+  }
+
   private _applyParameters(): void {
-    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale, ...this._paramOptions });
+    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale, ...this._paramOptions, ...this._hintOption });
     this._fieldErrors = { ...result.fieldErrors };
+    this._errorSource = result.ok ? null : 'draft';
     if (!result.ok) {
       this._error = parametersBannerText(result.errors, this._locale);
       this._placeholderParams = true;

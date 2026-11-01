@@ -29,6 +29,8 @@ export interface ReportViewerProps {
    * back to the default and calls `onTimeZoneInvalid`.
    */
   timeZone?: string;
+  /** Format shown in the "invalid date" parameter message (default `'YYYY-MM-DD'`); see `dateFormatHintFor(locale)`. */
+  dateFormatHint?: string;
   /** Base URL for the woff2 faces. Omitted leaves the element's default. */
   fontsBaseUrl?: string;
   className?: string;

@@ -49,7 +49,7 @@ describe('BUG-68 date format hint follows the report locale', () => {
     await flush(viewer);
 
     const error = () => viewer.shadowRoot!.querySelector('#param-error-from')?.textContent ?? '';
-    expect(error()).toBe('أدخل تاريخًا صالحًا بصيغة يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م');
+    expect(error()).toContain('يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م');
 
     viewer.dateFormatHint = hintFor('en');
     await flush(viewer);

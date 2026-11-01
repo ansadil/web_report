@@ -30,6 +30,11 @@ export const propertiesStyles = css`
     .bool { display: flex; align-items: center; gap: 4px; }
     .bool input { accent-color: #1f5fa8; width: auto; }
     .prow .v { position: relative; padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%; }
+    .prow.margin-row { align-items: start; }
+    .prow .v.margin-v { flex-wrap: wrap; }
+    .margin-error { flex: 1 0 100%; margin: 0; color: #b91c1c; font-size: 11px; line-height: 1.35; }
+    .margin-notice { margin: 6px 10px; color: #9a3412; background: #fff7ed; border: 1px solid #fdba74; border-radius: 6px; padding: 6px 8px; font-size: 11px; line-height: 1.35; }
+    .prow .v input[aria-invalid='true'] { border-color: #b91c1c; background: #fff5f5; }
     .prow .v input, .prow .v select {
       width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; height: 24px;
       font: inherit; font-size: 12px; color: inherit; text-overflow: ellipsis; border-radius: 4px; outline: none;

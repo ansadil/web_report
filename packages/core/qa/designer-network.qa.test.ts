@@ -231,7 +231,7 @@ describe('playground designer stays on the local origin', () => {
     const page = await browser.newPage();
     await page.setViewportSize({ width: 900, height: 700 });
     await page.goto(ORIGIN);
-    await page.waitForSelector('reports-viewer');
+    await page.waitForSelector('reports-viewer', { state: 'attached' });
     const box = await page.evaluate(async () => {
       const viewer = document.createElement('reports-viewer') as HTMLElement & {
         locale: string;

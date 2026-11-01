@@ -21,6 +21,7 @@ export const ReportViewer = defineComponent({
     hidePageBoundaries: { type: Boolean, default: false },
     params: { type: Object as PropType<ReportViewerProps['params']>, default: undefined },
     timeZone: { type: String, default: undefined },
+    dateFormatHint: { type: String, default: undefined },
     fontsBaseUrl: { type: String, default: undefined },
   },
   emits: ['rendered', 'export', 'export-error', 'parameters-error', 'time-zone-invalid'],
@@ -41,6 +42,7 @@ export const ReportViewer = defineComponent({
       el.hidePageBoundaries = props.hidePageBoundaries;
       el.params = props.params ?? null;
       el.timeZone = props.timeZone;
+      el.dateFormatHint = props.dateFormatHint;
       if (props.fontsBaseUrl !== undefined) el.fontsBaseUrl = props.fontsBaseUrl;
     };
 
@@ -69,7 +71,7 @@ export const ReportViewer = defineComponent({
     });
 
     watch(
-      () => [props.schema, props.rows, props.dataAdapter, props.chartAdapter, props.locale, props.dir, props.noToolbar, props.hideViewControls, props.hidePageBoundaries, props.params, props.timeZone, props.fontsBaseUrl],
+      () => [props.schema, props.rows, props.dataAdapter, props.chartAdapter, props.locale, props.dir, props.noToolbar, props.hideViewControls, props.hidePageBoundaries, props.params, props.timeZone, props.dateFormatHint, props.fontsBaseUrl],
       () => apply(),
       { deep: true },
     );

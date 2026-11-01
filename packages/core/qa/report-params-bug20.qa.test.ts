@@ -3,8 +3,10 @@
  * QA — BUG-20 (feat/report-parameters-fetch-v2 @ 998b0db): strict date / datetime parameter strings,
  * exercised through <reports-viewer>.params with a spy DataAdapter. Every rejection must fire
  * `parameters-error` with code 'invalid' and must NOT call the adapter.
- * Run with TZ=Asia/Riyadh (set here if unset, before any Date is built). Expected to FAIL on main.
+ * Machine-TZ independent; TZ defaults to Asia/Riyadh here if unset, before any Date is built. Expected to FAIL on main.
  */
+/** True when TZ was unset (or already Asia/Riyadh) before this file ran, i.e. the line below decides the machine zone. */
+const SUITE_SET_TZ = !process.env.TZ || process.env.TZ === 'Asia/Riyadh';
 process.env.TZ ||= 'Asia/Riyadh';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../src/components/reports-viewer.js';
@@ -23,6 +25,8 @@ function schema(parameters: unknown[]) {
   if (!r.ok) throw new Error(r.error);
   return r.value;
 }
+const riyadhOffset = (d: Date) =>
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Riyadh', timeZoneName: 'longOffset' }).formatToParts(d).find((p) => p.type === 'timeZoneName')!.value;
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 const DATE = [{ name: 'day', type: 'date', required: true }];
 const RANGE = [{ name: 'period', type: 'dateRange', required: true }];
@@ -60,7 +64,13 @@ describe('BUG-20: strict date / datetime strings via <reports-viewer> (TZ=Asia/R
   });
   afterEach(() => v.remove());
 
-  it('runtime is really UTC+3', () => expect(new Date(2026, 9, 1).getTimezoneOffset()).toBe(-180));
+  // Precondition for the Riyadh expectations below. The product reads Dates in its own `timeZone` (default
+  // Asia/Riyadh, BUG-52), not the machine zone, so: Asia/Riyadh must be UTC+3 for these instants, always; the machine
+  // offset is checked only when this file's own TZ default is in effect (the runner does not set TZ).
+  it('runtime is really UTC+3', () => {
+    expect(riyadhOffset(new Date('2026-09-30T21:00:00Z'))).toBe('GMT+03:00');
+    if (SUITE_SET_TZ) expect(new Date('2026-09-30T21:00:00Z').getTimezoneOffset()).toBe(-180);
+  });
 
   for (const bad of ['2026-02-30', '2026-04-31', '2025-02-29', '1900-02-29', '2026-13-01', '2026-00-10', '1', 'hello 5', '10/01/2026', '2026-10-01 10:00', '20261001', '2026-1-5', 'Thu, 01 Oct 2026 00:00:00 GMT', '2026-10-01T25:00:00Z', '2026-10-01T10:60:00Z', '2026-10-01T10:00:00+25:00']) {
     it(`date ${JSON.stringify(bad)} is rejected; no fetch`, async () => {

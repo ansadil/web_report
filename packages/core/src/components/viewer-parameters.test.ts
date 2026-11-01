@@ -280,4 +280,38 @@ describe('reports-viewer parameters: Arabic banner and time zone (BUG-52, BUG-53
     await rendered;
     expect(calls.at(-1)!.params).toEqual({ day: '2026-11-01' });
   });
+
+  it('BUG-59: emits time-zone-invalid once per unknown zone (not parameters-error) and still renders', async () => {
+    const invalid: CustomEvent[] = [];
+    const paramErrors: Event[] = [];
+    v.addEventListener('time-zone-invalid', (e) => invalid.push(e as CustomEvent));
+    v.addEventListener('parameters-error', (e) => paramErrors.push(e));
+    v.setAttribute('time-zone', 'Mars/Olympus');
+    let rendered = nextEvent(v, 'report-rendered');
+    v.dataAdapter = adapter;
+    v.params = { day: instant };
+    v.schema = dateReport();
+    await rendered;
+    expect(invalid.map((e) => e.detail)).toEqual([{ timeZone: 'Mars/Olympus', fallback: 'Asia/Riyadh' }]);
+    expect(paramErrors).toHaveLength(0);
+    expect(calls.at(-1)!.params).toEqual({ day: '2026-11-01' });
+
+    // re-renders with the same bad zone do not repeat the event
+    rendered = nextEvent(v, 'report-rendered');
+    v.params = { day: '2026-10-01' };
+    await rendered;
+    expect(invalid).toHaveLength(1);
+
+    // a different bad zone is reported again; a valid one is not
+    v.timeZone = 'Not/AZone';
+    await settle();
+    expect(invalid.map((e) => e.detail.timeZone)).toEqual(['Mars/Olympus', 'Not/AZone']);
+    rendered = nextEvent(v, 'report-rendered');
+    v.timeZone = 'UTC';
+    await rendered;
+    expect(invalid).toHaveLength(2);
+    v.timeZone = '';
+    await settle();
+    expect(invalid).toHaveLength(2);
+  });
 });

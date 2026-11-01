@@ -10,7 +10,7 @@ import {
   resolveRelativeDateRange,
   type WeekStart,
 } from './relative-dates.js';
-import { resolveTimeZone, ymdInTimeZone, zonedTimeToInstant } from './time-zone.js';
+import { resolveTimeZone, ymdInTimeZone, zonedParts, zonedTimeToInstant } from './time-zone.js';
 
 /** Parameter values supplied by the host, keyed by `ParameterDef.name`. */
 export type ParameterValues = Readonly<Record<string, unknown>>;
@@ -649,41 +649,51 @@ const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩';
 /** FIRST STRONG ISOLATE / POP DIRECTIONAL ISOLATE: keep a date's `-` `/` `:` from being reordered inside RTL text. */
 const FSI = '\u2068';
 const PDI = '\u2069';
+/** LEFT-TO-RIGHT ISOLATE: keeps `YYYY-MM-DD HH:mm` in reading order inside an RTL bound. */
+const LRI = '\u2066';
 
-const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** Locale-aware Gregorian date + time of an instant in `tz` (Arabic-Indic digits for `ar*`), e.g. `٠١‏/١١‏/٢٠٢٦، ٠١:٣٠`. */
+/**
+ * Offset of `tz` from UTC at the instant `ms` as `GMT+3` / `GMT-4` / `GMT+5:30` (`GMT+0` for UTC); computed from the
+ * zoned wall clock, so it is DST-correct for the instant and does not depend on ICU zone-name data.
+ */
+function gmtOffsetLabel(ms: number, tz: string): string {
+  const p = zonedParts(ms, tz);
+  const whole = Math.floor(ms / 1000) * 1000;
+  const wall = new Date(Date.UTC(2000, p.month - 1, p.day, p.hour, p.minute, p.second));
+  wall.setUTCFullYear(p.year, p.month - 1, p.day);
+  const minutes = Math.round((wall.getTime() - whole) / 60_000);
+  const abs = Math.abs(minutes);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `GMT${minutes < 0 ? '-' : '+'}${h}${m ? `:${pad2(m)}` : ''}`;
+}
+
+/**
+ * Date-time bound for messages (BUG-60): `YYYY-MM-DD HH:mm` (`:ss` only when non-zero, 24-hour, Gregorian) as the wall
+ * clock in `tz`, followed by the zone: its UTC offset at that instant and the IANA id, e.g.
+ * `2026-11-01 01:30 GMT+3 (Asia/Riyadh)`. ISO-like order is unambiguous in English (no US `11/01/2026`) and matches the
+ * `YYYY-MM-DD` date bounds and the `datetime` input format. Arabic uses the same order with Arabic-Indic digits and
+ * `غرينتش` for GMT, e.g. `٢٠٢٦-١١-٠١ ٠١:٣٠ غرينتش+٣ (Asia/Riyadh)`; the date-time is wrapped in LRI ... PDI so it is
+ * not reordered in RTL, and the Latin IANA id in FSI ... PDI.
+ */
 function formatDateTimeBound(ms: number, locale: string, tz: string): string {
-  const withSeconds = ms % 60_000 !== 0;
-  const key = `${locale}|${tz}|${withSeconds}`;
-  let f = dateTimeFormats.get(key);
-  if (!f) {
-    const opts: Intl.DateTimeFormatOptions = {
-      timeZone: tz,
-      calendar: 'gregory',
-      numberingSystem: isArabicLocale(locale) ? 'arab' : 'latn',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-      ...(withSeconds ? { second: '2-digit' as const } : {}),
-    };
-    try {
-      f = new Intl.DateTimeFormat(locale, opts);
-    } catch {
-      f = new Intl.DateTimeFormat(isArabicLocale(locale) ? 'ar' : 'en', opts);
-    }
-    dateTimeFormats.set(key, f);
-  }
-  return f.format(ms);
+  const p = zonedParts(ms, tz);
+  const year = p.year < 0 ? `-${String(-p.year).padStart(4, '0')}` : String(p.year).padStart(4, '0');
+  let text = `${year}-${pad2(p.month)}-${pad2(p.day)} ${pad2(p.hour)}:${pad2(p.minute)}`;
+  if (ms % 60_000 !== 0) text += `:${pad2(p.second)}`;
+  const offset = gmtOffsetLabel(ms, tz);
+  if (!isArabicLocale(locale)) return `${text} ${offset} (${tz})`;
+  const digits = (t: string) => t.replace(/[0-9]/g, (d) => ARABIC_INDIC[+d]!);
+  return `${LRI}${digits(text)}${PDI} ${digits(offset.replace('GMT', 'غرينتش'))} (${FSI}${tz}${PDI})`;
 }
 
 /**
  * Bound for a message: numbers via `formatNumber` (Arabic-Indic digits for `ar*`); `date` / `dateRange` bounds as
- * `YYYY-MM-DD` with localized digits; `datetime` bounds as a locale-aware date and time in the time zone (never a raw
- * UTC ISO string). In Arabic messages date bounds are wrapped in FSI ... PDI so they are not scrambled in RTL text.
+ * `YYYY-MM-DD` with localized digits; `datetime` bounds as `YYYY-MM-DD HH:mm` in the time zone plus the zone label
+ * (see `formatDateTimeBound`; never a raw UTC ISO string). In Arabic messages date bounds are wrapped in FSI ... PDI so
+ * they are not scrambled in RTL text.
  */
 function formatBound(v: unknown, locale: string, type: ParameterType, tz: string): string | undefined {
   if (v === undefined) return undefined;

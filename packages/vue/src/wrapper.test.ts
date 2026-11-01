@@ -68,4 +68,28 @@ describe('Vue ReportViewer params prop', () => {
     app.unmount();
     host.remove();
   });
+
+  it('emits time-zone-invalid for an unknown zone (BUG-59)', async () => {
+    const { createApp, nextTick } = await import('vue');
+    const invalid: unknown[] = [];
+    const paramErrors: unknown[] = [];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const app = createApp({
+      render: () =>
+        h(ReportViewer, {
+          schema: null,
+          timeZone: 'Mars/Olympus',
+          onTimeZoneInvalid: (d: unknown) => invalid.push(d),
+          onParametersError: (d: unknown) => paramErrors.push(d),
+        }),
+    });
+    app.mount(host);
+    await nextTick();
+    await (host.querySelector('reports-viewer') as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+    expect(invalid).toEqual([{ timeZone: 'Mars/Olympus', fallback: 'Asia/Riyadh' }]);
+    expect(paramErrors).toEqual([]);
+    app.unmount();
+    host.remove();
+  });
 });

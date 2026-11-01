@@ -23,7 +23,7 @@ export const ReportViewer = defineComponent({
     timeZone: { type: String, default: undefined },
     fontsBaseUrl: { type: String, default: undefined },
   },
-  emits: ['rendered', 'export', 'export-error', 'parameters-error'],
+  emits: ['rendered', 'export', 'export-error', 'parameters-error', 'time-zone-invalid'],
   setup(props, { emit }) {
     const elRef = ref<ReportsViewerElement | null>(null);
 
@@ -48,6 +48,7 @@ export const ReportViewer = defineComponent({
     const onExport = (e: Event) => emit('export', (e as CustomEvent).detail);
     const onErr = (e: Event) => emit('export-error', (e as CustomEvent).detail);
     const onParamsErr = (e: Event) => emit('parameters-error', (e as CustomEvent).detail);
+    const onTzInvalid = (e: Event) => emit('time-zone-invalid', (e as CustomEvent).detail);
 
     onMounted(() => {
       apply();
@@ -56,6 +57,7 @@ export const ReportViewer = defineComponent({
       el?.addEventListener('export', onExport);
       el?.addEventListener('export-error', onErr);
       el?.addEventListener('parameters-error', onParamsErr);
+      el?.addEventListener('time-zone-invalid', onTzInvalid);
     });
     onBeforeUnmount(() => {
       const el = elRef.value;
@@ -63,6 +65,7 @@ export const ReportViewer = defineComponent({
       el?.removeEventListener('export', onExport);
       el?.removeEventListener('export-error', onErr);
       el?.removeEventListener('parameters-error', onParamsErr);
+      el?.removeEventListener('time-zone-invalid', onTzInvalid);
     });
 
     watch(

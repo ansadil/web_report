@@ -67,7 +67,7 @@ importers:
         specifier: ^5.4.11
         version: 5.4.21(@types/node@22.19.18)(terser@5.51.2)
 
-  examples/nextjs:
+  examples/next:
     dependencies:
       '@reports-web/core':
         specifier: workspace:*

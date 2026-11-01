@@ -43,14 +43,21 @@ export function ReportBuilder(props: ReportBuilderProps) {
     };
   }, [onSave, onSaveError, onExportJson]);
 
-  return <reports-builder ref={ref as unknown as React.Ref<HTMLElement>} className={className} style={style} />;
+  return (
+    <reports-builder
+      ref={ref as unknown as React.Ref<HTMLElement>}
+      className={className}
+      style={style}
+      {...(fontsBaseUrl != null ? { 'fonts-base-url': fontsBaseUrl } : {})}
+    />
+  );
 }
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- augment React JSX intrinsic elements
   namespace JSX {
     interface IntrinsicElements {
-      'reports-builder': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'reports-builder': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & { 'fonts-base-url'?: string }, HTMLElement>;
     }
   }
 }

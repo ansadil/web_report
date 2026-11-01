@@ -2,7 +2,8 @@
   "name": "reports-web-nuxt",
   "private": true,
   "scripts": {
-    "build": "nuxt build"
+    "build": "rm -rf public/fonts && mkdir -p public/fonts && cp -a ../../packages/core/assets/fonts/. public/fonts/ && nuxt build",
+    "start:ci": "node .output/server/index.mjs"
   },
   "dependencies": {
     "@reports-web/core": "workspace:*",

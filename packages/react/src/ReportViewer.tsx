@@ -55,14 +55,21 @@ export function ReportViewer(props: ReportViewerProps) {
     };
   }, [onRendered, onExport, onExportError, onParametersError, onTimeZoneInvalid]);
 
-  return <reports-viewer ref={ref as unknown as React.Ref<HTMLElement>} className={className} style={style} />;
+  return (
+    <reports-viewer
+      ref={ref as unknown as React.Ref<HTMLElement>}
+      className={className}
+      style={style}
+      {...(fontsBaseUrl != null ? { 'fonts-base-url': fontsBaseUrl } : {})}
+    />
+  );
 }
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- augment React JSX intrinsic elements
   namespace JSX {
     interface IntrinsicElements {
-      'reports-viewer': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'reports-viewer': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & { 'fonts-base-url'?: string }, HTMLElement>;
     }
   }
 }

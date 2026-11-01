@@ -1,7 +1,7 @@
 <template>
   <section>
-    <ReportViewer :schema="schema" locale="ar" dir="rtl" :rows="rows" style="height: 420px" />
-    <ReportBuilder :schema="schema" locale="ar" dir="rtl" style="height: 520px" />
+    <ReportViewer :schema="schema" locale="ar" dir="rtl" :rows="rows" fonts-base-url="/fonts/" style="height: 420px" />
+    <ReportBuilder :schema="schema" locale="ar" dir="rtl" fonts-base-url="/fonts/" style="height: 520px" />
   </section>
 </template>
 

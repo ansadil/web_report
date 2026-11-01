@@ -1,8 +1,9 @@
 {
-  "name": "reports-web-nextjs",
+  "name": "reports-web-next",
   "private": true,
   "scripts": {
-    "build": "next build"
+    "build": "rm -rf public/fonts && mkdir -p public/fonts && cp -a ../../packages/core/assets/fonts/. public/fonts/ && next build",
+    "start:ci": "next start --hostname 127.0.0.1 --port ${PORT:-3010}"
   },
   "dependencies": {
     "@reports-web/core": "workspace:*",

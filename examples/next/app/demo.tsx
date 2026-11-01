@@ -27,9 +27,9 @@ export function Demo() {
   return (
     <main dir="rtl" lang="ar">
       <h1>العرض</h1>
-      <ReportViewer schema={schema} locale="ar" dir="rtl" rows={[{ amount: 120 }]} style={{ height: 420 }} />
+      <ReportViewer schema={schema} locale="ar" dir="rtl" rows={[{ amount: 120 }]} fontsBaseUrl="/fonts/" style={{ height: 420 }} />
       <h1>المصمم</h1>
-      <ReportBuilder schema={schema} locale="ar" dir="rtl" style={{ height: 520 }} />
+      <ReportBuilder schema={schema} locale="ar" dir="rtl" fontsBaseUrl="/fonts/" style={{ height: 520 }} />
     </main>
   );
 }

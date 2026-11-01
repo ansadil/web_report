@@ -78,6 +78,6 @@ export const ReportViewer = defineComponent({
       { deep: true },
     );
 
-    return () => h('reports-viewer', { ref: elRef });
+    return () => h('reports-viewer', { ref: elRef, ...(props.fontsBaseUrl != null ? { 'fonts-base-url': props.fontsBaseUrl } : {}) });
   },
 });

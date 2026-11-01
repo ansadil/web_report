@@ -60,6 +60,6 @@ export const ReportBuilder = defineComponent({
       { deep: true },
     );
 
-    return () => h('reports-builder', { ref: elRef });
+    return () => h('reports-builder', { ref: elRef, ...(props.fontsBaseUrl != null ? { 'fonts-base-url': props.fontsBaseUrl } : {}) });
   },
 });

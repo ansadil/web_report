@@ -33,6 +33,28 @@ export const hostStyles = css`
       color: var(--rb-text);
     }
     :host([data-left-collapsed='true']) { --rb-side-w: var(--rb-rail); }
+    slot[name='preview'] { display: none; }
+    :host([previewing]) slot[name='preview'] {
+      display: flex;
+      grid-column: 1 / -1;
+      grid-row: 3 / 5;
+      min-width: 0;
+      min-height: 0;
+      z-index: 4;
+      background: #dfe4eb;
+    }
+    :host([previewing]) ::slotted(reports-viewer) {
+      display: block;
+      flex: 1 1 auto;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+    }
+    :host([previewing]) aside.left,
+    :host([previewing]) main.center,
+    :host([previewing]) aside.props,
+    :host([previewing]) .page-tabs { visibility: hidden; }
     .titlebar { grid-area: title; }
     .page-tabs { grid-area: pages; }
     aside.props { grid-area: props; }

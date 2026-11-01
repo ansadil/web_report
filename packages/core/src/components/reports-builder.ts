@@ -49,6 +49,8 @@ export class ReportsBuilderElement extends LitElement {
   @property({ attribute: false }) actions: readonly BuilderAction[] = BUILDER_DEFAULT_ACTIONS;
   /** Folder of fonts.json and the woff2 faces. Default: the bundled assets/fonts directory. */
   @property({ type: String, attribute: 'fonts-base-url' }) fontsBaseUrl = DEFAULT_FONTS_BASE_URL;
+  /** When set, the canvas and side panels yield to the slotted preview (title, ribbon, and status stay). */
+  @property({ type: Boolean, reflect: true }) previewing = false;
 
   @state() private _schema: ReportSchemaV1 = emptySchema();
   @state() private _selectedIds: ReadonlySet<string> = new Set();

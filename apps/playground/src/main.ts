@@ -11,8 +11,6 @@ import { DATASETS, allTables } from './datasets.js';
 import { SAMPLE_REPORTS, getSampleReport } from './reports.js';
 
 type Locale = 'ar' | 'en';
-type View = 'viewer' | 'builder';
-
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
 const viewer = $('viewer') as ReportsViewerElement;
@@ -33,7 +31,6 @@ viewer.fontsBaseUrl = FONTS_BASE_URL;
 
 const state = {
   locale: 'ar' as Locale,
-  view: 'builder' as View,
   activeReportId: SAMPLE_REPORTS[0]!.id,
 };
 
@@ -145,17 +142,11 @@ function renderDatasets(): void {
     .join('');
 }
 
-function switchView(which: View): void {
-  state.view = which;
-  $('view-viewer').hidden = which !== 'viewer';
-  $('view-builder').hidden = which !== 'builder';
-}
-
 function switchLocale(loc: Locale): void {
   state.locale = loc;
   const dir = loc === 'ar' ? 'rtl' : 'ltr';
   viewer.locale = loc;
-  viewer.dir = '';
+  viewer.dirOverride = dir;
   builder.locale = loc;
   builder.dir = dir;
   document.documentElement.setAttribute('dir', dir);
@@ -186,7 +177,13 @@ viewer.addEventListener('export-error', (e) => {
 builder.addEventListener('request-preview', () => {
   viewer.fontsBaseUrl = builder.fontsBaseUrl;
   viewer.schema = builder.getSchema();
-  switchView('viewer');
+  viewer.locale = state.locale;
+  viewer.dirOverride = state.locale === 'ar' ? 'rtl' : 'ltr';
+  builder.previewing = true;
+});
+builder.addEventListener('ribbon-tab', (event) => {
+  const tab = (event as CustomEvent<{ tab: string }>).detail.tab;
+  if (tab !== 'preview') builder.previewing = false;
 });
 
 builder.addEventListener('save', (e) => {
@@ -232,7 +229,7 @@ builder.addEventListener('locale-change', (event) => {
   const detail = (event as CustomEvent<{ locale: Locale; dir: 'rtl' | 'ltr' }>).detail;
   state.locale = detail.locale;
   viewer.locale = detail.locale;
-  viewer.dir = '';
+  viewer.dirOverride = detail.dir;
   document.documentElement.setAttribute('dir', detail.dir);
   document.documentElement.setAttribute('lang', detail.locale);
   paintChrome();
@@ -240,6 +237,4 @@ builder.addEventListener('locale-change', (event) => {
   void renderSavedList();
   renderDatasets();
 });
-$('tab-builder').addEventListener('click', () => switchView('builder'));
-
 switchLocale('ar');

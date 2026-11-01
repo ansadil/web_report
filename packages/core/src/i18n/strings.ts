@@ -171,6 +171,10 @@ type StringKey =
   | 'localeRtl'
   | 'reportParameters'
   | 'viewerParameters'
+  | 'of'
+  | 'runReport'
+  | 'resetParams'
+  | 'paramRequired'
   | 'elements'
   | 'savedState'
   | 'propertyGrid'
@@ -403,6 +407,10 @@ const en: Record<StringKey, string> = {
   localeRtl: 'Arabic · right to left',
   reportParameters: 'Parameters',
   viewerParameters: 'Report parameters',
+  of: 'of',
+  runReport: 'Run report',
+  resetParams: 'Reset',
+  paramRequired: 'Required',
   elements: 'Elements',
   savedState: 'Saved just now',
   propertyGrid: 'Property grid',
@@ -636,6 +644,10 @@ const ar: Record<StringKey, string> = {
   localeRtl: 'العربية · من اليمين لليسار',
   reportParameters: 'المعاملات',
   viewerParameters: 'معاملات التقرير',
+  of: 'من',
+  runReport: 'عرض التقرير',
+  resetParams: 'إعادة تعيين',
+  paramRequired: 'إلزامي',
   elements: 'العناصر',
   savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',

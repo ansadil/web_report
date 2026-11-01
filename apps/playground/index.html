@@ -119,13 +119,9 @@
         min-width: 0;
         min-height: 0;
       }
-      #view-viewer, #view-builder { height: 100%; min-height: 0; }
-      #view-viewer reports-viewer { display: block; height: 100vh; }
-      #view-builder reports-builder { display: grid; height: 100vh; }
-      #tab-builder {
-        position: absolute; z-index: 5; top: 8px; inset-inline-start: 8px;
-        border: 0; background: #1f5fa8; color: #fff; border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer;
-      }
+      #view-builder { height: 100%; min-height: 0; }
+      #view-builder reports-builder { display: grid; height: 100%; min-height: 0; }
+      #view-viewer { display: none; }
       [hidden] { display: none !important; }
       .toast {
         position: fixed;
@@ -165,12 +161,11 @@
       </aside>
 
       <main class="main">
-        <div id="view-viewer" hidden>
-          <button id="tab-builder" type="button" data-testid="back-to-builder">Builder</button>
-          <reports-viewer id="viewer"></reports-viewer>
-        </div>
+        <div id="view-viewer" hidden></div>
         <div id="view-builder">
-          <reports-builder id="builder"></reports-builder>
+          <reports-builder id="builder">
+            <reports-viewer id="viewer" slot="preview"></reports-viewer>
+          </reports-builder>
         </div>
       </main>
     </div>

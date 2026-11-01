@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import './reports-viewer.js';
 import type { ReportsViewerElement } from './reports-viewer.js';
+import { validateReport } from '../schema/report-schema.js';
 
 async function flush(el: HTMLElement): Promise<void> {
   await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
@@ -24,6 +25,47 @@ describe('viewer preview layout', () => {
     expect(printBtn.hidden).toBe(false);
     expect(pdfBtn.hidden).toBe(true);
     expect(pdfBtn.disabled).toBe(true);
+    viewer.remove();
+  });
+
+  it('shows Arabic field errors under the field and in the banner', async () => {
+    const parsed = validateReport({
+      version: '1',
+      id: 'panel',
+      meta: { name: 'P', locale: 'ar', dir: 'rtl' },
+      dataset: { adapter: 'static', source: 'sales' },
+      fields: [{ name: 'x', type: 'number' }],
+      parameters: [
+        { name: 'from', type: 'date', required: true, label: { ar: 'الفترة من', en: 'From' } },
+        { name: 'branch', type: 'select', required: true, label: { ar: 'الفرع', en: 'Branch' }, options: [{ value: 'ruh', label: { ar: 'الرياض', en: 'Riyadh' } }] },
+      ],
+      bands: { detail: { height: 6, elements: [{ id: 'd', kind: 'field', field: 'x', pos: { x: 0, y: 0, w: 40, h: 5 } }] } },
+    });
+    if (!parsed.ok) throw new Error(parsed.error);
+    const viewer = document.createElement('reports-viewer') as ReportsViewerElement;
+    viewer.locale = 'ar';
+    viewer.rows = [{ x: 1 }];
+    viewer.schema = parsed.value;
+    document.body.appendChild(viewer);
+    await flush(viewer);
+    await new Promise((r) => setTimeout(r, 0));
+    const err = new Promise<CustomEvent>((resolve) => {
+      viewer.addEventListener('parameters-error', (event) => resolve(event as CustomEvent), { once: true });
+    });
+    viewer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="run-report"]')!.click();
+    const event = await err;
+    await viewer.updateComplete;
+    await viewer.updateComplete;
+    expect(event.detail.fieldErrors.from).toContain('الفترة من');
+    const markup = viewer.shadowRoot!.querySelector('.params-body')!.innerHTML;
+    expect(markup.includes('field-error'), markup.slice(markup.indexOf('الفرع'), markup.indexOf('الفرع') + 400)).toBe(true);
+    const errors = [...viewer.shadowRoot!.querySelectorAll('p.field-error')].map((node) => node.textContent ?? '').filter(Boolean);
+    const banner = viewer.shadowRoot!.querySelector('[data-testid="param-banner"]')?.textContent ?? '';
+    expect(banner).toContain('يجب إدخال');
+    expect(errors).toHaveLength(2);
+    expect(errors.join('')).toContain('يجب إدخال');
+    expect(banner).toContain(errors[0]);
+    expect(banner).toContain(errors[1]);
     viewer.remove();
   });
 });

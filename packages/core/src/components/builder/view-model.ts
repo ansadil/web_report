@@ -232,6 +232,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     ribbon: {
       onTab: (tab) => {
         session.ribbonTab = tab;
+        session.dispatchEvent(new CustomEvent('ribbon-tab', { detail: { tab }, bubbles: true, composed: true }));
       },
       actions: {
         onNameInput: (value) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, name: value } }),

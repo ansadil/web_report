@@ -67,7 +67,7 @@ describe('reports-viewer zoom + page navigation', () => {
     expect(sections.length).toBeGreaterThanOrEqual(1);
     expect(sheets.length).toBe(1);
     const label = v.shadowRoot!.querySelector('.zoom-label')!.textContent!.trim();
-    expect(label).toBe('1 / 1');
+    expect(label).toBe('Page 1 of 1');
     expect(v.shadowRoot!.querySelector('button[data-control="page-prev"]')!.hasAttribute('disabled')).toBe(true);
     expect(v.shadowRoot!.querySelector('button[data-control="page-next"]')!.hasAttribute('disabled')).toBe(true);
   });

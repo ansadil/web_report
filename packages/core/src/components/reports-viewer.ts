@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import type { LocaleTag, Row } from '@reports-web/shared';
+import { escapeHtml, type LocaleTag, type Row } from '@reports-web/shared';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { validateReport } from '../schema/report-schema.js';
 import type { DataAdapter } from '../adapters/data/index.js';
@@ -12,10 +12,14 @@ import { interpret } from '../engine/interpreter.js';
 import { renderHtml } from '../engine/renderer-html.js';
 import {
   buildDataQuery,
+  getParameterDefinitions,
+  loadParameterOptions,
   ParameterValidationError,
   parameterValuesEqual,
   resolveParameterValues,
   validateParameterValues,
+  type ParameterDefinition,
+  type ParameterOptionItem,
   type ParameterValues,
 } from '../engine/parameters.js';
 import { t } from '../i18n/strings.js';
@@ -62,6 +66,7 @@ export class ReportsViewerElement extends LitElement {
       flex-direction: column;
       align-items: stretch;
       box-sizing: border-box;
+      height: 100%;
       min-height: 0;
       background: var(--rw-bg);
       padding: 0;
@@ -75,15 +80,16 @@ export class ReportsViewerElement extends LitElement {
       z-index: 40;
       flex: none;
       display: flex;
-      gap: 4px;
+      gap: 6px;
       margin: 0;
-      padding: 5px 8px;
+      padding: 6px 10px;
+      min-height: 42px;
+      box-sizing: border-box;
       flex-wrap: wrap;
       align-items: center;
       align-self: stretch;
-      background: var(--rw-bg);
+      background: #fff;
       border-bottom: 1px solid var(--rw-border);
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
     }
     .toolbar-sep {
       width: 1px;
@@ -98,9 +104,10 @@ export class ReportsViewerElement extends LitElement {
       min-width: 8px;
     }
     .zoom-label {
-      font-size: 11px;
-      color: var(--rw-muted);
-      min-width: 4em;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rw-accent);
+      min-width: 7.5em;
       text-align: center;
       flex: none;
     }
@@ -147,7 +154,25 @@ export class ReportsViewerElement extends LitElement {
       font-weight: 700;
       font-size: 13px;
     }
-    .params-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 12px 12px; color: var(--rw-muted); }
+    .params-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 12px 12px; color: var(--rw-text); }
+    .param-banner { background: #fef2f2; color: #b91c1c; border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-size: 12px; line-height: 1.4; }
+    .fld-l { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 12px; }
+    .fld-l small { color: var(--rw-muted); font-weight: 400; margin-inline-start: 4px; }
+    .params-body input, .params-body select {
+      width: 100%; height: 32px; border: 1px solid var(--rw-border); border-radius: 7px;
+      padding: 0 9px; box-sizing: border-box; background: #fff; font: inherit; color: inherit;
+    }
+    .field-error:empty { display: none; }
+    .field-error { color: #b91c1c; font-size: 11px; margin: 3px 0 0; }
+    .range { display: grid; gap: 6px; }
+    button.run {
+      width: 100%; margin-top: 16px; height: 36px; border: 0; border-radius: 8px;
+      background: #0e9384; color: #fff; font-weight: 700; cursor: pointer; font: inherit;
+    }
+    button.reset {
+      width: 100%; margin-top: 6px; height: 32px; border: 1px solid var(--rw-border);
+      border-radius: 8px; background: #fff; color: var(--rw-muted); cursor: pointer; font: inherit;
+    }
     .viewer-main {
       flex: 1 1 auto;
       min-width: 0;
@@ -159,7 +184,7 @@ export class ReportsViewerElement extends LitElement {
       padding: 4px 6px;
     }
     .toolbar button.view-tool .label {
-      display: none;
+      display: inline;
     }
     .status {
       font-size: 11px;
@@ -172,16 +197,16 @@ export class ReportsViewerElement extends LitElement {
     .status.error { color: var(--rw-error); }
     .surface {
       flex: 1 1 auto;
-      min-height: 120px;
+      min-height: 0;
       max-width: 100%;
       overflow: auto;
       box-sizing: border-box;
-      padding: 8px 10px 12px;
+      padding: 22px 16px 32px;
+      background: #dfe4eb;
     }
     .zoom-host {
       display: block;
       width: max-content;
-      max-width: 100%;
       margin-inline: auto;
     }
     .rw-visual-pages-root {
@@ -287,6 +312,10 @@ export class ReportsViewerElement extends LitElement {
   @state() private _zoom = 1;
   @state() private _pageIndex = 0;
   @state() private _pageCount = 0;
+  @state() private _draft: Record<string, unknown> = {};
+  @state() private _fieldErrors: Record<string, string> = {};
+  @state() private _paramBanner = '';
+  @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
 
   @query('.surface') private _surface!: HTMLDivElement;
 
@@ -325,6 +354,8 @@ export class ReportsViewerElement extends LitElement {
       if (changed.has('fontsBaseUrl') || changed.has('schema')) void ensureReportFonts(this.schema, this.fontsBaseUrl);
       void this._renderReport();
     }
+    if (changed.has('schema') || changed.has('locale')) this._resetParameterDraft();
+    this._paintParameterFields();
     if (changed.has('_zoom')) {
       queueMicrotask(() => {
         this._destroyCharts();
@@ -415,8 +446,10 @@ export class ReportsViewerElement extends LitElement {
       if (e instanceof ParameterValidationError) {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
         // `fieldErrors`: name -> message in the report locale, for showing each error next to its field.
-        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale });
-        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
+        const checked = validateParameterValues(finalSchema, this.params, { locale: this._locale });
+        this._fieldErrors = { ...checked.fieldErrors };
+        this._paramBanner = checked.errors.map((issue) => issue.message).join(' · ');
+        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors: checked.fieldErrors } }));
       } else {
         logger.error('reports-viewer', 'render failed', { error: this._error });
       }
@@ -510,7 +543,9 @@ export class ReportsViewerElement extends LitElement {
     const n = this._pageCount;
     const digits = { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? ('locale' as const) };
     const zLabel = formatZoomPercent(this._zoom, digits);
-    const pageLabel = n === 0 ? '—' : `${formatLocalizedNumber(this._pageIndex + 1, digits)} / ${formatLocalizedNumber(n, digits)}`;
+    const pageLabel = n === 0
+      ? '—'
+      : `${t(this._locale, 'page')} ${formatLocalizedNumber(this._pageIndex + 1, digits)} ${t(this._locale, 'of')} ${formatLocalizedNumber(n, digits)}`;
     const pageDisabled = disabled || n === 0;
     return html`
       <button
@@ -692,6 +727,112 @@ export class ReportsViewerElement extends LitElement {
     }
   }
 
+  private _definitions(): ParameterDefinition[] {
+    return getParameterDefinitions(this.schema, { locale: this._locale });
+  }
+
+  private _resetParameterDraft(): void {
+    const draft: Record<string, unknown> = {};
+    for (const def of this._definitions()) {
+      if (def.defaultValue !== undefined) draft[def.name] = def.defaultValue;
+    }
+    this._draft = draft;
+    this._fieldErrors = {};
+    this._paramBanner = '';
+    void this._loadParamOptions();
+  }
+
+  private async _loadParamOptions(): Promise<void> {
+    const lists: Record<string, readonly ParameterOptionItem[]> = {};
+    for (const def of this._definitions()) {
+      if (def.type !== 'select') continue;
+      try {
+        lists[def.name] = await loadParameterOptions(def.def, this.dataAdapter, { locale: this._locale });
+      } catch {
+        lists[def.name] = def.options ?? [];
+      }
+    }
+    this._optionLists = lists;
+  }
+
+  private _setDraft(name: string, value: unknown): void {
+    this._draft = { ...this._draft, [name]: value };
+  }
+
+  private _applyParameters(): void {
+    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale });
+    this._fieldErrors = { ...result.fieldErrors };
+    this._paramBanner = result.errors.map((issue) => issue.message).join(' · ');
+    if (!result.ok) {
+      this.dispatchEvent(new CustomEvent('parameters-error', {
+        detail: { error: this._paramBanner, issues: result.errors, fieldErrors: result.fieldErrors },
+        bubbles: true,
+        composed: true,
+      }));
+      return;
+    }
+    this.params = { ...result.values };
+  }
+
+  @query('.param-fields') private _paramFields?: HTMLDivElement;
+
+  private _paintParameterFields(): void {
+    const host = this._paramFields;
+    if (!host) return;
+    const banner = this._paramBanner
+      ? `<div class="param-banner" data-testid="param-banner">${escapeHtml(this._paramBanner)}</div>`
+      : '';
+    const html = banner + this._parameterFieldsHtml();
+    if (host.innerHTML !== html) host.innerHTML = html;
+  }
+
+  private _parameterFieldsHtml(): string {
+    return this._definitions().map((def) => {
+      const error = this._fieldErrors[def.name] ?? '';
+      const value = this._draft[def.name] ?? def.defaultValue ?? '';
+      const required = def.required ? ` <small>(${escapeHtml(t(this._locale, 'paramRequired'))})</small>` : '';
+      return `<label class="fld-l">${escapeHtml(def.label)}${required}</label>${this._parameterControlHtml(def, value)}<p class="field-error">${escapeHtml(error)}</p>`;
+    }).join('');
+  }
+
+  private _parameterControlHtml(def: ParameterDefinition, value: unknown): string {
+    const name = escapeHtml(def.name);
+    if (def.type === 'dateRange') {
+      const range = value && typeof value === 'object' ? value as { from?: string; to?: string } : {};
+      return `<div class="range"><input data-testid="param-${name}-from" data-param="${name}" data-part="from" type="date" value="${escapeHtml(range.from ?? '')}"><input data-testid="param-${name}-to" data-param="${name}" data-part="to" type="date" value="${escapeHtml(range.to ?? '')}"></div>`;
+    }
+    if (def.type === 'select' || def.type === 'bool') {
+      const options = def.type === 'bool'
+        ? [{ value: false, label: t(this._locale, 'no') }, { value: true, label: t(this._locale, 'yes') }]
+        : (this._optionLists[def.name] ?? def.options ?? []);
+      const current = value == null ? '' : String(value);
+      const opts = options.map((option) => {
+        const raw = String(option.value);
+        const selected = raw === current ? ' selected' : '';
+        return `<option value="${escapeHtml(raw)}"${selected}>${escapeHtml(option.label)}</option>`;
+      }).join('');
+      return `<select data-testid="param-${name}" data-param="${name}">${opts}</select>`;
+    }
+    const type = def.type === 'number' ? 'number' : def.type === 'date' ? 'date' : def.type === 'datetime' ? 'datetime-local' : 'text';
+    return `<input data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}">`;
+  }
+
+  private _onParamInput(event: Event): void {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+    const name = target.dataset.param;
+    if (!name) return;
+    const part = target.dataset.part;
+    if (part === 'from' || part === 'to') {
+      const current = this._draft[name];
+      const range = current && typeof current === 'object' ? { ...(current as { from?: string; to?: string }) } : {};
+      range[part] = target.value;
+      this._setDraft(name, range);
+      return;
+    }
+    this._setDraft(name, target.value);
+  }
+
   override render(): unknown {
     if (this.noToolbar) {
       return html`<div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>`;
@@ -702,7 +843,11 @@ export class ReportsViewerElement extends LitElement {
       <div class="viewer-frame">
         <aside class="params" data-testid="viewer-parameters">
           <div class="params-head">${t(this._locale, 'viewerParameters')}</div>
-          <div class="params-body"></div>
+          <div class="params-body" @input=${(e: Event) => this._onParamInput(e)} @change=${(e: Event) => this._onParamInput(e)}>
+            <div class="param-fields"></div>
+            <button type="button" class="run" data-testid="run-report" @click=${() => this._applyParameters()}>${t(this._locale, 'runReport')}</button>
+            <button type="button" class="reset" data-testid="reset-params" @click=${() => this._resetParameterDraft()}>${t(this._locale, 'resetParams')}</button>
+          </div>
         </aside>
         <div class="viewer-main">
           <div class="toolbar" role="toolbar">

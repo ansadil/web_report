@@ -1,10 +1,13 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
 import { ReportsBuilderElement } from '@reports-web/core';
 import type { ReportBuilderProps } from './types.js';
 import type { ReportSchemaV1 } from '@reports-web/core';
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-builder')) {
-  customElements.define('reports-builder', ReportsBuilderElement);
+function defineReportsBuilder(): void {
+  if (typeof window === 'undefined') return;
+  if (!customElements.get('reports-builder')) customElements.define('reports-builder', ReportsBuilderElement);
 }
 
 export function ReportBuilder(props: ReportBuilderProps) {
@@ -12,6 +15,7 @@ export function ReportBuilder(props: ReportBuilderProps) {
   const { schema, dataAdapter, storageAdapter, sampleRows, locale, dir, fontsBaseUrl, onSave, onSaveError, onExportJson, className, style } = props;
 
   useEffect(() => {
+    defineReportsBuilder();
     const el = ref.current;
     if (!el) return;
     el.schema = schema ?? null;

@@ -1,0 +1,20 @@
+{
+  "name": "reports-web-nextjs",
+  "private": true,
+  "scripts": {
+    "build": "next build"
+  },
+  "dependencies": {
+    "@reports-web/core": "workspace:*",
+    "@reports-web/react": "workspace:*",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.2"
+  }
+}

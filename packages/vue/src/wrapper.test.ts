@@ -16,9 +16,19 @@ describe('Vue wrappers', () => {
     expect(html).toContain('reports-builder');
   });
 
-  it('registers custom elements on import', () => {
+  it('registers custom elements when the client components mount', async () => {
+    const { createApp, nextTick } = await import('vue');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const app = createApp({
+      render: () => h('div', null, [h(ReportViewer, { schema: null }), h(ReportBuilder)]),
+    });
+    app.mount(host);
+    await nextTick();
     expect(customElements.get('reports-viewer')).toBeTruthy();
     expect(customElements.get('reports-builder')).toBeTruthy();
+    app.unmount();
+    host.remove();
   });
 });
 

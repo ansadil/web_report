@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['qa/**/*.qa.test.ts'],
+    setupFiles: ['./vitest.setup.ts'],
     testTimeout: 60_000,
     hookTimeout: 240_000,
     // keep the summary readable: report every failure, never bail

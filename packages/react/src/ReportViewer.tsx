@@ -1,10 +1,13 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
 import { ReportsViewerElement } from '@reports-web/core';
 import type { ParameterIssue } from '@reports-web/core';
 import type { ReportViewerProps, ExportPayload, ExportKind } from './types.js';
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer')) {
-  customElements.define('reports-viewer', ReportsViewerElement);
+function defineReportsViewer(): void {
+  if (typeof window === 'undefined') return;
+  if (!customElements.get('reports-viewer')) customElements.define('reports-viewer', ReportsViewerElement);
 }
 
 export function ReportViewer(props: ReportViewerProps) {
@@ -12,6 +15,7 @@ export function ReportViewer(props: ReportViewerProps) {
   const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, dateFormatHint, fontsBaseUrl, onRendered, onExport, onExportError, onParametersError, onTimeZoneInvalid, className, style } = props;
 
   useEffect(() => {
+    defineReportsViewer();
     const el = ref.current;
     if (!el) return;
     el.schema = schema ?? null;

@@ -1,0 +1,13 @@
+{
+  "name": "reports-web-nuxt",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build"
+  },
+  "dependencies": {
+    "@reports-web/core": "workspace:*",
+    "@reports-web/vue": "workspace:*",
+    "nuxt": "^3.15.0",
+    "vue": "^3.5.0"
+  }
+}

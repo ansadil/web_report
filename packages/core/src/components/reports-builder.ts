@@ -438,10 +438,6 @@ export class ReportsBuilderElement extends LitElement {
 
 installDirOverride(ReportsBuilderElement.prototype);
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-builder')) {
-  customElements.define('reports-builder', ReportsBuilderElement);
-}
-
 declare global {
   interface HTMLElementTagNameMap {
     'reports-builder': ReportsBuilderElement;

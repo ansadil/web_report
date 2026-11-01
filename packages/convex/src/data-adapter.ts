@@ -6,7 +6,11 @@ import { toDescribeFn, type DescribeOption } from '@reports-web/core/adapters/da
 /** Arguments the Convex query / HTTP action receives. */
 export interface ConvexDataRequest {
   readonly source: string;
-  /** Resolved report parameters; `Date`s are ISO strings, `undefined` values are dropped. */
+  /**
+   * Resolved report parameters (`DataQuery.params`: `dataset.params` merged with the values from core's
+   * `resolveParameterValues`, e.g. `{ period: { from: '2026-10-01', to: '2026-10-31' }, branch: 'riyadh' }`);
+   * `Date`s are ISO strings, `undefined` values are dropped. Validate with `reportDataArgs` from `@reports-web/convex/server`.
+   */
   readonly params: Record<string, unknown>;
 }
 

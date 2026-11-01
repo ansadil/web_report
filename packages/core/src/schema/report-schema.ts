@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ParameterDef } from '@reports-web/shared';
+import { isRelativeDatePreset } from '../engine/relative-dates.js';
 import { canonicalizeLocaleTag, directionForLocale, type LocaleTag } from '@reports-web/shared';
 
 export const PageSizeName = z.enum(['A4', 'A5', 'Letter']);
@@ -187,6 +188,27 @@ export type FieldDeclaration = z.infer<typeof FieldDeclaration>;
 /** `string` or a per-locale map such as `{ ar: '...', en: '...' }`. */
 export const LocalizedTextSchema = z.union([z.string(), z.record(z.string())]);
 
+const ISO_YMD = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_OR_DATE_TIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}([.,]\d{1,9})?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/i;
+
+/** Shape check for `ParameterDef.min` / `max` against the parameter type; returns an error message or undefined. */
+function parameterBoundError(type: string, v: number | string | undefined): string | undefined {
+  if (v === undefined) return undefined;
+  switch (type) {
+    case 'number':
+      return typeof v === 'number' && Number.isFinite(v) ? undefined : 'number parameters need a numeric bound';
+    case 'date':
+    case 'dateRange':
+      return typeof v === 'string' && (ISO_YMD.test(v) || isRelativeDatePreset(v))
+        ? undefined
+        : 'date bounds must be YYYY-MM-DD or a relative date preset';
+    case 'datetime':
+      return typeof v === 'string' && (v === 'now' || ISO_DATE_OR_DATE_TIME.test(v)) ? undefined : 'datetime bounds must be ISO 8601 or "now"';
+    default:
+      return undefined;
+  }
+}
+
 export const ParameterType = z.enum(['string', 'number', 'date', 'datetime', 'dateRange', 'bool', 'select']);
 
 const ParameterOptionSchema = z.object({
@@ -208,10 +230,24 @@ export const ParameterDefSchema = z
     required: z.boolean().optional(),
     default: z.unknown().optional(),
     options: z.union([z.array(ParameterOptionSchema), ParameterOptionsSourceSchema]).optional(),
+    description: LocalizedTextSchema.optional(),
+    min: z.union([z.number(), z.string()]).optional(),
+    max: z.union([z.number(), z.string()]).optional(),
   })
   .superRefine((p, ctx) => {
     if (p.type === 'select' && p.options === undefined) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['options'], message: 'select parameters require options' });
+    }
+    for (const key of ['min', 'max'] as const) {
+      const msg = parameterBoundError(p.type, p[key]);
+      if (msg) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: msg });
+    }
+    if (p.type === 'number' && typeof p.min === 'number' && typeof p.max === 'number' && p.min > p.max) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['min'], message: 'min must not be greater than max' });
+    }
+    if ((p.type === 'date' || p.type === 'dateRange') && typeof p.min === 'string' && typeof p.max === 'string'
+      && ISO_YMD.test(p.min) && ISO_YMD.test(p.max) && p.min > p.max) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['min'], message: 'min must not be after max' });
     }
   });
 

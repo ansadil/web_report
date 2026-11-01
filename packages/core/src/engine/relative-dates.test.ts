@@ -7,11 +7,12 @@ import {
   RELATIVE_DATE_RANGE_PRESETS,
   resolveRelativeDate,
   resolveRelativeDateRange,
-  toLocalYmd,
 } from './relative-dates.js';
 
-// Wednesday 2026-10-14, local noon (independent of the runtime TZ)
-const now = new Date(2026, 9, 14, 12, 0, 0);
+/** Instant of a wall-clock time in Asia/Riyadh (UTC+3, the default time zone; month 0-based). Process TZ-independent. */
+const riy = (y: number, m: number, d: number, h = 0) => new Date(Date.UTC(y, m, d, h) - 3 * 3600_000);
+// Wednesday 2026-10-14, Riyadh noon
+const now = riy(2026, 9, 14, 12);
 
 describe('resolveRelativeDate', () => {
   it('resolves day / month / quarter / year presets against `now`', () => {
@@ -36,16 +37,19 @@ describe('resolveRelativeDate', () => {
   });
 
   it('handles month / year boundaries and leap years', () => {
-    expect(resolveRelativeDate('yesterday', { now: new Date(2026, 0, 1, 9) })).toBe('2025-12-31');
-    expect(resolveRelativeDate('tomorrow', { now: new Date(2026, 11, 31, 9) })).toBe('2027-01-01');
-    expect(resolveRelativeDate('endOfMonth', { now: new Date(2028, 1, 10) })).toBe('2028-02-29');
-    expect(resolveRelativeDate('endOfMonth', { now: new Date(2026, 1, 10) })).toBe('2026-02-28');
-    expect(resolveRelativeDate('endOfQuarter', { now: new Date(2026, 4, 5) })).toBe('2026-06-30');
+    expect(resolveRelativeDate('yesterday', { now: riy(2026, 0, 1, 9) })).toBe('2025-12-31');
+    expect(resolveRelativeDate('tomorrow', { now: riy(2026, 11, 31, 9) })).toBe('2027-01-01');
+    expect(resolveRelativeDate('endOfMonth', { now: riy(2028, 1, 10) })).toBe('2028-02-29');
+    expect(resolveRelativeDate('endOfMonth', { now: riy(2026, 1, 10) })).toBe('2026-02-28');
+    expect(resolveRelativeDate('endOfQuarter', { now: riy(2026, 4, 5) })).toBe('2026-06-30');
   });
 
   it('accepts epoch ms and defaults to the current date', () => {
     expect(resolveRelativeDate('today', { now: now.getTime() })).toBe('2026-10-14');
-    expect(resolveRelativeDate('today')).toBe(toLocalYmd(new Date()));
+    const riyadhToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const before = riyadhToday.format(new Date());
+    const today = resolveRelativeDate('today');
+    expect([before, riyadhToday.format(new Date())]).toContain(today); // default zone Asia/Riyadh, not the process TZ
   });
 });
 
@@ -69,10 +73,10 @@ describe('resolveRelativeDateRange', () => {
   });
 
   it('crosses year boundaries for last month / quarter', () => {
-    const jan = { now: new Date(2026, 0, 15) };
+    const jan = { now: riy(2026, 0, 15) };
     expect(resolveRelativeDateRange('lastMonth', jan)).toEqual({ from: '2025-12-01', to: '2025-12-31' });
     expect(resolveRelativeDateRange('lastQuarter', jan)).toEqual({ from: '2025-10-01', to: '2025-12-31' });
-    expect(resolveRelativeDateRange('lastMonth', { now: new Date(2028, 2, 31) })).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+    expect(resolveRelativeDateRange('lastMonth', { now: riy(2028, 2, 31) })).toEqual({ from: '2028-02-01', to: '2028-02-29' });
   });
 
   it('every preset has ar / en labels and the guards recognise them', () => {

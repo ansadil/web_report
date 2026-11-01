@@ -81,7 +81,8 @@ describe('reports-viewer parameters', () => {
     expect(e.detail.issues).toEqual([{ name: 'year', code: 'required', message: 'value is required' }]);
     expect(e.detail.error).toMatch(/year: value is required/);
     await v.updateComplete;
-    expect(v.shadowRoot!.textContent).toMatch(/year: value is required/);
+    // banner: localized field errors (BUG-53), not the legacy English `error`
+    expect(v.shadowRoot!.textContent).toMatch(/Invalid report parameters — year: year is required/);
 
     const rendered = nextEvent(v, 'report-rendered');
     v.params = { year: 2026 };
@@ -138,7 +139,7 @@ describe('reports-viewer parameters', () => {
     expect(counts).toEqual([2]);
   });
 
-  it('accepts datetime parameters in the schema and sends date/dateRange Dates as local calendar dates', async () => {
+  it('accepts datetime parameters in the schema and sends date/dateRange Dates as Asia/Riyadh calendar dates', async () => {
     const r = validateReport({
       version: '1', id: 'dates', meta: { name: 'D' },
       dataset: { adapter: 'custom', source: 't' },
@@ -152,9 +153,10 @@ describe('reports-viewer parameters', () => {
     });
     if (!r.ok) throw new Error(r.error);
     const at = new Date(2026, 9, 1, 8, 15);
+    const riyadhMidnight = new Date('2026-10-01T00:00:00+03:00'); // default time zone Asia/Riyadh (BUG-52)
     const rendered = nextEvent(v, 'report-rendered');
     v.dataAdapter = adapter;
-    v.params = { day: new Date(2026, 9, 1), period: { from: new Date(2026, 9, 1) }, at };
+    v.params = { day: riyadhMidnight, period: { from: riyadhMidnight }, at };
     v.schema = r.value;
     await rendered;
     expect(calls.at(-1)!.params).toEqual({ day: '2026-10-01', period: { from: '2026-10-01' }, at: at.toISOString() });
@@ -172,5 +174,110 @@ describe('reports-viewer parameters', () => {
     v.schema = r.value;
     await rendered;
     expect(calls.at(-1)).toEqual({ source: 't', params: { a: 1 } });
+  });
+});
+
+describe('reports-viewer parameters: Arabic banner and time zone (BUG-52, BUG-53)', () => {
+  let v: ReportsViewerElement;
+  let calls: DataQuery[];
+  let adapter: DataAdapter;
+
+  beforeEach(() => {
+    calls = [];
+    adapter = { id: 'spy', fetch: vi.fn(async (q: DataQuery) => { calls.push(q); return []; }) };
+    v = document.createElement('reports-viewer') as ReportsViewerElement;
+    document.body.appendChild(v);
+  });
+  afterEach(() => v.remove());
+
+  function arabicReport() {
+    const r = validateReport({
+      version: '1', id: 'ar', meta: { name: 'تقرير', locale: 'ar-SA', dir: 'rtl' },
+      dataset: { adapter: 'custom', source: 'sales' },
+      fields: [],
+      parameters: [
+        { name: 'branch', type: 'string', label: { ar: 'الفرع', en: 'Branch' }, required: true },
+        { name: 'top', type: 'number', min: 1, max: 50 },
+      ],
+      bands: { detail: { height: 5 } },
+    });
+    if (!r.ok) throw new Error(r.error);
+    return r.value;
+  }
+
+  it('builds the Arabic error banner from the localized field errors', async () => {
+    const err = nextEvent(v, 'parameters-error');
+    v.dataAdapter = adapter;
+    v.params = { top: 80 };
+    v.schema = arabicReport();
+    const e = await err;
+    await v.updateComplete;
+    const banner = v.shadowRoot!.querySelector('.status')!.textContent!;
+    expect(banner).toContain('قيم معاملات التقرير غير صالحة');
+    expect(banner).toContain('\u2068الفرع\u2069: يجب إدخال الفرع');
+    expect(banner).toContain('\u2068top\u2069: يجب ألا تزيد القيمة عن ٥٠');
+    expect(banner).not.toMatch(/Invalid report parameters|must be|is required/);
+    expect(e.detail.fieldErrors).toEqual({ branch: 'يجب إدخال الفرع', top: 'يجب ألا تزيد القيمة عن ٥٠' });
+    expect(e.detail.error).toMatch(/Invalid report parameters/); // programmatic detail unchanged
+    expect(calls.length).toBe(0);
+  });
+
+  it('uses the viewer locale for the banner when it overrides the report locale', async () => {
+    v.locale = 'en';
+    const err = nextEvent(v, 'parameters-error');
+    v.dataAdapter = adapter;
+    v.params = { top: 80 };
+    v.schema = arabicReport();
+    await err;
+    await v.updateComplete;
+    expect(v.shadowRoot!.querySelector('.status')!.textContent).toContain('Invalid report parameters — Branch: Branch is required; top: Must be at most 50');
+  });
+
+  function dateReport() {
+    const r = validateReport({
+      version: '1', id: 'tz', meta: { name: 'T' },
+      dataset: { adapter: 'custom', source: 't' },
+      fields: [],
+      parameters: [{ name: 'day', type: 'date', required: true }],
+      bands: { detail: { height: 5 } },
+    });
+    if (!r.ok) throw new Error(r.error);
+    return r.value;
+  }
+  const instant = new Date('2026-10-31T22:30:00Z'); // 2026-11-01 in Riyadh, 2026-10-31 in UTC
+
+  it('defaults to Asia/Riyadh for Date values, whatever the process TZ', async () => {
+    const rendered = nextEvent(v, 'report-rendered');
+    v.dataAdapter = adapter;
+    v.params = { day: instant };
+    v.schema = dateReport();
+    await rendered;
+    expect(calls.at(-1)!.params).toEqual({ day: '2026-11-01' });
+  });
+
+  it('honours the time-zone attribute and refetches when timeZone changes', async () => {
+    v.setAttribute('time-zone', 'UTC');
+    expect(v.timeZone).toBe('UTC');
+    let rendered = nextEvent(v, 'report-rendered');
+    v.dataAdapter = adapter;
+    v.params = { day: instant };
+    v.schema = dateReport();
+    await rendered;
+    expect(calls.at(-1)!.params).toEqual({ day: '2026-10-31' });
+
+    rendered = nextEvent(v, 'report-rendered');
+    v.timeZone = 'Asia/Riyadh';
+    await rendered;
+    expect(calls.at(-1)!.params).toEqual({ day: '2026-11-01' });
+  });
+
+  it('falls back to Asia/Riyadh for an unknown time zone', async () => {
+    v.timeZone = 'Mars/Olympus';
+    const rendered = nextEvent(v, 'report-rendered');
+    v.dataAdapter = adapter;
+    v.params = { day: instant };
+    v.schema = dateReport();
+    await rendered;
+    expect(calls.at(-1)!.params).toEqual({ day: '2026-11-01' });
   });
 });

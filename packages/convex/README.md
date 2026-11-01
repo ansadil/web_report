@@ -104,9 +104,10 @@ resolved values), as JSON-safe values; `undefined` values are dropped:
 | --- | --- | --- |
 | `date` | `YYYY-MM-DD`, the calendar date in the viewer's `timeZone` (a `Date` / epoch / ISO instant is converted to that zone's date) | `'2026-11-01'` |
 | `dateRange` | `{ from?, to? }` of `YYYY-MM-DD` dates, same rule | `{ from: '2026-11-01', to: '2026-11-05' }` |
-| `datetime` | a `Date`, epoch ms or `'now'` becomes a UTC ISO string; a string is sent as given (trimmed), so a zone-less `YYYY-MM-DDTHH:mm` is a wall time in the viewer's `timeZone` that your handler must interpret in that zone | `'2026-10-31T22:30:00.000Z'`, `'2026-11-01T01:30'` |
+| `datetime` | a `Date`, epoch ms or `'now'` (as a default) becomes a UTC ISO string; `'now'` passed as a value is rejected; a string is sent as given (trimmed), so a zone-less `YYYY-MM-DDTHH:mm` is a wall time in the viewer's `timeZone` that your handler must interpret in that zone | `'2026-10-31T22:30:00.000Z'`, `'2026-11-01T01:30'` |
 | static `dataset.params` | as written; a `Date` becomes a UTC ISO string | `'2026-01-01T00:00:00.000Z'` |
- Failures come back as `Error('Convex data source "<source>" failed: …')`, with the original error
+
+Failures come back as `Error('Convex data source "<source>" failed: …')`, with the original error
 as `cause`. An aborted `AbortSignal` rejects right away. A Convex one-shot query cannot be cancelled, so its
 result is simply ignored. `describe` (a static object or an async function) is optional.
 

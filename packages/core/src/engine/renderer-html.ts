@@ -13,7 +13,7 @@ function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: nu
     text ? 'height:auto' : 'overflow:hidden',
     'box-sizing:border-box',
     text ? 'display:block' : 'display:flex',
-    text ? 'line-height:1.35' : 'align-items:center',
+    text ? 'line-height:1.7' : 'align-items:center',
   ];
   if (text) css.push('overflow:visible', 'white-space:normal');
   if (style) {

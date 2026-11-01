@@ -107,7 +107,25 @@ values are strings, numbers, booleans, `null`, arrays of those, or a dateRange `
 end. A string, `null` or nested objects are rejected. It does not know the report's parameter definitions
 (required, `min`/`max`, options), so re-check anything security-relevant in your handler.
 
-Dates are calendar dates in the viewer's `timeZone` (IANA name, default `Asia/Riyadh`, never the browser's zone).
+Nested objects are rejected on purpose. If your static `dataset.params` really need them, build your own args
+from the exported `reportParamValue` instead of using `reportDataArgs`:
+
+```ts
+import { v } from 'convex/values';
+import { reportParamValue } from '@reports-web/convex/server';
+
+const myParamValue = v.union(reportParamValue, v.object({ code: v.string(), label: v.string() }));
+export const rows = query({
+  args: { source: v.string(), params: v.record(v.string(), myParamValue) },
+  handler: async (ctx, { source, params }) => { /* ... */ },
+});
+```
+
+**Time zone.** Dates are calendar dates in the viewer's `timeZone` (IANA name). The default is `Asia/Riyadh`
+(our platform's zone), never the browser's or the server's zone. A host in another zone passes it explicitly:
+the `time-zone` attribute or `timeZone` property on `<reports-viewer>`, the `timeZone` prop in the React/Vue
+wrappers, or the `timeZone` option of `getParameterDefinitions` / `validateParameterValues`. `Date` values
+given without a `timeZone` are read as Riyadh time.
 Relative presets such as `thisMonth` use the Gregorian calendar only; Hijri (Umm al-Qura) periods are not supported.
 
 ## Example: Nuxt 3 + Convex (Madar)

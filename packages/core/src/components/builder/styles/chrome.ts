@@ -140,7 +140,7 @@ export const chromeStyles = css`
   }
   .side-tabs button.on { color: #1f5fa8; border-bottom-color: #1f5fa8; background: #fff; }
   aside.props {
-    background: var(--rb-panel); border-inline-start: 1px solid var(--rb-border); min-width: 0; min-height: 0; overflow: auto; display: flex; flex-direction: column;
+    background: var(--rb-panel); border-inline-start: 1px solid var(--rb-border); min-width: 0; min-height: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column;
   }
   .ribbon-insert-btn { cursor: grab; flex-direction: column; min-width: 64px; }
   .band-strip { display: flex; flex-direction: column; }

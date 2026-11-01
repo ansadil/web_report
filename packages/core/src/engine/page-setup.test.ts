@@ -45,6 +45,7 @@ describe('page setup margins', () => {
       clamped = applyPageSetup(loaded);
     }).not.toThrow();
     expect(210 - (clamped!.margins.left + clamped!.margins.right)).toBeGreaterThanOrEqual(MIN_CONTENT_MM);
+    expect(clamped!.margins.right).toBe(15);
     expect(297 - (clamped!.margins.top + clamped!.margins.bottom)).toBeGreaterThanOrEqual(MIN_CONTENT_MM);
     expect(clamped!.margins.left).toBeLessThan(180);
     expect(clamped!.margins.left).toBeLessThan(400);

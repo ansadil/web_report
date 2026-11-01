@@ -62,8 +62,10 @@ describe('BUG-67 paper changes clamp margins', () => {
     expect(portrait.clamped).toBe(true);
     expect(portrait.page.orientation).toBe('portrait');
     expect(contentWidth(portrait.page)).toBeGreaterThanOrEqual(MIN_CONTENT_MM);
-    expect(portrait.page.margins.left).toBeLessThan(lengthToMm(14, 'cm'));
-    expect(portrait.page.margins.right).toBeLessThan(lengthToMm(14, 'cm'));
+    const kept = Math.max(portrait.page.margins.left, portrait.page.margins.right);
+    const reduced = Math.min(portrait.page.margins.left, portrait.page.margins.right);
+    expect(kept).toBe(lengthToMm(14, 'cm'));
+    expect(reduced).toBeLessThan(lengthToMm(14, 'cm'));
     warn.mockRestore();
   });
 

@@ -3,13 +3,22 @@ import { html, nothing, type TemplateResult } from 'lit';
 import { icon, t } from '../../api.js';
 import { formatLocalizedNumber } from '../../status-bar.js';
 import type { ReportSchemaV1 } from '../../api.js';
+import {
+  MIN_CONTENT_MM,
+  marginClampNotice,
+  marginErrorText,
+  marginNumberError,
+  mmToLength,
+  paperSizeMm,
+} from '../../../../engine/page-setup.js';
 import { renderGroupsBandsEditor, renderReportBandsEditor, type BandsCallbacks } from './bands.js';
 import { renderWatermarkEditor, type WatermarkCallbacks } from './watermark.js';
 
 export interface DocumentState {
   locale: LocaleTag;
   schema: ReportSchemaV1;
-  marginFeedback?: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string; kind?: 'invalid' | 'clamped' }>>;
+  marginFeedback?: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string; kind?: 'invalid' | 'clamped'; reason?: 'nan' | 'negative' | 'width' | 'height' | 'clamped' }>>;
+  /** `'clamped'` asks the panel to describe the reduction in the current UI language. */
   marginNotice?: string;
 }
 
@@ -67,17 +76,19 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
   const page = state.schema.page;
   const fmt = { locale: state.locale, digits: state.schema.meta.pageNumberDigits ?? ('locale' as const) };
   const cm = (mm: number) => formatLocalizedNumber(mm / 10, fmt, 2);
+  const notice = state.marginNotice ? marginMessage(state, 'clamped') : '';
   const marginRow = (side: 'top' | 'right' | 'bottom' | 'left', label: string) => {
     const feedback = state.marginFeedback?.[side];
-    const error = feedback?.error ?? '';
+    const error = feedback?.reason ? marginMessage(state, feedback.reason) : (feedback?.error ?? '');
     const errorId = `prop-margin-${side}-error`;
+    const typed = feedback?.kind === 'invalid';
     return html`
       <div class="prow margin-row">
         <span class="k" title=${label}>${label}</span>
         <span class="v margin-v">
           <input
             data-testid=${`prop-margin-${side}`}
-            .value=${feedback ? feedback.raw : cm(page.margins[side])}
+            .value=${typed ? feedback?.raw ?? '' : cm(page.margins[side])}
             aria-invalid=${error ? 'true' : 'false'}
             aria-describedby=${error ? errorId : nothing}
             @input=${(e: Event) => cb.onMarginInput(side, (e.target as HTMLInputElement).value)}
@@ -97,7 +108,7 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
       <div class="ptoggle"><button type="button" class="on">${t(state.locale, 'properties')}</button><button type="button">${t(state.locale, 'events')}</button></div>
       ${renderInspectorChrome(state.locale, filterPropRows)}
       ${renderCategory(t(state.locale, 'page'), 6, [
-        state.marginNotice ? html`<p class="margin-notice" data-testid="page-margin-notice" role="alert">${state.marginNotice}</p>` : nothing,
+        notice ? html`<p class="margin-notice" data-testid="page-margin-notice" role="alert">${notice}</p>` : nothing,
         html`<div class="prow"><span class="k" title=${t(state.locale, 'paperSize')}>${t(state.locale, 'paperSize')}</span><span class="v"><select data-testid="prop-paper-size" @change=${(e: Event) => cb.updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>
           <option value="A4" ?selected=${page.size === 'A4'}>A4</option>
           <option value="A5" ?selected=${page.size === 'A5'}>A5</option>
@@ -131,6 +142,18 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
       ])}
     </div>
   `;
+}
+
+function marginMessage(state: DocumentState, reason: 'nan' | 'negative' | 'width' | 'height' | 'clamped'): string {
+  const locale = state.locale;
+  const digits = state.schema.meta.pageNumberDigits ?? 'locale';
+  const unit = locale.toLowerCase().startsWith('ar') ? 'سم' : 'cm';
+  const label = (mm: number) => `${formatLocalizedNumber(mmToLength(mm, 'cm'), { locale, digits }, 2)} ${unit}`;
+  const content = label(MIN_CONTENT_MM);
+  if (reason === 'clamped') return marginClampNotice(content, locale);
+  if (reason === 'nan' || reason === 'negative') return marginNumberError(reason, locale);
+  const paper = paperSizeMm(state.schema.page.size, state.schema.page.orientation);
+  return marginErrorText(reason, label(reason === 'width' ? paper.width : paper.height), content, locale);
 }
 
 function filterPropRows(event: Event): void {

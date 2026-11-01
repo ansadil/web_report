@@ -211,4 +211,66 @@ describe('property panel details', () => {
     expect(a5.margins.left).toBeLessThan(120);
     expect(builder.shadowRoot!.querySelector('[data-testid="page-margin-notice"]')).toBeTruthy();
   });
+
+  it('BUG-72 rewrites the clamp notice when the UI language changes', async () => {
+    builder = document.createElement('reports-builder');
+    document.body.appendChild(builder);
+    builder.locale = 'en';
+    builder.dir = 'ltr';
+    const loaded = schema();
+    loaded.page = { ...loaded.page, margins: { ...loaded.page.margins, left: 400 } };
+    builder.schema = loaded;
+    await flush(builder);
+    expect(builder.shadowRoot!.querySelector('[data-testid="page-margin-notice"]')?.textContent).toContain('Margins were reduced');
+    expect(builder.shadowRoot!.querySelector('#prop-margin-left-error')?.textContent).toContain('Margins were reduced');
+
+    builder.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="btn-ar"]')!.click();
+    await flush(builder);
+    expect(builder.shadowRoot!.querySelector('[data-testid="page-margin-notice"]')?.textContent).toContain('تم ضبط الهوامش');
+    expect(builder.shadowRoot!.querySelector('#prop-margin-left-error')?.textContent).toContain('تم ضبط الهوامش');
+
+    builder.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="btn-en"]')!.click();
+    await flush(builder);
+    expect(builder.shadowRoot!.querySelector('[data-testid="page-margin-notice"]')?.textContent).toContain('Margins were reduced');
+  });
+
+  it('BUG-73 keeps the 1.5 cm margin and pulls a group sum back onto the page', async () => {
+    builder = document.createElement('reports-builder');
+    document.body.appendChild(builder);
+    builder.locale = 'en';
+    builder.dir = 'ltr';
+    const loaded = schema();
+    loaded.page = { ...loaded.page, orientation: 'landscape', margins: { top: 15, right: 15, bottom: 15, left: 15 } };
+    loaded.groups = [{
+      key: 'region',
+      footer: {
+        height: 8,
+        elements: [{ id: 'sum', kind: 'aggregate', fn: 'sum', field: 'amount', scope: 'group', pos: { x: 130, y: 1, w: 50, h: 6 } }],
+      },
+    }];
+    builder.schema = loaded;
+    await flush(builder);
+
+    const setMargin = (side: 'left' | 'right', value: string) => {
+      const input = builder!.shadowRoot!.querySelector<HTMLInputElement>(`[data-testid="prop-margin-${side}"]`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    setMargin('left', '12');
+    setMargin('right', '11');
+    await flush(builder);
+    const orientation = builder.shadowRoot!.querySelector<HTMLSelectElement>('[data-testid="prop-page-orientation"]')!;
+    orientation.value = 'portrait';
+    orientation.dispatchEvent(new Event('change', { bubbles: true }));
+    await flush(builder);
+
+    const page = builder.getSchema().page;
+    expect(page.orientation).toBe('portrait');
+    expect(page.margins.right).toBe(110);
+    expect(page.margins.left).toBeLessThan(120);
+    const pos = builder.getSchema().groups[0]!.footer!.elements[0]!.pos;
+    const width = 210 - page.margins.left - page.margins.right;
+    expect(pos.x).toBeGreaterThanOrEqual(0);
+    expect(pos.x + pos.w).toBeLessThanOrEqual(width + 0.01);
+  });
 });

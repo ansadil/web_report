@@ -33,8 +33,10 @@ export interface BuilderSession {
   readonly history: HistoryStore;
   readonly shadowRoot: ShadowRoot | null;
 
-  marginFeedback: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string }>>;
-  setMarginFeedback(next: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string }>>): void;
+  marginFeedback: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string; kind?: 'invalid' | 'clamped' }>>;
+  setMarginFeedback(next: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string; kind?: 'invalid' | 'clamped' }>>): void;
+  marginNotice: string;
+  setMarginNotice(next: string): void;
 
   touchHistory(): void;
   focus(): void;

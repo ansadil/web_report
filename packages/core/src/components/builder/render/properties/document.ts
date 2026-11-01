@@ -9,7 +9,8 @@ import { renderWatermarkEditor, type WatermarkCallbacks } from './watermark.js';
 export interface DocumentState {
   locale: LocaleTag;
   schema: ReportSchemaV1;
-  marginFeedback?: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string }>>;
+  marginFeedback?: Partial<Record<'top' | 'right' | 'bottom' | 'left', { raw: string; error: string; kind?: 'invalid' | 'clamped' }>>;
+  marginNotice?: string;
 }
 
 export interface DocumentCallbacks extends BandsCallbacks, WatermarkCallbacks {
@@ -96,6 +97,7 @@ export function renderDocumentProperties(state: DocumentState, cb: DocumentCallb
       <div class="ptoggle"><button type="button" class="on">${t(state.locale, 'properties')}</button><button type="button">${t(state.locale, 'events')}</button></div>
       ${renderInspectorChrome(state.locale, filterPropRows)}
       ${renderCategory(t(state.locale, 'page'), 6, [
+        state.marginNotice ? html`<p class="margin-notice" data-testid="page-margin-notice" role="alert">${state.marginNotice}</p>` : nothing,
         html`<div class="prow"><span class="k" title=${t(state.locale, 'paperSize')}>${t(state.locale, 'paperSize')}</span><span class="v"><select data-testid="prop-paper-size" @change=${(e: Event) => cb.updatePage({ size: (e.target as HTMLSelectElement).value as 'A4' | 'A5' | 'Letter' })}>
           <option value="A4" ?selected=${page.size === 'A4'}>A4</option>
           <option value="A5" ?selected=${page.size === 'A5'}>A5</option>

@@ -1,5 +1,6 @@
 import { MM_TO_PX } from '@reports-web/shared';
 import {
+  MIN_CONTENT_MM,
   lengthToMm,
   marginErrorText,
   marginNumberError,
@@ -7,6 +8,7 @@ import {
   pageMarginViolation,
   paperSizeMm,
 } from '../../engine/page-setup.js';
+import { commitPageGeometry } from './ops/page-geometry.js';
 import type { DndController } from './interactions/dnd.js';
 import type { PointerController } from './interactions/pointer.js';
 import {
@@ -176,6 +178,7 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       selectedBand: session.selectedBand,
       selectedIds: session.selectedIds,
       marginFeedback: session.marginFeedback,
+      marginNotice: session.marginNotice,
     },
     contextMenu: menu
       ? {
@@ -279,12 +282,10 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
       onSendBackward: () => sendSelectionBackward(session),
       onInsertDragStart: (ev, kind) => ports.dnd.onToolDragStart(ev, kind),
       onPortrait: () => {
-        commitSchema(session, { ...session.schema, page: { ...session.schema.page, orientation: 'portrait' } });
-        reclampAllRootBandElements(session);
+        commitPageGeometry(session, { orientation: 'portrait' });
       },
       onLandscape: () => {
-        commitSchema(session, { ...session.schema, page: { ...session.schema.page, orientation: 'landscape' } });
-        reclampAllRootBandElements(session);
+        commitPageGeometry(session, { orientation: 'landscape' });
       },
       onNew: () => newReport(session),
       onOpenText: (text) => openReportText(session, text),
@@ -303,33 +304,36 @@ export function buildViewModel(session: BuilderSession, ports: InteractionPorts)
     properties: {
       updateMeta: (patch) => commitSchema(session, { ...session.schema, meta: { ...session.schema.meta, ...patch } }),
       updatePage: (patch) => {
-        commitSchema(session, { ...session.schema, page: { ...session.schema.page, ...patch } });
-        reclampAllRootBandElements(session);
+        commitPageGeometry(session, patch);
       },
       onMarginInput: (side, raw) => {
         const parsed = parseLocalizedNumber(raw);
         const locale = session.uiLocale;
         if (!Number.isFinite(parsed)) {
-          session.setMarginFeedback({ ...session.marginFeedback, [side]: { raw, error: marginNumberError('nan', locale) } });
+          session.setMarginFeedback({ ...session.marginFeedback, [side]: { raw, error: marginNumberError('nan', locale), kind: 'invalid' } });
           return;
         }
         const mm = lengthToMm(parsed, 'cm');
         if (mm < 0) {
-          session.setMarginFeedback({ ...session.marginFeedback, [side]: { raw, error: marginNumberError('negative', locale) } });
+          session.setMarginFeedback({ ...session.marginFeedback, [side]: { raw, error: marginNumberError('negative', locale), kind: 'invalid' } });
           return;
         }
         const margins = { ...session.schema.page.margins, [side]: mm };
         const violation = pageMarginViolation({ ...session.schema.page, margins });
         if (violation === 'width' || violation === 'height') {
           const paper = paperSizeMm(session.schema.page.size, session.schema.page.orientation);
-          const limitMm = violation === 'width' ? paper.width : paper.height;
-          const limit = `${formatLocalizedNumber(mmToLength(limitMm, 'cm'), { locale, digits: session.schema.meta.pageNumberDigits ?? 'locale' }, 2)} ${locale.toLowerCase().startsWith('ar') ? 'سم' : 'cm'}`;
-          session.setMarginFeedback({ ...session.marginFeedback, [side]: { raw, error: marginErrorText(violation, limit, locale) } });
+          const paperMm = violation === 'width' ? paper.width : paper.height;
+          const digits = session.schema.meta.pageNumberDigits ?? 'locale';
+          const unit = locale.toLowerCase().startsWith('ar') ? 'سم' : 'cm';
+          const paperLabel = `${formatLocalizedNumber(mmToLength(paperMm, 'cm'), { locale, digits }, 2)} ${unit}`;
+          const contentLabel = `${formatLocalizedNumber(mmToLength(MIN_CONTENT_MM, 'cm'), { locale, digits }, 2)} ${unit}`;
+          session.setMarginFeedback({ ...session.marginFeedback, [side]: { raw, error: marginErrorText(violation, paperLabel, contentLabel, locale), kind: 'invalid' } });
           return;
         }
         const next = { ...session.marginFeedback };
         delete next[side];
         session.setMarginFeedback(next);
+        if (!Object.values(next).some((item) => item?.kind === 'clamped')) session.setMarginNotice('');
         commitSchema(session, {
           ...session.schema,
           page: { ...session.schema.page, margins },

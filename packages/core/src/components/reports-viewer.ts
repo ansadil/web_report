@@ -66,9 +66,12 @@ export class ReportsViewerElement extends LitElement {
       flex-direction: column;
       align-items: stretch;
       box-sizing: border-box;
+      position: relative;
       height: 100%;
+      max-height: 100%;
       min-height: 0;
-      background: var(--rw-bg);
+      overflow: hidden;
+      background: #dfe4eb;
       padding: 0;
       font-family: var(--rw-font);
       font-size: 12px;
@@ -80,12 +83,14 @@ export class ReportsViewerElement extends LitElement {
       z-index: 40;
       flex: none;
       display: flex;
-      gap: 6px;
+      gap: 4px;
       margin: 0;
-      padding: 6px 10px;
+      padding: 0 10px;
+      height: 42px;
       min-height: 42px;
       box-sizing: border-box;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       align-items: center;
       align-self: stretch;
       background: #fff;
@@ -133,10 +138,12 @@ export class ReportsViewerElement extends LitElement {
     .toolbar button[disabled] { opacity: 0.5; cursor: not-allowed; }
     .toolbar button[hidden] { display: none !important; }
     .viewer-frame {
+      position: absolute;
+      inset: 0;
       display: flex;
-      flex: 1 1 auto;
       min-height: 0;
       min-width: 0;
+      overflow: hidden;
     }
     aside.params {
       width: 262px;
@@ -146,7 +153,9 @@ export class ReportsViewerElement extends LitElement {
       border-inline-end: 1px solid var(--rw-border);
       display: flex;
       flex-direction: column;
+      height: 100%;
       min-height: 0;
+      overflow: hidden;
     }
     .params-head {
       padding: 10px 12px;
@@ -155,7 +164,6 @@ export class ReportsViewerElement extends LitElement {
       font-size: 13px;
     }
     .params-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 12px 12px; color: var(--rw-text); }
-    .param-banner { background: #fef2f2; color: #b91c1c; border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-size: 12px; line-height: 1.4; }
     .fld-l { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 12px; }
     .fld-l small { color: var(--rw-muted); font-weight: 400; margin-inline-start: 4px; }
     .params-body input, .params-body select {
@@ -173,12 +181,20 @@ export class ReportsViewerElement extends LitElement {
       width: 100%; margin-top: 6px; height: 32px; border: 1px solid var(--rw-border);
       border-radius: 8px; background: #fff; color: var(--rw-muted); cursor: pointer; font: inherit;
     }
+    .vinfo {
+      margin-top: 14px; border-top: 1px solid var(--rw-border); padding-top: 10px;
+      font-size: 11.5px; color: var(--rw-muted); line-height: 1.9;
+    }
+    .vinfo div { display: flex; justify-content: space-between; gap: 8px; }
+    .vinfo b { color: var(--rw-text); font-weight: 700; }
     .viewer-main {
       flex: 1 1 auto;
       min-width: 0;
       min-height: 0;
+      height: 100%;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
     .toolbar button.view-tool {
       padding: 4px 6px;
@@ -314,8 +330,8 @@ export class ReportsViewerElement extends LitElement {
   @state() private _pageCount = 0;
   @state() private _draft: Record<string, unknown> = {};
   @state() private _fieldErrors: Record<string, string> = {};
-  @state() private _paramBanner = '';
   @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
+  @state() private _rowCount = 0;
 
   @query('.surface') private _surface!: HTMLDivElement;
 
@@ -434,6 +450,7 @@ export class ReportsViewerElement extends LitElement {
       this._html = rendered.html;
       this._chartIds = [...rendered.chartIds];
       this._codeIds = [...rendered.codeIds];
+      this._rowCount = rows.length;
       this._phase = 'ready';
       await this.updateComplete;
       this._renderCharts(this._chartIds);
@@ -445,11 +462,10 @@ export class ReportsViewerElement extends LitElement {
       this._error = e instanceof Error ? e.message : String(e);
       if (e instanceof ParameterValidationError) {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
-        // `fieldErrors`: name -> message in the report locale, for showing each error next to its field.
-        const checked = validateParameterValues(finalSchema, this.params, { locale: this._locale });
-        this._fieldErrors = { ...checked.fieldErrors };
-        this._paramBanner = checked.errors.map((issue) => issue.message).join(' · ');
-        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors: checked.fieldErrors } }));
+        // Show each localized message under its field. The summary banner is owned by the parameters fix.
+        const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: this._locale });
+        this._fieldErrors = { ...fieldErrors };
+        this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
       } else {
         logger.error('reports-viewer', 'render failed', { error: this._error });
       }
@@ -480,6 +496,25 @@ export class ReportsViewerElement extends LitElement {
 
   private _zoomReset(): void {
     this._zoom = 1;
+  }
+
+  /** Scale the sheet so its width and the summary cards fit the canvas. */
+  fitSheet(): void {
+    const surface = this._surface;
+    const sheet = surface?.querySelector<HTMLElement>('.rw-page-visual-sheet') ?? surface?.querySelector<HTMLElement>('.rw-report');
+    if (!surface || !sheet) return;
+    const pad = 16;
+    const availW = Math.max(80, surface.clientWidth - pad);
+    const availH = Math.max(80, surface.clientHeight - pad);
+    const sheetRect = sheet.getBoundingClientRect();
+    const footer = sheet.querySelector<HTMLElement>('[data-band="reportFooter"]');
+    const footerTop = footer ? footer.getBoundingClientRect().top - sheetRect.top : sheetRect.height;
+    const basisW = sheetRect.width / this._zoom;
+    // Keep the summary cards (about 22mm of the report footer) on screen, not the empty page tail.
+    const basisH = (footer ? footerTop / this._zoom + 22 * (96 / 25.4) : sheetRect.height / this._zoom);
+    if (basisW < 1 || basisH < 1) return;
+    const next = Math.min(1, Math.max(ZOOM_MIN, Math.min(availW / basisW, availH / basisH)));
+    this._zoom = this._roundZoom(next);
   }
 
   private _fitWidth(): void {
@@ -738,7 +773,6 @@ export class ReportsViewerElement extends LitElement {
     }
     this._draft = draft;
     this._fieldErrors = {};
-    this._paramBanner = '';
     void this._loadParamOptions();
   }
 
@@ -762,10 +796,9 @@ export class ReportsViewerElement extends LitElement {
   private _applyParameters(): void {
     const result = validateParameterValues(this.schema, this._draft, { locale: this._locale });
     this._fieldErrors = { ...result.fieldErrors };
-    this._paramBanner = result.errors.map((issue) => issue.message).join(' · ');
     if (!result.ok) {
       this.dispatchEvent(new CustomEvent('parameters-error', {
-        detail: { error: this._paramBanner, issues: result.errors, fieldErrors: result.fieldErrors },
+        detail: { error: result.errors[0]?.message ?? '', issues: result.errors, fieldErrors: result.fieldErrors },
         bubbles: true,
         composed: true,
       }));
@@ -779,10 +812,7 @@ export class ReportsViewerElement extends LitElement {
   private _paintParameterFields(): void {
     const host = this._paramFields;
     if (!host) return;
-    const banner = this._paramBanner
-      ? `<div class="param-banner" data-testid="param-banner">${escapeHtml(this._paramBanner)}</div>`
-      : '';
-    const html = banner + this._parameterFieldsHtml();
+    const html = this._parameterFieldsHtml();
     if (host.innerHTML !== html) host.innerHTML = html;
   }
 
@@ -847,6 +877,10 @@ export class ReportsViewerElement extends LitElement {
             <div class="param-fields"></div>
             <button type="button" class="run" data-testid="run-report" @click=${() => this._applyParameters()}>${t(this._locale, 'runReport')}</button>
             <button type="button" class="reset" data-testid="reset-params" @click=${() => this._resetParameterDraft()}>${t(this._locale, 'resetParams')}</button>
+            <div class="vinfo" data-testid="param-info">
+              <div><span>${t(this._locale, 'paramRecords')}</span><b>${formatLocalizedNumber(this._rowCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
+              <div><span>${t(this._locale, 'paramPages')}</span><b>${formatLocalizedNumber(this._pageCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
+            </div>
           </div>
         </aside>
         <div class="viewer-main">

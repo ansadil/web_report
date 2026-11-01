@@ -47,4 +47,29 @@ describe('BUG-19: page header and footer repeat on every HTML page', () => {
     expect(html).not.toContain('{page}');
     expect(html).not.toContain('{pages}');
   });
+
+  it('draws the report header above the running page header on the first sheet only', () => {
+    const base = schema();
+    const withTitle = validateReport({
+      ...base,
+      bands: {
+        ...base.bands,
+        reportHeader: {
+          height: 12,
+          elements: [{ id: 'rh', kind: 'text', value: 'عنوان التقرير', pos: { x: 0, y: 0, w: 160, h: 8 } }],
+        },
+      },
+    });
+    if (!withTitle.ok) throw new Error(withTitle.error);
+    const rows = Array.from({ length: 12 }, (_, i) => ({ item: `بند ${i + 1}` }));
+    const { html } = renderHtml(interpret({ schema: withTitle.value, rows }), { visualPages: true, idPrefix: 'b19b' });
+    const sheets = html.split('rw-page-visual-sheet').slice(1);
+    expect(sheets.length).toBeGreaterThanOrEqual(2);
+    const firstHeader = sheets[0]!.indexOf('data-band="reportHeader"');
+    const firstPage = sheets[0]!.indexOf('data-band="pageHeader"');
+    expect(firstHeader).toBeGreaterThanOrEqual(0);
+    expect(firstPage).toBeGreaterThan(firstHeader);
+    expect(sheets[1]).not.toContain('data-band="reportHeader"');
+    expect(sheets[1]).toContain('data-band="pageHeader"');
+  });
 });

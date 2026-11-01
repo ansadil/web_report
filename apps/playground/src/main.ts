@@ -181,6 +181,10 @@ builder.addEventListener('request-preview', () => {
   viewer.dirOverride = state.locale === 'ar' ? 'rtl' : 'ltr';
   builder.previewing = true;
 });
+viewer.addEventListener('report-rendered', () => {
+  if (!builder.previewing) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => viewer.fitSheet()));
+});
 builder.addEventListener('ribbon-tab', (event) => {
   const tab = (event as CustomEvent<{ tab: string }>).detail.tab;
   if (tab !== 'preview') builder.previewing = false;

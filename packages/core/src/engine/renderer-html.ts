@@ -147,11 +147,25 @@ function paginateWithRunningBands(sections: readonly RenderSection[], budgetMm: 
   const chrome = (pageHeader?.height ?? 0) + (pageFooter?.height ?? 0);
   const bodyBudget = Math.max(1, budgetMm - chrome);
   const chunks = chunkSectionsForVisualPages(body, bodyBudget);
-  return chunks.map((chunk) => [
-    ...(pageHeader ? [pageHeader] : []),
-    ...chunk,
-    ...(pageFooter ? [pageFooter] : []),
-  ]);
+  return chunks.map((chunk) => {
+    // A report header belongs above the repeating column header on the first page.
+    const leading: RenderSection[] = [];
+    const rest: RenderSection[] = [];
+    let seenBody = false;
+    for (const section of chunk) {
+      if (!seenBody && section.band === 'reportHeader') leading.push(section);
+      else {
+        seenBody = true;
+        rest.push(section);
+      }
+    }
+    return [
+      ...leading,
+      ...(pageHeader ? [pageHeader] : []),
+      ...rest,
+      ...(pageFooter ? [pageFooter] : []),
+    ];
+  });
 }
 
 /** Split sections into visual pages using content-area height (page minus margins). Honors pageBreakBefore/After. */

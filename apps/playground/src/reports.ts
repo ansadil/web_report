@@ -8,6 +8,12 @@ export interface SampleReport {
   build(): ReportSchemaV1;
 }
 
+const SALES_LOGO =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#1f5fa8"/><path d="M10 52h44M16 52V30l16-12 16 12v22M28 52V40h8v12" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>',
+  );
+
 const salesByRegion: SampleReport = {
   id: 'sales-by-region',
   name: { en: 'Monthly Sales', ar: 'تقرير المبيعات الشهري' },
@@ -58,23 +64,23 @@ const salesByRegion: SampleReport = {
     ],
     bands: {
       reportHeader: {
-        height: 24,
+        height: 32,
         elements: [
-          { id: 'logo', kind: 'image', src: 'logo', alt: 'الشعار', pos: { x: 2, y: 3, w: 26, h: 18 } },
-          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 32, y: 3, w: 112, h: 10 } },
-          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 32, y: 14, w: 112, h: 7 } },
-          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 156, y: 3, w: 18, h: 18 } },
+          { id: 'logo', kind: 'image', src: SALES_LOGO, alt: 'الشعار', pos: { x: 2, y: 2, w: 22, h: 16 } },
+          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 28, y: 2, w: 120, h: 9 } },
+          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 28, y: 12, w: 120, h: 6 } },
+          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 28, y: 19, w: 80, h: 6 } },
+          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 110, y: 19, w: 48, h: 6 } },
+          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 160, y: 2, w: 16, h: 16 } },
         ],
       },
       pageHeader: {
-        height: 18,
+        height: 8,
         elements: [
-          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 2, y: 1, w: 90, h: 6 } },
-          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 100, y: 1, w: 78, h: 6 } },
-          { id: 'h1', kind: 'text', value: 'الصنف', style: { bold: true, color: '#fff', background: '#1f5fa8', font: 'Cairo' }, pos: { x: 0, y: 10, w: 70, h: 7 } },
-          { id: 'h2', kind: 'text', value: 'الكمية', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 70, y: 10, w: 30, h: 7 } },
-          { id: 'h3', kind: 'text', value: 'السعر', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 100, y: 10, w: 30, h: 7 } },
-          { id: 'h4', kind: 'text', value: 'الإجمالي', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 130, y: 10, w: 50, h: 7 } },
+          { id: 'h1', kind: 'text', value: 'الصنف', style: { bold: true, color: '#fff', background: '#1f5fa8', font: 'Cairo' }, pos: { x: 0, y: 0.5, w: 70, h: 7 } },
+          { id: 'h2', kind: 'text', value: 'الكمية', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 70, y: 0.5, w: 30, h: 7 } },
+          { id: 'h3', kind: 'text', value: 'السعر', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 100, y: 0.5, w: 30, h: 7 } },
+          { id: 'h4', kind: 'text', value: 'الإجمالي', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 130, y: 0.5, w: 50, h: 7 } },
         ],
       },
       detail: {

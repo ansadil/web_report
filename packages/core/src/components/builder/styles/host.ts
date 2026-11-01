@@ -34,12 +34,18 @@ export const hostStyles = css`
     }
     :host([data-left-collapsed='true']) { --rb-side-w: var(--rb-rail); }
     slot[name='preview'] { display: none; }
+    /* Preview covers the canvas row only. Page tabs collapse so the designer status bar stays on screen. */
+    :host([previewing]) {
+      grid-template-rows: 34px auto minmax(0, 1fr) 0px 28px;
+    }
     :host([previewing]) slot[name='preview'] {
       display: flex;
+      flex-direction: column;
       grid-column: 1 / -1;
-      grid-row: 3 / 5;
+      grid-row: 3;
       min-width: 0;
       min-height: 0;
+      overflow: hidden;
       z-index: 4;
       background: #dfe4eb;
     }
@@ -48,13 +54,17 @@ export const hostStyles = css`
       flex: 1 1 auto;
       width: 100%;
       height: 100%;
+      max-height: 100%;
       min-width: 0;
       min-height: 0;
+      overflow: hidden;
     }
     :host([previewing]) aside.left,
     :host([previewing]) main.center,
     :host([previewing]) aside.props,
     :host([previewing]) .page-tabs { visibility: hidden; }
+    :host([previewing]) .page-tabs { height: 0; min-height: 0; overflow: hidden; padding: 0; border: 0; }
+    :host([previewing]) .status-bar { position: relative; z-index: 6; }
     .titlebar { grid-area: title; }
     .page-tabs { grid-area: pages; }
     aside.props { grid-area: props; }

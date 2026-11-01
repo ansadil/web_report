@@ -175,6 +175,8 @@ type StringKey =
   | 'runReport'
   | 'resetParams'
   | 'paramRequired'
+  | 'paramRecords'
+  | 'paramPages'
   | 'elements'
   | 'savedState'
   | 'propertyGrid'
@@ -411,6 +413,8 @@ const en: Record<StringKey, string> = {
   runReport: 'Run report',
   resetParams: 'Reset',
   paramRequired: 'Required',
+  paramRecords: 'Records',
+  paramPages: 'Pages',
   elements: 'Elements',
   savedState: 'Saved just now',
   propertyGrid: 'Property grid',
@@ -648,6 +652,8 @@ const ar: Record<StringKey, string> = {
   runReport: 'عرض التقرير',
   resetParams: 'إعادة تعيين',
   paramRequired: 'إلزامي',
+  paramRecords: 'عدد السجلات',
+  paramPages: 'عدد الصفحات',
   elements: 'العناصر',
   savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',

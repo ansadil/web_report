@@ -181,6 +181,10 @@ type StringKey =
   | 'paramRequired'
   | 'paramRecords'
   | 'paramPages'
+  | 'lastRefresh'
+  | 'generatedAt'
+  | 'dateFrom'
+  | 'dateTo'
   | 'elements'
   | 'savedState'
   | 'propertyGrid'
@@ -423,6 +427,10 @@ const en: Record<StringKey, string> = {
   paramRequired: 'Required',
   paramRecords: 'Records',
   paramPages: 'Pages',
+  lastRefresh: 'Last refresh',
+  generatedAt: 'Generated',
+  dateFrom: 'From',
+  dateTo: 'To',
   elements: 'Elements',
   savedState: 'Saved just now',
   propertyGrid: 'Property grid',
@@ -666,6 +674,10 @@ const ar: Record<StringKey, string> = {
   paramRequired: 'إلزامي',
   paramRecords: 'عدد السجلات',
   paramPages: 'عدد الصفحات',
+  lastRefresh: 'آخر تحديث',
+  generatedAt: 'وقت الإنشاء',
+  dateFrom: 'من',
+  dateTo: 'إلى',
   elements: 'العناصر',
   savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',

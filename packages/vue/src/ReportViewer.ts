@@ -1,6 +1,6 @@
 import type { LocaleTag } from '@reports-web/shared';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue';
-import { ReportsViewerElement } from '@reports-web/core';
+import { ReportsViewerElement, dateFormatHintFor } from '@reports-web/core';
 import type { ReportViewerProps } from './types.js';
 
 if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer')) {
@@ -42,7 +42,7 @@ export const ReportViewer = defineComponent({
       el.hidePageBoundaries = props.hidePageBoundaries;
       el.params = props.params ?? null;
       el.timeZone = props.timeZone;
-      el.dateFormatHint = props.dateFormatHint;
+      el.dateFormatHint = props.dateFormatHint ?? dateFormatHintFor((props.schema?.meta?.locale ?? props.locale ?? 'en').replace(/_/g, '-'));
       if (props.fontsBaseUrl !== undefined) el.fontsBaseUrl = props.fontsBaseUrl;
     };
 

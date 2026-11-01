@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ReportsViewerElement } from '@reports-web/core';
+import { ReportsViewerElement, dateFormatHintFor } from '@reports-web/core';
 import type { ParameterIssue } from '@reports-web/core';
 import type { ReportViewerProps, ExportPayload, ExportKind } from './types.js';
 
@@ -25,7 +25,7 @@ export function ReportViewer(props: ReportViewerProps) {
     el.hidePageBoundaries = !!hidePageBoundaries;
     el.params = params ?? null;
     el.timeZone = timeZone;
-    el.dateFormatHint = dateFormatHint;
+    el.dateFormatHint = dateFormatHint ?? dateFormatHintFor((schema?.meta?.locale ?? locale ?? 'en').replace(/_/g, '-'));
     if (fontsBaseUrl !== undefined) el.fontsBaseUrl = fontsBaseUrl;
   }, [schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, dateFormatHint, fontsBaseUrl]);
 

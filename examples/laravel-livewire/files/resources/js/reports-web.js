@@ -1,5 +1,10 @@
 import '@reports-web/core/viewer';
 import '@reports-web/core/builder';
+import { dateFormatHintFor } from '@reports-web/core';
+
+function hintForReportLocale(locale) {
+  return dateFormatHintFor(String(locale ?? 'en').replace(/_/g, '-'));
+}
 
 /**
  * Called from Livewire `@script` after the custom element is registered.
@@ -13,6 +18,7 @@ window.mountInvoiceReportViewer = function mountInvoiceReportViewer(opts) {
     el.schema = schema;
     el.rows = rows;
     el.locale = locale;
+    el.dateFormatHint = hintForReportLocale(schema?.meta?.locale ?? locale);
     el.dir = dir;
   });
 };

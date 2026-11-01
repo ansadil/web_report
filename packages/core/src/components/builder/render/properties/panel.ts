@@ -1,6 +1,6 @@
 import { html } from 'lit';
 import type { FieldMeta } from '@reports-web/shared';
-import { lineThicknessMm, t } from '../../api.js';
+import { icon, lineThicknessMm, t } from '../../api.js';
 import type { ConditionalFormatRule, ReportElement, Style } from '../../api.js';
 import { elementStatusName, formatLocalizedNumber, parseLocalizedNumber } from '../../status-bar.js';
 import type { BandKey } from '../../types.js';
@@ -69,6 +69,7 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
   };
   const arabic = state.locale.toLowerCase().startsWith('ar');
   const xLabel = t(state.locale, !arabic && state.schema.meta.dir !== 'rtl' ? 'propXLeft' : 'propXRight');
+  const families = ['Cairo', 'Tajawal', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Noto Sans'] as const;
   const family = (el.style?.font ?? '').split(',')[0]?.trim().replace(/^['"]|['"]$/g, '') || 'Cairo';
   const hex = colorInputValue(el.style?.color);
   const alignLabel = el.style?.align === 'start' ? t(state.locale, 'alignStart')
@@ -92,16 +93,21 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
       ${renderInspectorChrome(state.locale, filterRows)}
       <div class="props-body">
       <section class="cat">
-        <div class="cat-h">${t(state.locale, 'positionSize')}<span class="cnt">5</span></div>
-        ${gridRow(t(state.locale, 'propName'), html`<input class="name-value" data-testid="prop-name" .value=${elementStatusName(el, state.locale)} readonly />`)}
+        <button type="button" class="cat-h" @click=${toggleCat}>${icon('sectionDown')}<span>${t(state.locale, 'positionSize')}</span><span class="cnt">5</span></button>
+        <div class="cat-b">
+        ${gridRow(t(state.locale, 'propName'), html`<input class="name-value" data-testid="prop-name" .value=${elementStatusName(el, state.locale)} readonly />`, undefined, true)}
         ${gridRow(xLabel, html`<input data-testid="prop-x" .value=${cm(el.pos.x)} @input=${(e: Event) => setCm('x', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
         ${gridRow(t(state.locale, 'propYTop'), html`<input data-testid="prop-y" .value=${cm(el.pos.y)} @input=${(e: Event) => setCm('y', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
         ${gridRow(t(state.locale, 'propWidth'), html`<input data-testid="prop-width" .value=${cm(el.pos.w)} @input=${(e: Event) => setCm('w', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
         ${gridRow(t(state.locale, 'propHeight'), html`<input data-testid="prop-height" .value=${el.kind === 'line' ? formatLocalizedNumber(lineThicknessMm(el.thickness ?? 1) / 10, fmt, 2) : cm(el.pos.h)} ?disabled=${el.kind === 'line' && el.orientation === 'horizontal'} @input=${(e: Event) => setCm('h', (e.target as HTMLInputElement).value)} />`, t(state.locale, 'unitCm'))}
+        </div>
       </section>
       <section class="cat">
-        <div class="cat-h">${t(state.locale, 'textAndFont')}<span class="cnt">8</span></div>
-        ${gridRow(t(state.locale, 'fontFamily'), html`<input data-testid="prop-font-family" .value=${family} @input=${(e: Event) => updateStyle({ font: (e.target as HTMLInputElement).value || undefined })} />`)}
+        <button type="button" class="cat-h" @click=${toggleCat}>${icon('sectionDown')}<span>${t(state.locale, 'textAndFont')}</span><span class="cnt">8</span></button>
+        <div class="cat-b">
+        ${gridRow(t(state.locale, 'fontFamily'), html`<select data-testid="prop-font-family" @change=${(e: Event) => updateStyle({ font: (e.target as HTMLSelectElement).value || undefined })}>
+          ${families.map((name) => html`<option value=${name} ?selected=${family === name}>${name}</option>`)}
+        </select>`)}
         ${gridRow(t(state.locale, 'fontSize'), html`<input data-testid="prop-font-size" .value=${formatLocalizedNumber(el.style?.fontSize ?? 10, fmt, 0)} @input=${(e: Event) => { const n = parseLocalizedNumber((e.target as HTMLInputElement).value); if (Number.isFinite(n)) updateStyle({ fontSize: n }); }} />`, t(state.locale, 'unitPt'))}
         ${gridRow(t(state.locale, 'direction'), html`<span class="pick"><span class="pick-label">${t(state.locale, state.schema.meta.dir === 'rtl' ? 'dirRtl' : 'dirLtr')}</span><select data-testid="prop-text-direction" @change=${(e: Event) => cb.updateMeta({ dir: (e.target as HTMLSelectElement).value as 'rtl' | 'ltr' })}>
           <option value="ltr" ?selected=${state.schema.meta.dir !== 'rtl'}>${t(state.locale, 'dirLtr')}</option>
@@ -121,11 +127,13 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
           <option value="end" ?selected=${el.style?.valign === 'end'}>${t(state.locale, 'alignBottom')}</option>
         </select></span>`)}
         ${gridRow(t(state.locale, 'color'), html`<span class="color-value"><input type="color" class="swatch" .value=${hex} @input=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /><input data-testid="prop-color" class="hex" .value=${hex} @change=${(e: Event) => updateStyle({ color: (e.target as HTMLInputElement).value })} /></span>`)}
-        ${gridRow(t(state.locale, 'bold'), html`<input data-testid="prop-bold" type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} />`)}
-        ${gridRow(t(state.locale, 'padding'), html`<input data-testid="prop-padding" .value=${String(el.style?.padding ?? 0)} @input=${(e: Event) => updateStyle({ padding: Number((e.target as HTMLInputElement).value) || undefined })} />`)}
+        ${gridRow(t(state.locale, 'bold'), html`<span class="bool"><input data-testid="prop-bold" type="checkbox" .checked=${!!el.style?.bold} @change=${(e: Event) => updateStyle({ bold: (e.target as HTMLInputElement).checked })} /><span>${t(state.locale, el.style?.bold ? 'yes' : 'no')}</span></span>`)}
+        ${gridRow(t(state.locale, 'padding'), html`<input data-testid="prop-padding" .value=${formatLocalizedNumber(el.style?.padding ?? 0, fmt, 0)} @input=${(e: Event) => { const n = parseLocalizedNumber((e.target as HTMLInputElement).value); if (Number.isFinite(n)) updateStyle({ padding: n || undefined }); }} />`, t(state.locale, 'unitPt'))}
+        </div>
       </section>
-      <details class="cat">
-        <summary class="cat-h">${t(state.locale, 'style')}</summary>
+      <section class="cat closed">
+        <button type="button" class="cat-h" @click=${toggleCat}>${icon('sectionDown')}<span>${t(state.locale, 'style')}</span><span class="cnt">4</span></button>
+        <div class="cat-b">
         <label>${t(state.locale, 'visibleWhen')}<input data-testid="prop-visible-when" .value=${el.visibleWhen ?? ''} @input=${(e: Event) => update({ visibleWhen: (e.target as HTMLInputElement).value || undefined })} /></label>
         <label><input data-testid="prop-italic" type="checkbox" .checked=${!!el.style?.italic} @change=${(e: Event) => updateStyle({ italic: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'italic')}</label>
         <label><input data-testid="prop-underline" type="checkbox" .checked=${!!el.style?.underline} @change=${(e: Event) => updateStyle({ underline: (e.target as HTMLInputElement).checked })} /> ${t(state.locale, 'underline')}</label>
@@ -151,15 +159,20 @@ export function renderProperties(state: PropertiesState, cb: PropertiesCallbacks
       ${renderKindSpecific({ el, fields: state.fields, locale: state.locale }, { update })}
 
       <button class="danger" type="button" @click=${cb.deleteSelected}>${t(state.locale, 'delete')}</button>
-      </details>
+        </div>
+      </section>
       </div>
       <div class="events-body">${t(state.locale, 'events')}</div>
     </div>
   `;
 }
 
-function gridRow(label: string, control: unknown, unit?: string) {
-  return html`<div class="prow"><span class="k">${label}</span><span class="v">${control}${unit ? html`<span class="u">${unit}</span>` : ''}</span></div>`;
+function gridRow(label: string, control: unknown, unit?: string, highlight = false) {
+  return html`<div class="prow ${highlight ? 'hl' : ''}"><span class="k">${label}</span><span class="v">${control}${unit ? html`<span class="u">${unit}</span>` : ''}</span></div>`;
+}
+
+function toggleCat(event: Event): void {
+  (event.currentTarget as HTMLElement).closest('.cat')?.classList.toggle('closed');
 }
 
 function filterRows(event: Event): void {

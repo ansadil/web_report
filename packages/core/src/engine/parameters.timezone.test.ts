@@ -132,19 +132,16 @@ describe('BUG-54: datetime bounds are formatted for the locale and time zone', (
     expect(msg.startsWith('يجب ألا')).toBe(true);
     const bound = msg.slice(msg.indexOf(FSI));
     expect(bound.startsWith(FSI) && bound.endsWith(PDI)).toBe(true);
-    expect(bound).toContain('٢٠٢٦');
-    expect(bound).toContain('٠١:٣٠'); // 22:30Z = 01:30 Riyadh
-    expect(bound).toMatch(/٠١.*١١|١١.*٠١/); // 1 November
-    expect(bound).not.toMatch(LATIN_DIGIT_OR_ISO);
+    expect(bound).toContain('٢٠٢٦-١١-٠١ ٠١:٣٠'); // 22:30Z = 01:30 Riyadh, 1 November
+    expect(bound.replace('Asia/Riyadh', '')).not.toMatch(LATIN_DIGIT_OR_ISO);
   });
 
   it('English: Latin digits in the configured zone, no ISO T/Z', () => {
     const msg = validateParameterValues(defs, early, { locale: 'en', now: lateUtc, timeZone: 'UTC' }).fieldErrors.at!;
-    expect(msg).toContain('2026');
-    expect(msg).toContain('22:30');
+    expect(msg).toContain('2026-10-31 22:30');
     expect(msg).not.toContain('2026-10-31T');
     expect(msg).not.toMatch(/Z\b/);
-    expect(validateParameterValues(defs, early, { locale: 'en', now: lateUtc }).fieldErrors.at).toContain('01:30');
+    expect(validateParameterValues(defs, early, { locale: 'en', now: lateUtc }).fieldErrors.at).toContain('2026-11-01 01:30');
   });
 
   it('formatParameterIssue takes the time zone and isolates date bounds in Arabic', () => {
@@ -155,6 +152,48 @@ describe('BUG-54: datetime bounds are formatted for the locale and time zone', (
     const d = formatParameterIssue({ rule: 'min', args: { min: '2020-01-01' } }, { name: 'd', type: 'date' }, 'ar');
     expect(d).toContain(`${FSI}٢٠٢٠-٠١-٠١${PDI}`);
     expect(formatParameterIssue({ rule: 'min', args: { min: '2020-01-01' } }, { name: 'd', type: 'date' }, 'en')).toBe('Must not be before 2020-01-01');
+  });
+});
+
+describe('BUG-60: datetime bounds name the time zone and use an unambiguous order', () => {
+  const at = { name: 'at', type: 'datetime' as const, label: { ar: 'الوقت', en: 'Time' } };
+  const max = { rule: 'max' as const, args: { max: '2026-10-31T22:30:00Z' } };
+
+  it('English: YYYY-MM-DD HH:mm, UTC offset and IANA id (never US 11/01/2026)', () => {
+    expect(formatParameterIssue(max, at, 'en')).toBe('Must not be after 2026-11-01 01:30 GMT+3 (Asia/Riyadh)');
+    expect(formatParameterIssue(max, at, 'en', { timeZone: 'Asia/Dubai' })).toBe('Must not be after 2026-11-01 02:30 GMT+4 (Asia/Dubai)');
+    expect(formatParameterIssue(max, at, 'en', { timeZone: 'UTC' })).toBe('Must not be after 2026-10-31 22:30 GMT+0 (UTC)');
+    expect(formatParameterIssue(max, at, 'en', { timeZone: 'Asia/Kolkata' })).toContain('2026-11-01 04:00 GMT+5:30 (Asia/Kolkata)');
+    // en-GB / en-US report locales get the same unambiguous text
+    expect(formatParameterIssue(max, at, 'en-US')).toBe(formatParameterIssue(max, at, 'en-GB'));
+    expect(formatParameterIssue(max, at, 'en-US')).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
+  });
+
+  it('English: DST-correct offset and seconds only when non-zero', () => {
+    // New York: EDT (GMT-4) before 2026-11-01 06:00Z, EST (GMT-5) after
+    expect(formatParameterIssue(max, at, 'en', { timeZone: 'America/New_York' })).toContain('2026-10-31 18:30 GMT-4 (America/New_York)');
+    const winter = { rule: 'max' as const, args: { max: '2026-12-01T12:00:05Z' } };
+    expect(formatParameterIssue(winter, at, 'en', { timeZone: 'America/New_York' })).toContain('2026-12-01 07:00:05 GMT-5 (America/New_York)');
+  });
+
+  it('Arabic: same order with Arabic-Indic digits, غرينتش offset, isolated date-time and IANA id', () => {
+    const LRI = '\u2066';
+    expect(formatParameterIssue(max, at, 'ar')).toBe(
+      `يجب ألا يكون التاريخ بعد ${FSI}${LRI}٢٠٢٦-١١-٠١ ٠١:٣٠${PDI} غرينتش+٣ (${FSI}Asia/Riyadh${PDI})${PDI}`,
+    );
+    const dubai = formatParameterIssue(max, at, 'ar-AE', { timeZone: 'Asia/Dubai' });
+    expect(dubai).toContain(`${LRI}٢٠٢٦-١١-٠١ ٠٢:٣٠${PDI} غرينتش+٤ (${FSI}Asia/Dubai${PDI})`);
+    expect(formatParameterIssue(max, at, 'ar', { timeZone: 'America/New_York' })).toContain('غرينتش-٤');
+  });
+
+  it('min-after-max definition errors carry the zone too', () => {
+    const defs: ParameterDef[] = [{ name: 't', type: 'datetime', min: '2026-11-02T00:00', max: '2026-11-01T00:00' }];
+    const [en] = getParameterDefinitions(defs, { locale: 'en' });
+    expect(en!.definitionError).toContain('2026-11-02 00:00 GMT+3 (Asia/Riyadh)');
+    expect(en!.definitionError).toContain('2026-11-01 00:00 GMT+3 (Asia/Riyadh)');
+    const [ar] = getParameterDefinitions(defs, { locale: 'ar' });
+    expect(ar!.definitionError).toContain('٢٠٢٦-١١-٠٢ ٠٠:٠٠');
+    expect(ar!.definitionError).toContain('غرينتش+٣');
   });
 });
 

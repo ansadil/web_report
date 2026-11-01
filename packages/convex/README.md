@@ -97,8 +97,17 @@ const data = createConvexDataAdapter({ client, query: api.reports.rows });
 const http = createConvexDataAdapter({ httpUrl: 'https://<deployment>.convex.site/reports/data', headers: async () => ({ authorization: `Bearer ${await getToken()}` }) });
 ```
 
-The adapter sends the report's resolved parameters. `Date`s become ISO strings and `undefined` values are
-dropped. Failures come back as `Error('Convex data source "<source>" failed: …')`, with the original error
+The adapter sends the report's resolved parameters (core's `buildDataQuery`: `dataset.params` merged with the
+resolved values), as JSON-safe values; `undefined` values are dropped:
+
+| Parameter type | Sent as | Example |
+| --- | --- | --- |
+| `date` | `YYYY-MM-DD`, the calendar date in the viewer's `timeZone` (a `Date` / epoch / ISO instant is converted to that zone's date) | `'2026-11-01'` |
+| `dateRange` | `{ from?, to? }` of `YYYY-MM-DD` dates, same rule | `{ from: '2026-11-01', to: '2026-11-05' }` |
+| `datetime` | a `Date`, epoch ms or `'now'` (as a default) becomes a UTC ISO string; `'now'` passed as a value is rejected; a string is sent as given (trimmed), so a zone-less `YYYY-MM-DDTHH:mm` is a wall time in the viewer's `timeZone` that your handler must interpret in that zone | `'2026-10-31T22:30:00.000Z'`, `'2026-11-01T01:30'` |
+| static `dataset.params` | as written; a `Date` becomes a UTC ISO string | `'2026-01-01T00:00:00.000Z'` |
+
+Failures come back as `Error('Convex data source "<source>" failed: …')`, with the original error
 as `cause`. An aborted `AbortSignal` rejects right away. A Convex one-shot query cannot be cancelled, so its
 result is simply ignored. `describe` (a static object or an async function) is optional.
 
@@ -126,6 +135,12 @@ export const rows = query({
 the `time-zone` attribute or `timeZone` property on `<reports-viewer>`, the `timeZone` prop in the React/Vue
 wrappers, or the `timeZone` option of `getParameterDefinitions` / `validateParameterValues`. `Date` values
 given without a `timeZone` are read as Riyadh time.
+An unknown zone (not an IANA name) throws a `RangeError` in the core functions. The viewer does not throw: it falls
+back to `Asia/Riyadh`, logs a warning and dispatches a `time-zone-invalid` event with
+`detail: { timeZone, fallback: 'Asia/Riyadh' }`, once per value set (`onTimeZoneInvalid` in React,
+`@time-zone-invalid` in Vue). It is a separate event, so `parameters-error` handlers are not affected.
+Date-time bounds in validation messages name the zone and use an unambiguous order, e.g.
+`Must not be before 2026-11-01 01:30 GMT+3 (Asia/Riyadh)` (Arabic: same order with Arabic-Indic digits and `غرينتش+٣`).
 Relative presets such as `thisMonth` use the Gregorian calendar only; Hijri (Umm al-Qura) periods are not supported.
 
 ## Example: Nuxt 3 + Convex (Madar)

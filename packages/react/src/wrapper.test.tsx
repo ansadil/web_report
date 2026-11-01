@@ -54,4 +54,32 @@ describe('React ReportViewer params prop', () => {
     await act(async () => root.unmount());
     host.remove();
   });
+
+  it('forwards time-zone-invalid as onTimeZoneInvalid (BUG-59)', async () => {
+    const { act } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const invalid: unknown[] = [];
+    const paramErrors: unknown[] = [];
+    await act(async () => {
+      root.render(
+        createElement(ReportViewer, {
+          schema: null,
+          timeZone: 'Mars/Olympus',
+          onTimeZoneInvalid: (d) => invalid.push(d),
+          onParametersError: (d) => paramErrors.push(d),
+        }),
+      );
+    });
+    await act(async () => {
+      await (host.querySelector('reports-viewer') as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+    });
+    expect(invalid).toEqual([{ timeZone: 'Mars/Olympus', fallback: 'Asia/Riyadh' }]);
+    expect(paramErrors).toEqual([]);
+    await act(async () => root.unmount());
+    host.remove();
+  });
 });

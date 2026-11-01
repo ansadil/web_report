@@ -9,7 +9,7 @@ if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer
 
 export function ReportViewer(props: ReportViewerProps) {
   const ref = useRef<ReportsViewerElement | null>(null);
-  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, fontsBaseUrl, onRendered, onExport, onExportError, onParametersError, className, style } = props;
+  const { schema, rows, dataAdapter, chartAdapter, locale, dir, noToolbar, hideViewControls, hidePageBoundaries, params, timeZone, fontsBaseUrl, onRendered, onExport, onExportError, onParametersError, onTimeZoneInvalid, className, style } = props;
 
   useEffect(() => {
     const el = ref.current;
@@ -39,13 +39,16 @@ export function ReportViewer(props: ReportViewerProps) {
     const onParams = (e: Event) => onParametersError?.((e as CustomEvent<{ error: string; issues: readonly ParameterIssue[] }>).detail);
     el.addEventListener('export-error', onErr);
     el.addEventListener('parameters-error', onParams);
+    const onTz = (e: Event) => onTimeZoneInvalid?.((e as CustomEvent<{ timeZone: string; fallback: string }>).detail);
+    el.addEventListener('time-zone-invalid', onTz);
     return () => {
       el.removeEventListener('report-rendered', onRender);
       el.removeEventListener('export', onExp);
       el.removeEventListener('export-error', onErr);
       el.removeEventListener('parameters-error', onParams);
+      el.removeEventListener('time-zone-invalid', onTz);
     };
-  }, [onRendered, onExport, onExportError, onParametersError]);
+  }, [onRendered, onExport, onExportError, onParametersError, onTimeZoneInvalid]);
 
   return <reports-viewer ref={ref as unknown as React.Ref<HTMLElement>} className={className} style={style} />;
 }

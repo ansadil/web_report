@@ -8,9 +8,11 @@ export interface ConvexDataRequest {
   readonly source: string;
   /**
    * Resolved report parameters (`DataQuery.params`: `dataset.params` merged with the values from core's
-   * `resolveParameterValues`, e.g. `{ period: { from: '2026-10-01', to: '2026-10-31' }, branch: 'riyadh' }`);
-   * `Date`s are ISO strings, `undefined` values are dropped. Check the shape with `reportDataArgs` from
-   * `@reports-web/convex/server` (scalars, arrays of scalars and `{ from?, to? }` only).
+   * `resolveParameterValues`, e.g. `{ period: { from: '2026-10-01', to: '2026-10-31' }, branch: 'riyadh' }`):
+   * `date` / `dateRange` values are `YYYY-MM-DD` in the viewer's time zone, `datetime` values are UTC ISO strings (from a
+   * `Date` / epoch / `'now'`) or the string as given, other `Date`s are UTC ISO strings, `undefined` values are dropped.
+   * Check the shape with `reportDataArgs` from `@reports-web/convex/server` (scalars, arrays of scalars and
+   * `{ from?, to? }` only).
    */
   readonly params: Record<string, unknown>;
 }

@@ -27,19 +27,19 @@ vi.mock('chart.js', () => {
   };
 });
 
-import { Chart } from 'chart.js';
-import { createChartJsAdapter } from './chartjs.js';
-
 const spec = { type: 'bar' as const, labels: ['Jan'], values: [3] };
 
 describe('chartjs adapter', () => {
   beforeEach(() => {
     created.length = 0;
-    vi.mocked(Chart.getChart).mockReset();
-    vi.mocked(Chart.getChart).mockReturnValue(undefined);
+    // The Vitest setup file imports the viewer, which loads this adapter (and the real
+    // chart.js) before vi.mock applies. Re-import so render uses the mock.
+    vi.resetModules();
   });
 
-  it('destroys a chart already bound to the canvas before creating another', () => {
+  it('destroys a chart already bound to the canvas before creating another', async () => {
+    const { Chart } = await import('chart.js');
+    const { createChartJsAdapter } = await import('./chartjs.js');
     const previous = { destroy: vi.fn() };
     vi.mocked(Chart.getChart).mockReturnValue(previous as never);
     const canvas = document.createElement('canvas');

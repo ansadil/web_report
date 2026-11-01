@@ -14,9 +14,19 @@ describe('React wrappers', () => {
     expect(html).toContain('reports-builder');
   });
 
-  it('registers custom elements on import', () => {
+  it('registers custom elements when the client components mount', async () => {
+    const { act } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(createElement('div', null, createElement(ReportViewer, { schema: null }), createElement(ReportBuilder, {})));
+    });
     expect(customElements.get('reports-viewer')).toBeTruthy();
     expect(customElements.get('reports-builder')).toBeTruthy();
+    await act(async () => root.unmount());
+    host.remove();
   });
 });
 

@@ -3,8 +3,9 @@ import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropTy
 import { ReportsBuilderElement } from '@reports-web/core';
 import type { ReportBuilderProps } from './types.js';
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-builder')) {
-  customElements.define('reports-builder', ReportsBuilderElement);
+function defineReportsBuilder(): void {
+  if (typeof window === 'undefined') return;
+  if (!customElements.get('reports-builder')) customElements.define('reports-builder', ReportsBuilderElement);
 }
 
 export const ReportBuilder = defineComponent({
@@ -39,6 +40,7 @@ export const ReportBuilder = defineComponent({
     const onJson = (e: Event) => emit('export-json', (e as CustomEvent).detail);
 
     onMounted(() => {
+      defineReportsBuilder();
       apply();
       const el = elRef.value;
       el?.addEventListener('save', onSave);
@@ -58,6 +60,6 @@ export const ReportBuilder = defineComponent({
       { deep: true },
     );
 
-    return () => h('reports-builder', { ref: elRef });
+    return () => h('reports-builder', { ref: elRef, ...(props.fontsBaseUrl != null ? { 'fonts-base-url': props.fontsBaseUrl } : {}) });
   },
 });

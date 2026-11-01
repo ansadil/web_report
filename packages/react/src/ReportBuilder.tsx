@@ -1,10 +1,13 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
 import { ReportsBuilderElement } from '@reports-web/core';
 import type { ReportBuilderProps } from './types.js';
 import type { ReportSchemaV1 } from '@reports-web/core';
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-builder')) {
-  customElements.define('reports-builder', ReportsBuilderElement);
+function defineReportsBuilder(): void {
+  if (typeof window === 'undefined') return;
+  if (!customElements.get('reports-builder')) customElements.define('reports-builder', ReportsBuilderElement);
 }
 
 export function ReportBuilder(props: ReportBuilderProps) {
@@ -12,6 +15,7 @@ export function ReportBuilder(props: ReportBuilderProps) {
   const { schema, dataAdapter, storageAdapter, sampleRows, locale, dir, fontsBaseUrl, onSave, onSaveError, onExportJson, className, style } = props;
 
   useEffect(() => {
+    defineReportsBuilder();
     const el = ref.current;
     if (!el) return;
     el.schema = schema ?? null;
@@ -39,14 +43,21 @@ export function ReportBuilder(props: ReportBuilderProps) {
     };
   }, [onSave, onSaveError, onExportJson]);
 
-  return <reports-builder ref={ref as unknown as React.Ref<HTMLElement>} className={className} style={style} />;
+  return (
+    <reports-builder
+      ref={ref as unknown as React.Ref<HTMLElement>}
+      className={className}
+      style={style}
+      {...(fontsBaseUrl != null ? { 'fonts-base-url': fontsBaseUrl } : {})}
+    />
+  );
 }
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- augment React JSX intrinsic elements
   namespace JSX {
     interface IntrinsicElements {
-      'reports-builder': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      'reports-builder': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement> & { 'fonts-base-url'?: string }, HTMLElement>;
     }
   }
 }

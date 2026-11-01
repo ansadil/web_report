@@ -1025,10 +1025,6 @@ export function parametersBannerText(errors: readonly { readonly label: string; 
 
 installDirOverride(ReportsViewerElement.prototype);
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer')) {
-  customElements.define('reports-viewer', ReportsViewerElement);
-}
-
 declare global {
   interface HTMLElementTagNameMap {
     'reports-viewer': ReportsViewerElement;

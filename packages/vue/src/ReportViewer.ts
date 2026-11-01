@@ -3,8 +3,9 @@ import { defineComponent, h, onBeforeUnmount, onMounted, ref, watch, type PropTy
 import { ReportsViewerElement } from '@reports-web/core';
 import type { ReportViewerProps } from './types.js';
 
-if (typeof customElements !== 'undefined' && !customElements.get('reports-viewer')) {
-  customElements.define('reports-viewer', ReportsViewerElement);
+function defineReportsViewer(): void {
+  if (typeof window === 'undefined') return;
+  if (!customElements.get('reports-viewer')) customElements.define('reports-viewer', ReportsViewerElement);
 }
 
 export const ReportViewer = defineComponent({
@@ -53,6 +54,7 @@ export const ReportViewer = defineComponent({
     const onTzInvalid = (e: Event) => emit('time-zone-invalid', (e as CustomEvent).detail);
 
     onMounted(() => {
+      defineReportsViewer();
       apply();
       const el = elRef.value;
       el?.addEventListener('report-rendered', onRendered);
@@ -76,6 +78,6 @@ export const ReportViewer = defineComponent({
       { deep: true },
     );
 
-    return () => h('reports-viewer', { ref: elRef });
+    return () => h('reports-viewer', { ref: elRef, ...(props.fontsBaseUrl != null ? { 'fonts-base-url': props.fontsBaseUrl } : {}) });
   },
 });

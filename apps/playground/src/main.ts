@@ -1,4 +1,7 @@
 import '@reports-web/core';
+import { defineReportsElements } from '../../../packages/core/src/components/register.ts';
+
+defineReportsElements();
 import {
   createStaticAdapter,
   createLocalStorageAdapter,

@@ -3,18 +3,19 @@ import type { Style } from '../schema/report-schema.js';
 import type { RenderElement, RenderSection, RenderTree, RenderWatermark } from './interpreter.js';
 import { replacePageTokens, type PageTokenContext } from './page-tokens.js';
 
-function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: number; h: number }): string {
+function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: number; h: number }, text = false): string {
   const css: string[] = [
     'position:absolute',
     `inset-inline-start:${pos.x}mm`,
     `top:${pos.y}mm`,
     `width:${pos.w}mm`,
-    `height:${pos.h}mm`,
-    'overflow:hidden',
+    text ? `min-height:${pos.h}mm` : `height:${pos.h}mm`,
+    text ? 'height:auto' : 'overflow:hidden',
     'box-sizing:border-box',
     'display:flex',
     'align-items:center',
   ];
+  if (text) css.push('overflow:visible', 'line-height:1.35', 'white-space:normal');
   if (style) {
     if (style.font) css.push(`font-family:${style.font}`);
     if (style.fontSize) css.push(`font-size:${style.fontSize}pt`);
@@ -56,7 +57,7 @@ function renderElementToHtml(
   codeId: (id: string) => string,
   pageCtx?: PageTokenContext,
 ): string {
-  const style = styleToCss(el.style, el.pos);
+  const style = styleToCss(el.style, el.pos, el.kind === 'text');
   switch (el.kind) {
     case 'text': {
       const text = pageCtx ? replacePageTokens(el.text ?? '', pageCtx) : (el.text ?? '');

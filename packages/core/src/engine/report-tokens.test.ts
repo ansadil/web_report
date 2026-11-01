@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { interpret } from './interpreter.js';
-import { formatReportDate, formatReportHijri, parseReportDate, replaceReportTokens } from './report-tokens.js';
+import { formatPanelStamp, formatReportDate, formatReportHijri, parseReportDate, replaceReportTokens } from './report-tokens.js';
 import { validateReport, type ReportSchemaV1 } from '../schema/report-schema.js';
 
 const now = new Date('2026-11-01T09:00:00Z');
@@ -22,8 +22,15 @@ describe('report locale dates', () => {
   it('BUG-63 formats an Arabic report date as Eastern digits with م', () => {
     expect(formatReportDate('2026-10-01', 'ar')).toBe('٠١/١٠/٢٠٢٦م');
     expect(formatReportDate('2026-10-01', 'ar-SA')).toBe('٠١/١٠/٢٠٢٦م');
-    expect(formatReportDate('2026-10-01', 'en')).toBe('01/10/2026');
+    expect(formatReportDate('2026-10-01', 'en')).toBe('2026-10-01');
     expect(parseReportDate('٠١/١٠/٢٠٢٦م')).toBe('2026-10-01');
+    expect(parseReportDate('2026-10-01')).toBe('2026-10-01');
+  });
+
+  it('BUG-64 formats generation and refresh stamps in the panel locale', () => {
+    const when = new Date('2026-11-01T09:00:00Z');
+    expect(formatPanelStamp(when, 'ar', 'Asia/Riyadh')).toBe('٠١/١١/٢٠٢٦م ١٢:٠٠');
+    expect(formatPanelStamp(when, 'en', 'Asia/Riyadh')).toBe('2026-11-01 12:00');
   });
 
   it('BUG-64 puts the Hijri equivalent under the Gregorian day', () => {

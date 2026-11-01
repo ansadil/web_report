@@ -28,7 +28,7 @@ import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 import { formatLocalizedNumber, formatZoomPercent } from './builder/status-bar.js';
-import { formatReportDate, formatReportHijri, parseReportDate } from '../engine/report-tokens.js';
+import { formatPanelStamp, formatReportDate, formatReportHijri, parseReportDate } from '../engine/report-tokens.js';
 import { DEFAULT_FONTS_BASE_URL } from '../exporters/fonts-manifest.js';
 import { ensureReportFonts } from './web-fonts.js';
 
@@ -344,11 +344,6 @@ export class ReportsViewerElement extends LitElement {
     return resolveLocale(this.locale, this.schema?.meta);
   }
 
-  /** Date text follows the report template locale, not the viewer chrome. */
-  private get _reportLocale(): LocaleTag {
-    return this.schema?.meta.locale ?? this._locale;
-  }
-
   private get _dir(): 'rtl' | 'ltr' {
     return resolveDir(this.dirOverride, this.schema?.meta, this._locale);
   }
@@ -383,7 +378,8 @@ export class ReportsViewerElement extends LitElement {
   @state() private _fieldErrors: Record<string, string> = {};
   @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
   @state() private _rowCount = 0;
-  @state() private _generatedAt = '';
+  @state() private _generatedAt: Date | null = null;
+  @state() private _refreshedAt: Date | null = null;
   private _lastRows: readonly Row[] | null = null;
   private _placeholderParams = false;
 
@@ -412,6 +408,10 @@ export class ReportsViewerElement extends LitElement {
   override updated(changed: Map<PropertyKey, unknown>): void {
     this._syncHostDir(this._dir);
     if (changed.has('timeZone')) this._checkTimeZone();
+    if (changed.has('schema')) {
+      this._generatedAt = null;
+      this._refreshedAt = null;
+    }
     if (changed.has('schema') || changed.has('locale')) this._resetParameterDraft();
     if (
       changed.has('schema') ||
@@ -514,12 +514,10 @@ export class ReportsViewerElement extends LitElement {
       this._codeIds = [...rendered.codeIds];
       this._rowCount = rows.length;
       this._lastRows = rows;
-      this._generatedAt = new Intl.DateTimeFormat(this._reportLocale, {
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZone: paramOptions.timeZone,
-      }).format(new Date());
       if (!placeholder) {
+        const stamped = new Date();
+        if (!this._generatedAt) this._generatedAt = stamped;
+        this._refreshedAt = stamped;
         this._error = '';
         this._fieldErrors = {};
       }
@@ -905,17 +903,25 @@ export class ReportsViewerElement extends LitElement {
       const errId = `param-error-${escapeHtml(def.name)}`;
       const value = this._draft[def.name] ?? def.defaultValue ?? '';
       const required = def.required ? ` <small>(${escapeHtml(t(this._locale, 'paramRequired'))})</small>` : '';
-      return `<label class="fld-l">${escapeHtml(def.label)}${required}</label>${this._parameterControlHtml(def, value, error ? errId : '')}<p id="${errId}" class="field-error">${escapeHtml(error)}</p>`;
+      const controlId = def.type === 'dateRange' ? `param-${def.name}-from` : `param-${def.name}`;
+      return `<label class="fld-l" id="param-label-${escapeHtml(def.name)}" for="${escapeHtml(controlId)}">${escapeHtml(def.label)}${required}</label>${this._parameterControlHtml(def, value, error ? errId : '')}<p id="${errId}" class="field-error">${escapeHtml(error)}</p>`;
     }).join('');
   }
 
-  private _dateFieldHtml(testId: string, name: string, part: '' | 'from' | 'to', raw: string, aria: string): string {
-    const locale = this._reportLocale;
+  private _dateFieldHtml(testId: string, name: string, part: '' | 'from' | 'to', raw: string, errorId: string, label: string): string {
+    const locale = this._locale;
     const iso = parseReportDate(raw);
     const shown = iso ? formatReportDate(iso, locale) : raw;
     const hijri = iso ? formatReportHijri(iso, locale) : '';
+    const inputId = `param-${escapeHtml(testId)}`;
+    const hijriId = `param-hijri-${escapeHtml(testId)}`;
+    const described = [errorId, hijri ? hijriId : ''].filter(Boolean).join(' ');
+    const partLabel = part === 'from' ? t(locale, 'dateFrom') : part === 'to' ? t(locale, 'dateTo') : '';
+    const accessible = partLabel ? `${label} (${partLabel})` : label;
     const partAttr = part ? ` data-part="${part}"` : '';
-    return `<div class="date-field"><input data-testid="param-${escapeHtml(testId)}" data-param="${escapeHtml(name)}" data-kind="date"${partAttr} type="text" inputmode="numeric" value="${escapeHtml(shown)}"${aria}>${hijri ? `<div class="hj">${escapeHtml(hijri)}</div>` : ''}</div>`;
+    const invalid = errorId ? ' aria-invalid="true"' : '';
+    const describedAttr = described ? ` aria-describedby="${described}"` : '';
+    return `<div class="date-field"><input id="${inputId}" data-testid="${inputId}" data-param="${escapeHtml(name)}" data-kind="date"${partAttr} type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="${escapeHtml(accessible)}" value="${escapeHtml(shown)}"${invalid}${describedAttr}>${hijri ? `<div class="hj" id="${hijriId}">${escapeHtml(hijri)}</div>` : ''}</div>`;
   }
 
   private _parameterControlHtml(def: ParameterDefinition, value: unknown, errorId: string): string {
@@ -923,9 +929,9 @@ export class ReportsViewerElement extends LitElement {
     const aria = errorId ? ` aria-invalid="true" aria-describedby="${errorId}"` : '';
     if (def.type === 'dateRange') {
       const range = value && typeof value === 'object' ? value as { from?: string; to?: string } : {};
-      return `<div class="range">${this._dateFieldHtml(`${name}-from`, name, 'from', range.from ?? '', aria)}${this._dateFieldHtml(`${name}-to`, name, 'to', range.to ?? '', aria)}</div>`;
+      return `<div class="range">${this._dateFieldHtml(`${name}-from`, name, 'from', range.from ?? '', errorId, def.label)}${this._dateFieldHtml(`${name}-to`, name, 'to', range.to ?? '', errorId, def.label)}</div>`;
     }
-    if (def.type === 'date') return this._dateFieldHtml(name, name, '', value == null ? '' : String(value), aria);
+    if (def.type === 'date') return this._dateFieldHtml(name, name, '', value == null ? '' : String(value), errorId, def.label);
     if (def.type === 'select' || def.type === 'bool') {
       const options = def.type === 'bool'
         ? [{ value: false, label: t(this._locale, 'no') }, { value: true, label: t(this._locale, 'yes') }]
@@ -936,10 +942,10 @@ export class ReportsViewerElement extends LitElement {
         const selected = raw === current ? ' selected' : '';
         return `<option value="${escapeHtml(raw)}"${selected}>${escapeHtml(option.label)}</option>`;
       }).join('');
-      return `<select data-testid="param-${name}" data-param="${name}"${aria}>${opts}</select>`;
+      return `<select id="param-${name}" data-testid="param-${name}" data-param="${name}"${aria}>${opts}</select>`;
     }
     const type = def.type === 'number' ? 'number' : def.type === 'datetime' ? 'datetime-local' : 'text';
-    return `<input data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}"${aria}>`;
+    return `<input id="param-${name}" data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}"${aria}>`;
   }
 
   private _onParamInput(event: Event): void {
@@ -978,7 +984,8 @@ export class ReportsViewerElement extends LitElement {
             <div class="vinfo" data-testid="param-info">
               <div><span>${t(this._locale, 'paramRecords')}</span><b>${formatLocalizedNumber(this._rowCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
               <div><span>${t(this._locale, 'paramPages')}</span><b>${formatLocalizedNumber(this._pageCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
-              ${this._generatedAt ? html`<div><span>${t(this._locale, 'lastRefresh')}</span><b>${this._generatedAt}</b></div>` : nothing}
+              <div data-testid="generated-at"><span>${t(this._locale, 'generatedAt')}</span><b>${this._generatedAt ? formatPanelStamp(this._generatedAt, this._locale, this._paramOptions.timeZone) : '—'}</b></div>
+              <div data-testid="last-refresh"><span>${t(this._locale, 'lastRefresh')}</span><b>${this._refreshedAt ? formatPanelStamp(this._refreshedAt, this._locale, this._paramOptions.timeZone) : '—'}</b></div>
             </div>
           </div>
         </aside>

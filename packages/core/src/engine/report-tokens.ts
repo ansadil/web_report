@@ -60,13 +60,31 @@ function localizeDigits(text: string, locale: string): string {
   return text.replace(/\d/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[Number(digit)] ?? digit);
 }
 
-/** Gregorian date in the report locale: Arabic is `٠١/١٠/٢٠٢٦م`. */
+/**
+ * Gregorian date for a field or a report token.
+ * Arabic is `٠١/١٠/٢٠٢٦م`. English stays `YYYY-MM-DD` so the value and the display match.
+ */
 export function formatReportDate(iso: string, locale: LocaleTag): string {
   const day = calendarDay(iso);
   if (!day) return iso;
+  if (!isArabic(locale)) return day;
   const [year, month, date] = day.split('-') as [string, string, string];
-  const body = localizeDigits(`${date}/${month}/${year}`, locale);
-  return isArabic(locale) ? `${body}م` : body;
+  return `${localizeDigits(`${date}/${month}/${year}`, locale)}م`;
+}
+
+/** Date plus time for the parameters panel footer, in `timeZone` (default callers pass Asia/Riyadh). */
+export function formatPanelStamp(when: Date, locale: LocaleTag, timeZone: string): string {
+  const day = formatReportDate(zonedISODate(when, timeZone), locale);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    numberingSystem: 'latn',
+  }).formatToParts(when);
+  const hour = parts.find((part) => part.type === 'hour')?.value ?? '00';
+  const minute = parts.find((part) => part.type === 'minute')?.value ?? '00';
+  return `${day} ${localizeDigits(`${hour}:${minute}`, locale)}`;
 }
 
 /** Parse a report-locale date or an ISO day back to `YYYY-MM-DD`. */

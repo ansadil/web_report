@@ -78,11 +78,50 @@ describe('viewer preview layout', () => {
     viewer.remove();
   });
 
-  it('BUG-63/64 shows the report-locale date and its Hijri line', async () => {
+  it('BUG-63/64 shows an Arabic date, its Hijri line, and the panel times', async () => {
     const parsed = validateReport({
       version: '1',
       id: 'dates',
       meta: { name: 'P', locale: 'ar', dir: 'rtl' },
+      dataset: { adapter: 'static', source: 'sales' },
+      fields: [{ name: 'x', type: 'number' }],
+      parameters: [{ name: 'from', type: 'date', default: '2026-10-01', label: { ar: 'الفترة من', en: 'From' } }],
+      bands: { detail: { height: 6, elements: [{ id: 'd', kind: 'field', field: 'x', pos: { x: 0, y: 0, w: 40, h: 5 } }] } },
+    });
+    if (!parsed.ok) throw new Error(parsed.error);
+    const viewer = document.createElement('reports-viewer') as ReportsViewerElement;
+    viewer.locale = 'ar';
+    const rendered = new Promise((resolve) => viewer.addEventListener('report-rendered', () => resolve(undefined), { once: true }));
+    viewer.rows = [{ x: 1 }];
+    viewer.schema = parsed.value;
+    document.body.appendChild(viewer);
+    await rendered;
+    await flush(viewer);
+    const input = viewer.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="param-from"]')!;
+    expect(input.type).toBe('text');
+    expect(input.getAttribute('inputmode')).toBe('numeric');
+    expect(input.value).toBe('٠١/١٠/٢٠٢٦م');
+    expect(input.getAttribute('aria-label')).toBe('الفترة من');
+    expect(viewer.shadowRoot!.querySelector('label.fld-l')?.getAttribute('for')).toBe(input.id);
+    expect(viewer.shadowRoot!.querySelector('.hj')?.textContent).toContain('الموافق');
+    const info = viewer.shadowRoot!.querySelector('[data-testid="param-info"]')!.textContent ?? '';
+    expect(info).toContain('وقت الإنشاء');
+    expect(info).toContain('آخر تحديث');
+    expect(viewer.shadowRoot!.querySelector('[data-testid="generated-at"] b')?.textContent).not.toBe('—');
+    expect(viewer.shadowRoot!.querySelector('[data-testid="last-refresh"] b')?.textContent).not.toBe('—');
+    input.value = '١٥/١٠/٢٠٢٦م';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    viewer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="run-report"]')!.click();
+    await flush(viewer);
+    expect(viewer.params?.from).toBe('2026-10-15');
+    viewer.remove();
+  });
+
+  it('BUG-63 English date field shows YYYY-MM-DD and keeps the ISO value', async () => {
+    const parsed = validateReport({
+      version: '1',
+      id: 'dates-en',
+      meta: { name: 'P', locale: 'en', dir: 'ltr' },
       dataset: { adapter: 'static', source: 'sales' },
       fields: [{ name: 'x', type: 'number' }],
       parameters: [{ name: 'from', type: 'date', default: '2026-10-01', label: { ar: 'الفترة من', en: 'From' } }],
@@ -95,10 +134,14 @@ describe('viewer preview layout', () => {
     viewer.schema = parsed.value;
     document.body.appendChild(viewer);
     await flush(viewer);
-    await viewer.updateComplete;
     const input = viewer.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="param-from"]')!;
-    expect(input.value).toBe('٠١/١٠/٢٠٢٦م');
-    expect(viewer.shadowRoot!.querySelector('.hj')?.textContent).toContain('الموافق');
+    expect(input.value).toBe('2026-10-01');
+    expect(input.getAttribute('aria-label')).toBe('From');
+    input.value = '2026-10-15';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    viewer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="run-report"]')!.click();
+    await flush(viewer);
+    expect(viewer.params?.from).toBe('2026-10-15');
     viewer.remove();
   });
 });

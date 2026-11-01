@@ -2,9 +2,12 @@
 /**
  * QA (v2) — PR feat/report-parameters-fetch-v2, exercised through <reports-viewer>.params (happy-dom)
  * with a spy DataAdapter, plus the REST adapter for GET serialization.
- * Run with TZ=Asia/Riyadh (the suite sets it if unset, before any Date is built).
+ * Dates are explicit Riyadh instants (+03:00), so results do not depend on the machine TZ (UTC, Riyadh, New York).
+ * TZ defaults to Asia/Riyadh if unset, before any Date is built.
  * Expected to FAIL on main 6bc6f5a.
  */
+/** True when TZ was unset (or already Asia/Riyadh) before this file ran, i.e. the line below decides the machine zone. */
+const SUITE_SET_TZ = !process.env.TZ || process.env.TZ === 'Asia/Riyadh';
 process.env.TZ ||= 'Asia/Riyadh';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import '../src/components/reports-viewer.js';
@@ -24,6 +27,8 @@ function schema(parameters: unknown[], datasetParams?: Record<string, unknown>) 
   if (!r.ok) throw new Error(r.error);
   return r.value;
 }
+const riyadhOffset = (d: Date) =>
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Riyadh', timeZoneName: 'longOffset' }).formatToParts(d).find((p) => p.type === 'timeZoneName')!.value;
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 describe('report parameters via <reports-viewer> (v2, TZ=Asia/Riyadh)', () => {
@@ -49,32 +54,38 @@ describe('report parameters via <reports-viewer> (v2, TZ=Asia/Riyadh)', () => {
   });
   afterEach(() => v.remove());
 
-  it('runtime is really UTC+3', () => expect(new Date(2026, 9, 1).getTimezoneOffset()).toBe(-180));
+  // Precondition for the Riyadh expectations below. The product reads Dates in its own `timeZone` (default
+  // Asia/Riyadh, BUG-52), not the machine zone, so: Asia/Riyadh must be UTC+3 for these instants, always; the machine
+  // offset is checked only when this file's own TZ default is in effect (the runner does not set TZ).
+  it('runtime is really UTC+3', () => {
+    expect(riyadhOffset(new Date('2026-09-30T21:00:00Z'))).toBe('GMT+03:00');
+    if (SUITE_SET_TZ) expect(new Date('2026-09-30T21:00:00Z').getTimezoneOffset()).toBe(-180);
+  });
 
-  it('date param from local Date 2026-10-01 00:00 is sent as "2026-10-01"', async () => {
-    await run([{ name: 'day', type: 'date', required: true }], { day: new Date(2026, 9, 1, 0, 0) });
+  it('date param from Date 2026-10-01 00:00 Riyadh is sent as "2026-10-01"', async () => {
+    await run([{ name: 'day', type: 'date', required: true }], { day: new Date('2026-10-01T00:00:00+03:00') });
     expect(errors).toEqual([]);
     expect(calls.at(-1)!.params!.day).toBe('2026-10-01');
   });
 
   it('required dateRange with a missing side is rejected; no fetch', async () => {
-    await run([{ name: 'period', type: 'dateRange', required: true }], { period: { from: new Date(2026, 9, 1) } });
+    await run([{ name: 'period', type: 'dateRange', required: true }], { period: { from: new Date('2026-10-01T00:00:00+03:00') } });
     expect(calls).toHaveLength(0);
     expect(errors[0]?.issues[0]).toMatchObject({ name: 'period', code: 'invalid' });
   });
 
   it('optional dateRange sends only {from}', async () => {
-    await run([{ name: 'period', type: 'dateRange' }], { period: { from: new Date(2026, 9, 1) } });
+    await run([{ name: 'period', type: 'dateRange' }], { period: { from: new Date('2026-10-01T00:00:00+03:00') } });
     expect(calls.at(-1)!.params!.period).toStrictEqual({ from: '2026-10-01' });
   });
 
   it('optional dateRange sends only {to}', async () => {
-    await run([{ name: 'period', type: 'dateRange' }], { period: { to: new Date(2026, 9, 31) } });
+    await run([{ name: 'period', type: 'dateRange' }], { period: { to: new Date('2026-10-31T00:00:00+03:00') } });
     expect(calls.at(-1)!.params!.period).toStrictEqual({ to: '2026-10-31' });
   });
 
   it('datetime param is sent as a full ISO instant', async () => {
-    await run([{ name: 'at', type: 'datetime' }], { at: new Date(2026, 9, 1, 0, 0) });
+    await run([{ name: 'at', type: 'datetime' }], { at: new Date('2026-10-01T00:00:00+03:00') });
     expect(calls.at(-1)!.params!.at).toBe('2026-09-30T21:00:00.000Z');
   });
 

@@ -813,14 +813,28 @@ export class ReportsViewerElement extends LitElement {
       const validation = validateReport(this.schema);
       if (!validation.ok) throw new Error(validation.error);
       const finalSchema: ReportSchemaV1 = { ...validation.value, meta: { ...validation.value.meta, locale: resolveLocale(this.locale, validation.value.meta), dir: resolveDir(this.dirOverride, validation.value.meta, resolveLocale(this.locale, validation.value.meta)) } };
+      const paramOptions = this._paramOptions;
       let rows = this.rows;
+      // Same parameter values as the on-screen render, so PDF tokens such as {المعاملات.الفترة} match the viewer.
+      let params: Readonly<Record<string, unknown>> | undefined;
       if (!rows) {
         const adapter = this.dataAdapter ?? createStaticAdapter({ tables: {} });
-        rows = await adapter.fetch(buildDataQuery(finalSchema, this.params, this._paramOptions));
+        const query = buildDataQuery(finalSchema, this.params, paramOptions);
+        if (finalSchema.parameters?.length) params = query.params;
+        rows = await adapter.fetch(query);
+      } else if (finalSchema.parameters?.length) {
+        const resolved = resolveParameterValues(finalSchema.parameters, this.params, paramOptions);
+        if (resolved.ok) params = { ...(finalSchema.dataset.params ?? {}), ...resolved.values };
       }
       if (kind === 'pdf') {
         const { exportPdf } = await import('../exporters/pdf.js');
-        const blob = await exportPdf({ schema: finalSchema, rows, fontsBaseUrl: this.fontsBaseUrl });
+        const blob = await exportPdf({
+          schema: finalSchema,
+          rows,
+          fontsBaseUrl: this.fontsBaseUrl,
+          timeZone: paramOptions.timeZone,
+          ...(params ? { params } : {}),
+        });
         this.dispatchEvent(new CustomEvent('export', { detail: { kind, blob, filename: `${finalSchema.id}.pdf` } }));
       } else if (kind === 'excel') {
         const { exportExcel } = await import('../exporters/excel.js');

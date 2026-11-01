@@ -475,7 +475,8 @@ export const DEFAULT_DATE_FORMAT_HINT = 'YYYY-MM-DD';
  * `ar-*`), `YYYY-MM-DD` otherwise.
  */
 export function dateFormatHintFor(locale: LocaleTag = 'en'): string {
-  return uiLanguage(locale) === 'ar' ? 'يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م' : DEFAULT_DATE_FORMAT_HINT;
+  // BUG-76: accept POSIX-style tags such as `ar_SA`.
+  return uiLanguage(String(locale).replace(/_/g, '-')) === 'ar' ? 'يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م' : DEFAULT_DATE_FORMAT_HINT;
 }
 
 export interface ParameterOptionItem {
@@ -739,8 +740,9 @@ export function formatParameterIssue(
   const tz = tzOf(options);
   const rawHint = options?.dateFormatHint?.trim() || DEFAULT_DATE_FORMAT_HINT;
   return MESSAGES[lang][issue.rule]({
-    // A host hint is bidi-isolated in Arabic so `/` and digits keep their order; the default text is unchanged.
-    hint: lang === 'ar' && rawHint !== DEFAULT_DATE_FORMAT_HINT ? `${FSI}${rawHint}${PDI}` : rawHint,
+    // A host hint is bidi-isolated in every language (BUG-75: an Arabic hint inside an English message) so `/` and
+    // digits keep their order; the default text is unchanged.
+    hint: rawHint !== DEFAULT_DATE_FORMAT_HINT ? `${FSI}${rawHint}${PDI}` : rawHint,
     label: parameterLabel(def, locale),
     type: def.type,
     min: formatBound(args.min, locale, def.type, tz),

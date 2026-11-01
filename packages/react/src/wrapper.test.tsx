@@ -41,11 +41,12 @@ describe('React ReportViewer params prop', () => {
     el.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: 'x', issues: [] } }));
     expect(errors).toEqual([{ error: 'x', issues: [] }]);
     await act(async () => {
-      root.render(createElement(ReportViewer, { schema: null, fontsBaseUrl: 'https://fonts.example/faces/', timeZone: 'UTC' }));
+      root.render(createElement(ReportViewer, { schema: null, fontsBaseUrl: 'https://fonts.example/faces/', timeZone: 'UTC', dateFormatHint: 'DD/MM/YYYY' }));
     });
-    const viewer = host.querySelector('reports-viewer') as HTMLElement & { fontsBaseUrl?: string; timeZone?: string };
+    const viewer = host.querySelector('reports-viewer') as HTMLElement & { fontsBaseUrl?: string; timeZone?: string; dateFormatHint?: string };
     expect(viewer.fontsBaseUrl).toBe('https://fonts.example/faces/');
     expect(viewer.timeZone).toBe('UTC');
+    expect(viewer.dateFormatHint).toBe('DD/MM/YYYY');
     await act(async () => {
       root.render(createElement(ReportBuilder, { fontsBaseUrl: 'https://fonts.example/builder/' }));
     });

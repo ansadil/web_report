@@ -132,6 +132,31 @@ describe('reports-viewer parameters', () => {
     expect(calls.length).toBe(0);
   });
 
+  it('BUG-74: changing date-format-hint after an error re-words the shown field error and banner', async () => {
+    const base = schemaWithParams();
+    const s = { ...base, meta: { ...base.meta, locale: 'ar', dir: 'rtl' as const }, parameters: [{ name: 'day', type: 'date' as const, required: true }] };
+    v.locale = 'ar';
+    const err = nextEvent(v, 'parameters-error');
+    v.dataAdapter = adapter;
+    v.params = { day: '31/02/2026' };
+    v.schema = s;
+    await err;
+    await v.updateComplete;
+    const fieldError = () => (v as unknown as { _fieldErrors: Record<string, string> })._fieldErrors.day;
+    const banner = () => v.shadowRoot!.textContent ?? '';
+    expect(fieldError()).toBe('أدخل تاريخًا صالحًا (YYYY-MM-DD)');
+    let events = 0;
+    v.addEventListener('parameters-error', () => events++);
+    v.dateFormatHint = 'يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م';
+    await v.updateComplete;
+    await settle();
+    expect(fieldError()).toBe('أدخل تاريخًا صالحًا (\u2068يوم/شهر/سنة، مثل ٠١/١٠/٢٠٢٦م\u2069)');
+    expect(banner()).toContain('يوم/شهر/سنة');
+    expect(banner()).not.toContain('YYYY-MM-DD');
+    expect(events).toBe(0);
+    expect(calls.length).toBe(0);
+  });
+
   it('ignores a stale response superseded by a newer parameter change', async () => {
     const resolvers: Array<(rows: { x: number }[]) => void> = [];
     const slow: DataAdapter = { id: 'slow', fetch: (q) => { calls.push(q); return new Promise((r) => resolvers.push(r)); } };

@@ -20,6 +20,7 @@ describe('dateFormatHint (BUG-68)', () => {
   it('dateFormatHintFor follows the report locale', () => {
     expect(dateFormatHintFor('ar')).toBe(AR_HINT);
     expect(dateFormatHintFor('ar-SA')).toBe(AR_HINT);
+    expect(dateFormatHintFor('ar_SA')).toBe(AR_HINT); // BUG-76
     expect(dateFormatHintFor('en')).toBe('YYYY-MM-DD');
     expect(dateFormatHintFor('en-US')).toBe('YYYY-MM-DD');
     expect(dateFormatHintFor()).toBe(DEFAULT_DATE_FORMAT_HINT);
@@ -49,10 +50,16 @@ describe('dateFormatHint (BUG-68)', () => {
 
   it('a custom host hint is used as given; blank falls back to the default', () => {
     expect(formatParameterIssue({ rule: 'type' }, { name: 'd', type: 'date' }, 'en', { dateFormatHint: 'DD.MM.YYYY' })).toBe(
-      'Enter a valid date (DD.MM.YYYY)',
+      `Enter a valid date (${FSI}DD.MM.YYYY${PDI})`,
     );
     expect(formatParameterIssue({ rule: 'type' }, { name: 'd', type: 'date' }, 'en', { dateFormatHint: '  ' })).toBe(
       'Enter a valid date (YYYY-MM-DD)',
+    );
+  });
+
+  it('BUG-75: an Arabic hint inside an English message is bidi-isolated', () => {
+    expect(formatParameterIssue({ rule: 'type' }, { name: 'd', type: 'date' }, 'en', { dateFormatHint: AR_HINT })).toBe(
+      `Enter a valid date (${FSI}${AR_HINT}${PDI})`,
     );
   });
 

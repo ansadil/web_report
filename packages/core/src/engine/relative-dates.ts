@@ -1,15 +1,26 @@
 import type { LocalizedText, RelativeDatePreset, RelativeDateRangePreset } from '@reports-web/shared';
+import { formatYmd, resolveTimeZone, zonedParts } from './time-zone.js';
 
 /** Day the week starts on: 0 = Sunday (default, as in Saudi Arabia) ... 6 = Saturday. */
 export type WeekStart = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface RelativeDateOptions {
-  /** Reference instant ("now"); default `new Date()`. Calendar days are taken in the runtime's local time zone. */
+  /** Reference instant ("now"); default `new Date()`. Its calendar day is taken in {@link RelativeDateOptions.timeZone}. */
   readonly now?: Date | number;
+  /**
+   * IANA time zone that decides which calendar day "now" falls on (e.g. `'Asia/Riyadh'`, `'UTC'`,
+   * `'America/New_York'`); default `'Asia/Riyadh'`, never the runtime's zone. Pass
+   * `Intl.DateTimeFormat().resolvedOptions().timeZone` for the browser's zone. Presets use the Gregorian calendar only.
+   */
+  readonly timeZone?: string;
   /** First day of the week for `startOfWeek` / `thisWeek` / `lastWeek`; default 0 (Sunday). */
   readonly weekStartsOn?: WeekStart;
 }
 
+/**
+ * Relative date presets. All presets (weeks, months, quarters, years) follow the Gregorian calendar only; Hijri
+ * (Umm al-Qura) months and years are not supported (undecided), even when the report locale is `ar-SA`.
+ */
 export const RELATIVE_DATE_PRESETS: readonly RelativeDatePreset[] = Object.freeze([
   'today', 'yesterday', 'tomorrow', 'startOfWeek', 'endOfWeek', 'startOfMonth', 'endOfMonth',
   'startOfQuarter', 'endOfQuarter', 'startOfYear', 'endOfYear',
@@ -55,30 +66,38 @@ export function toLocalYmd(d: Date): string {
   return `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Local midnight of `y-m-d` (month 0-based, day may overflow: `day(2026, 9, 0)` is 2026-09-30). */
+/** Calendar date `y-m-d` as a UTC-midnight Date (month 0-based, day may overflow: `day(2026, 9, 0)` is 2026-09-30). */
 function day(y: number, m: number, d: number): Date {
-  const r = new Date(2000, 0, 1);
-  r.setFullYear(y, m, d);
-  r.setHours(0, 0, 0, 0);
+  const r = new Date(Date.UTC(2000, 0, 1));
+  r.setUTCFullYear(y, m, d);
   return r;
 }
 
-function nowDate(opts?: RelativeDateOptions): Date {
+/** `YYYY-MM-DD` of a {@link day} value (UTC fields, so independent of the runtime time zone). */
+function ymd(d: Date): string {
+  return formatYmd(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}
+
+/** Today's calendar date in `opts.timeZone` (default Asia/Riyadh) as a {@link day} value. */
+function todayIn(opts?: RelativeDateOptions): Date {
   const n = opts?.now;
-  return n === undefined ? new Date() : new Date(n);
+  const ms = n === undefined ? Date.now() : new Date(n).getTime();
+  if (Number.isNaN(ms)) throw new RangeError('relative dates: invalid "now"');
+  const p = zonedParts(ms, resolveTimeZone(opts?.timeZone));
+  return day(p.year, p.month - 1, p.day);
 }
 
 function weekStart(t: Date, ws: WeekStart): Date {
-  const back = (t.getDay() - ws + 7) % 7;
-  return day(t.getFullYear(), t.getMonth(), t.getDate() - back);
+  const back = (t.getUTCDay() - ws + 7) % 7;
+  return day(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate() - back);
 }
 
-/** Resolves a {@link RelativeDatePreset} to a local `YYYY-MM-DD` date. */
+/** Resolves a {@link RelativeDatePreset} to a `YYYY-MM-DD` calendar date in `opts.timeZone` (default Asia/Riyadh). */
 export function resolveRelativeDate(preset: RelativeDatePreset, opts?: RelativeDateOptions): string {
-  const n = nowDate(opts);
-  const y = n.getFullYear();
-  const m = n.getMonth();
-  const d = n.getDate();
+  const n = todayIn(opts);
+  const y = n.getUTCFullYear();
+  const m = n.getUTCMonth();
+  const d = n.getUTCDate();
   const q = Math.floor(m / 3) * 3;
   const ws = opts?.weekStartsOn ?? 0;
   let r: Date;
@@ -87,7 +106,7 @@ export function resolveRelativeDate(preset: RelativeDatePreset, opts?: RelativeD
     case 'yesterday': r = day(y, m, d - 1); break;
     case 'tomorrow': r = day(y, m, d + 1); break;
     case 'startOfWeek': r = weekStart(n, ws); break;
-    case 'endOfWeek': { const s = weekStart(n, ws); r = day(s.getFullYear(), s.getMonth(), s.getDate() + 6); break; }
+    case 'endOfWeek': { const s = weekStart(n, ws); r = day(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() + 6); break; }
     case 'startOfMonth': r = day(y, m, 1); break;
     case 'endOfMonth': r = day(y, m + 1, 0); break;
     case 'startOfQuarter': r = day(y, q, 1); break;
@@ -96,15 +115,15 @@ export function resolveRelativeDate(preset: RelativeDatePreset, opts?: RelativeD
     case 'endOfYear': r = day(y, 11, 31); break;
     default: throw new Error(`unknown relative date preset "${String(preset)}"`);
   }
-  return toLocalYmd(r);
+  return ymd(r);
 }
 
-/** Resolves a {@link RelativeDateRangePreset} to `{ from, to }` local `YYYY-MM-DD` dates (both inclusive). */
+/** Resolves a {@link RelativeDateRangePreset} to `{ from, to }` `YYYY-MM-DD` dates in `opts.timeZone` (both inclusive). */
 export function resolveRelativeDateRange(preset: RelativeDateRangePreset, opts?: RelativeDateOptions): { from: string; to: string } {
-  const n = nowDate(opts);
-  const y = n.getFullYear();
-  const m = n.getMonth();
-  const d = n.getDate();
+  const n = todayIn(opts);
+  const y = n.getUTCFullYear();
+  const m = n.getUTCMonth();
+  const d = n.getUTCDate();
   const q = Math.floor(m / 3) * 3;
   const ws = opts?.weekStartsOn ?? 0;
   const today = day(y, m, d);
@@ -113,11 +132,11 @@ export function resolveRelativeDateRange(preset: RelativeDateRangePreset, opts?:
   switch (preset) {
     case 'today': from = to = today; break;
     case 'yesterday': from = to = day(y, m, d - 1); break;
-    case 'thisWeek': { from = weekStart(n, ws); to = day(from.getFullYear(), from.getMonth(), from.getDate() + 6); break; }
+    case 'thisWeek': { from = weekStart(n, ws); to = day(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate() + 6); break; }
     case 'lastWeek': {
       const s = weekStart(n, ws);
-      from = day(s.getFullYear(), s.getMonth(), s.getDate() - 7);
-      to = day(s.getFullYear(), s.getMonth(), s.getDate() - 1);
+      from = day(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() - 7);
+      to = day(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate() - 1);
       break;
     }
     case 'thisMonth': from = day(y, m, 1); to = day(y, m + 1, 0); break;
@@ -132,5 +151,5 @@ export function resolveRelativeDateRange(preset: RelativeDateRangePreset, opts?:
     case 'yearToDate': from = day(y, 0, 1); to = today; break;
     default: throw new Error(`unknown relative date range preset "${String(preset)}"`);
   }
-  return { from: toLocalYmd(from), to: toLocalYmd(to) };
+  return { from: ymd(from), to: ymd(to) };
 }

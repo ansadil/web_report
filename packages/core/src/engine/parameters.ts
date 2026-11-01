@@ -10,12 +10,13 @@ import {
   resolveRelativeDateRange,
   type WeekStart,
 } from './relative-dates.js';
+import { resolveTimeZone, ymdInTimeZone, zonedTimeToInstant } from './time-zone.js';
 
 /** Parameter values supplied by the host, keyed by `ParameterDef.name`. */
 export type ParameterValues = Readonly<Record<string, unknown>>;
 
 /**
- * Normalized value of a `dateRange` parameter. Each end is a local calendar date `YYYY-MM-DD` (from a Date, epoch ms,
+ * Normalized value of a `dateRange` parameter. Each end is a calendar date `YYYY-MM-DD` in the configured time zone (from a Date, epoch ms,
  * a `YYYY-MM-DD` string or an ISO 8601 date-time string). Both ends are present for required parameters; an OPTIONAL dateRange may be open-ended, in which
  * case only the provided end is set (`{ from }` or `{ to }`).
  */
@@ -33,9 +34,11 @@ export interface ParameterIssue {
 /**
  * Which rule an issue broke (finer than `ParameterIssue.code`, which stays `'required' | 'invalid'`):
  * `required` (no value), `type` (cannot be coerced to the declared type), `option` (not an allowed select option),
- * `incomplete` (required dateRange with one end), `range` (dateRange from > to), `min` / `max` (out of bounds).
+ * `incomplete` (required dateRange with one end), `range` (dateRange from > to), `min` / `max` (out of bounds),
+ * `bounds` (a definition error: the resolved `min` is after / greater than the resolved `max`, e.g. `min: 'today'`
+ * with `max: 'startOfMonth'`, so no value can be valid).
  */
-export type ParameterRule = 'required' | 'type' | 'option' | 'incomplete' | 'range' | 'min' | 'max';
+export type ParameterRule = 'required' | 'type' | 'option' | 'incomplete' | 'range' | 'min' | 'max' | 'bounds';
 
 /** Options for resolving / validating parameter values. */
 export interface ResolveParametersOptions {
@@ -43,6 +46,12 @@ export interface ResolveParametersOptions {
   readonly now?: Date | number;
   /** First day of the week for week presets; default 0 (Sunday). */
   readonly weekStartsOn?: WeekStart;
+  /**
+   * IANA time zone (default `'Asia/Riyadh'`, never the runtime's zone) used for relative presets (`today`,
+   * `thisMonth`, ...), for the calendar date of `Date` / epoch-ms / zoned ISO values given to `date` and `dateRange`
+   * parameters, for zone-less `datetime` bounds, and for formatting date-time bounds in messages.
+   */
+  readonly timeZone?: string;
 }
 
 export type ResolveParametersResult =
@@ -83,14 +92,13 @@ function isBlank(v: unknown): boolean {
 const ISO_DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 /**
  * ISO 8601 date-time (extended format): `YYYY-MM-DDTHH:mm`, optional `:ss` and `.fraction`, then `Z`, `±HH:mm`,
- * `±HHmm`, `±HH` or nothing (local time). The `T` separator is required (case-insensitive).
+ * `±HHmm`, `±HH` or nothing (wall time in the configured time zone). The `T` separator is required (case-insensitive).
  */
 const ISO_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:[.,](\d{1,9}))?)?(Z|[+-]\d{2}(?::?\d{2})?)?$/i;
 
-/** Local calendar date of `d` as `YYYY-MM-DD` (no time, no zone), e.g. local 2026-10-01 00:00 -> `2026-10-01` in any TZ. */
-function toLocalDateString(d: Date): string {
-  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
-  return `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** Effective time zone of the options (validated; default Asia/Riyadh). */
+function tzOf(opts?: ResolveParametersOptions): string {
+  return resolveTimeZone(opts?.timeZone);
 }
 
 /** True when year/month/day form a real calendar date (round-trip through Date.UTC: rejects 2026-02-30, 2026-13-01). */
@@ -104,7 +112,7 @@ function isValidYmd(y: number, m: number, d: number): boolean {
 interface ParsedDateString {
   /** `YYYY-MM-DD` as written in the string. */
   ymd: string;
-  /** Epoch ms of the instant when the string carries a zone (`Z` / offset); undefined for date-only or local times. */
+  /** Epoch ms of the instant when the string carries a zone (`Z` / offset); undefined for date-only or zone-less times. */
   instant?: number;
 }
 
@@ -137,27 +145,28 @@ function parseIsoDateString(s: string): ParsedDateString | undefined {
 }
 
 /**
- * Serializes a `date` parameter (and each end of a `dateRange`) to the LOCAL calendar date `YYYY-MM-DD`:
- * - `Date` object or epoch milliseconds -> local calendar date (never `toISOString()`, which would shift e.g. local
- *   2026-10-01 00:00 in UTC+3 to 2026-09-30T21:00Z).
+ * Serializes a `date` parameter (and each end of a `dateRange`) to the calendar date `YYYY-MM-DD` in the configured
+ * time zone (`options.timeZone`, default Asia/Riyadh; the runtime's zone is never used):
+ * - `Date` object or epoch milliseconds -> calendar date of that instant in the time zone (never `toISOString()`,
+ *   which would shift e.g. 2026-10-01 00:00 Riyadh to 2026-09-30T21:00Z).
  * - Strict `YYYY-MM-DD` string with a real calendar date -> unchanged (2026-02-30, 2026-04-31, 2026-13-01 rejected).
- * - ISO 8601 date-time string (`T` + time): with `Z` / an offset it is converted to the local calendar date of that
- *   instant; without a zone it is local time, so its own date part is used. Components are validated.
+ * - ISO 8601 date-time string (`T` + time): with `Z` / an offset it is converted to the calendar date of that
+ *   instant in the time zone; without a zone it is wall time, so its own date part is used. Components are validated.
  * - Anything else ("1", "hello 5", "10/01/2026", ...) -> invalid.
  */
-function coerceDate(v: unknown): string {
+function coerceDate(v: unknown, tz: string): string {
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) throw new InvalidValue('expected a valid date');
-    return toLocalDateString(v);
+    return ymdInTimeZone(v.getTime(), tz);
   }
   if (typeof v === 'number' && Number.isFinite(v)) {
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) throw new InvalidValue('expected a valid date');
-    return toLocalDateString(d);
+    return ymdInTimeZone(d.getTime(), tz);
   }
   if (typeof v === 'string') {
     const p = parseIsoDateString(v.trim());
-    if (p) return p.instant === undefined ? p.ymd : toLocalDateString(new Date(p.instant));
+    if (p) return p.instant === undefined ? p.ymd : ymdInTimeZone(p.instant, tz);
     throw new InvalidValue('expected a valid YYYY-MM-DD or ISO 8601 date-time string');
   }
   throw new InvalidValue('expected a YYYY-MM-DD string, Date or epoch milliseconds');
@@ -181,7 +190,7 @@ function coerceDateTime(v: unknown): string {
   throw new InvalidValue('expected an ISO date-time string, Date or epoch milliseconds');
 }
 
-function coerceDateRange(def: ParameterDef, v: unknown): DateRangeValue | typeof MISSING {
+function coerceDateRange(def: ParameterDef, v: unknown, tz: string): DateRangeValue | typeof MISSING {
   let from: unknown;
   let to: unknown;
   if (Array.isArray(v) && v.length === 2) [from, to] = v;
@@ -192,8 +201,8 @@ function coerceDateRange(def: ParameterDef, v: unknown): DateRangeValue | typeof
   if ((!hasFrom || !hasTo) && def.required) throw new InvalidValue('dateRange requires both from and to', 'incomplete');
   if (!hasFrom && !hasTo) return MISSING; // optional range with neither end: omitted like any absent optional value
   const r: DateRangeValue = {};
-  if (hasFrom) r.from = coerceDate(from);
-  if (hasTo) r.to = coerceDate(to);
+  if (hasFrom) r.from = coerceDate(from, tz);
+  if (hasTo) r.to = coerceDate(to, tz);
   if (r.from !== undefined && r.to !== undefined && Date.parse(r.from) > Date.parse(r.to)) {
     throw new InvalidValue('from must not be after to', 'range');
   }
@@ -211,7 +220,7 @@ function coerceSelect(def: ParameterDef, v: unknown): unknown {
   throw new InvalidValue('value is not one of the allowed options', 'option');
 }
 
-function coerce(def: ParameterDef, v: unknown): Coerced {
+function coerce(def: ParameterDef, v: unknown, tz: string): Coerced {
   if (isBlank(v)) return MISSING;
   switch (def.type) {
     case 'string':
@@ -229,11 +238,11 @@ function coerce(def: ParameterDef, v: unknown): Coerced {
       if (v === 0 || v === 'false' || v === '0') return false;
       throw new InvalidValue('expected a boolean');
     case 'date':
-      return coerceDate(v);
+      return coerceDate(v, tz);
     case 'datetime':
       return coerceDateTime(v);
     case 'dateRange':
-      return coerceDateRange(def, v);
+      return coerceDateRange(def, v, tz);
     case 'select':
       return coerceSelect(def, v);
     default:
@@ -285,15 +294,28 @@ function resolveBound(def: ParameterDef, b: number | string | undefined, opts?: 
   }
 }
 
-/** Epoch ms of a validated ISO date / date-time string (date-only and zone-less values are local time). */
-function instantOf(s: string): number {
+/** Epoch ms of a validated ISO date / date-time string (date-only and zone-less values are wall time in `tz`). */
+function instantOf(s: string, tz: string): number {
   const p = parseIsoDateString(s)!;
   if (p.instant !== undefined) return p.instant;
   const m = ISO_DATE_TIME.exec(s);
   const [y, mo, d] = p.ymd.split('-').map(Number) as [number, number, number];
-  const t = new Date(2000, mo - 1, d, m ? +m[4]! : 0, m ? +m[5]! : 0, m?.[6] ? +m[6] : 0, m?.[7] ? Math.floor(+`0.${m[7]}` * 1000) : 0);
-  t.setFullYear(y);
-  return t.getTime();
+  return zonedTimeToInstant(tz, y, mo, d, m ? +m[4]! : 0, m ? +m[5]! : 0, m?.[6] ? +m[6] : 0, m?.[7] ? Math.floor(+`0.${m[7]}` * 1000) : 0);
+}
+
+/**
+ * Definition-time check: an `InvalidValue` (rule `bounds`) when the resolved `min` is after / greater than the resolved
+ * `max` (relative presets resolved against `now` in the time zone), else undefined.
+ */
+function boundsConflict(def: ParameterDef, opts?: ResolveParametersOptions): InvalidValue | undefined {
+  const min = resolveBound(def, def.min, opts);
+  const max = resolveBound(def, def.max, opts);
+  if (min === undefined || max === undefined) return undefined;
+  let bad: boolean;
+  if (def.type === 'number') bad = (min as number) > (max as number);
+  else if (def.type === 'datetime') bad = instantOf(min as string, tzOf(opts)) > instantOf(max as string, tzOf(opts));
+  else bad = (min as string) > (max as string);
+  return bad ? new InvalidValue(`invalid parameter definition: min ${min} is after max ${max}`, 'bounds', { min, max }) : undefined;
 }
 
 function checkBounds(def: ParameterDef, v: unknown, opts?: ResolveParametersOptions): void {
@@ -307,9 +329,10 @@ function checkBounds(def: ParameterDef, v: unknown, opts?: ResolveParametersOpti
     return;
   }
   if (def.type === 'datetime') {
-    const t = instantOf(v as string);
-    if (min !== undefined && t < instantOf(min as string)) throw new InvalidValue(`must not be before ${min}`, 'min', { min });
-    if (max !== undefined && t > instantOf(max as string)) throw new InvalidValue(`must not be after ${max}`, 'max', { max });
+    const tz = tzOf(opts);
+    const t = instantOf(v as string, tz);
+    if (min !== undefined && t < instantOf(min as string, tz)) throw new InvalidValue(`must not be before ${min}`, 'min', { min });
+    if (max !== undefined && t > instantOf(max as string, tz)) throw new InvalidValue(`must not be after ${max}`, 'max', { max });
     return;
   }
   const ends = def.type === 'dateRange' ? [(v as DateRangeValue).from, (v as DateRangeValue).to] : [v as string];
@@ -339,15 +362,19 @@ function resolveDetailed(
   const out: Record<string, unknown> = {};
   const issues: ParameterIssueDetail[] = [];
   const declared = new Set<string>();
+  const tz = tzOf(opts);
   for (const def of defs ?? []) {
     declared.add(def.name);
     const explicit = values?.[def.name];
     const raw = isBlank(explicit) ? resolveDefault(def, def.default, opts) : explicit;
     try {
-      const v = coerce(def, raw);
+      const conflict = boundsConflict(def, opts);
+      const v = coerce(def, raw, tz);
       if (v === MISSING) {
+        if (conflict && def.required) throw conflict;
         if (def.required) issues.push({ name: def.name, code: 'required', message: 'value is required', rule: 'required', args: {} });
       } else {
+        if (conflict) throw conflict;
         checkBounds(def, v, opts);
         out[def.name] = v;
       }
@@ -364,8 +391,8 @@ function resolveDetailed(
 
 /**
  * Resolves effective parameter values: explicit value (blank = absent) ?? `ParameterDef.default` (relative presets such
- * as `thisMonth` / `today` / `now` resolved against `options.now`), coerced to the declared type
- * (number, bool, date -> local `YYYY-MM-DD` (Date, epoch ms, strict YYYY-MM-DD or ISO 8601 date-time; anything else invalid), datetime -> ISO via toISOString() or a validated ISO string, dateRange -> `{ from, to }` local dates (optional ranges may be open-ended), select -> matching option value)
+ * as `thisMonth` / `today` / `now` resolved against `options.now` in `options.timeZone`, default Asia/Riyadh), coerced to the declared type
+ * (number, bool, date -> `YYYY-MM-DD` in the time zone (Date, epoch ms, strict YYYY-MM-DD or ISO 8601 date-time; anything else invalid), datetime -> ISO via toISOString() or a validated ISO string, dateRange -> `{ from, to }` dates in the time zone (optional ranges may be open-ended), select -> matching option value)
  * and checked against `min` / `max`.
  * Required parameters without a value produce a `required` issue. Optional parameters without a value are omitted.
  * Values for names that are not declared are passed through unchanged.
@@ -459,6 +486,11 @@ export interface ParameterDefinition {
   /** Bounds with presets resolved (`number` for number params, `YYYY-MM-DD` for date/dateRange, ISO for datetime). */
   readonly min?: number | string;
   readonly max?: number | string;
+  /**
+   * Localized definition error, e.g. when the resolved `min` is after the resolved `max` (`min: 'today'`,
+   * `max: 'startOfMonth'`): no value can satisfy the field. Absent when the definition is usable.
+   */
+  readonly definitionError?: string;
   /** Static select options with labels for the locale. */
   readonly options?: readonly ParameterOptionItem[];
   /** Dynamic select options: load them with `loadParameterOptions`. */
@@ -518,6 +550,8 @@ export function getParameterDefinitions(report: ParametersSource | null | undefi
     }
     const min = resolveBound(def, def.min, options);
     const max = resolveBound(def, def.max, options);
+    const conflict = boundsConflict(def, options);
+    const definitionError = conflict ? formatParameterIssue(conflict, def, locale, options) : undefined;
     const preset = presetOf(def);
     const description = def.description !== undefined ? localized(def.description, locale, '') : '';
     return {
@@ -530,6 +564,7 @@ export function getParameterDefinitions(report: ParametersSource | null | undefi
       ...(preset ? { defaultPreset: preset } : {}),
       ...(min !== undefined ? { min } : {}),
       ...(max !== undefined ? { max } : {}),
+      ...(definitionError ? { definitionError } : {}),
       ...(Array.isArray(def.options)
         ? { options: (def.options as readonly ParameterOption[]).map((o) => ({ value: o.value, label: localized(o.label, locale, String(o.value)) })) }
         : {}),
@@ -581,6 +616,10 @@ const MESSAGES: Record<Lang, Record<ParameterRule, MessageFn>> = {
     range: () => 'The start date must not be after the end date',
     min: ({ type, min }) => (DATE_TYPES.has(type) ? `Must not be before ${min}` : `Must be at least ${min}`),
     max: ({ type, max }) => (DATE_TYPES.has(type) ? `Must not be after ${max}` : `Must be at most ${max}`),
+    bounds: ({ type, min, max }) =>
+      DATE_TYPES.has(type)
+        ? `Invalid parameter settings: the minimum date ${min} is after the maximum date ${max}`
+        : `Invalid parameter settings: the minimum ${min} is greater than the maximum ${max}`,
   },
   ar: {
     required: ({ label }) => `يجب إدخال ${label}`,
@@ -599,35 +638,83 @@ const MESSAGES: Record<Lang, Record<ParameterRule, MessageFn>> = {
     range: () => 'يجب ألا يكون تاريخ البداية بعد تاريخ النهاية',
     min: ({ type, min }) => (DATE_TYPES.has(type) ? `يجب ألا يكون التاريخ قبل ${min}` : `يجب ألا تقل القيمة عن ${min}`),
     max: ({ type, max }) => (DATE_TYPES.has(type) ? `يجب ألا يكون التاريخ بعد ${max}` : `يجب ألا تزيد القيمة عن ${max}`),
+    bounds: ({ type, min, max }) =>
+      DATE_TYPES.has(type)
+        ? `إعدادات المعامل غير صالحة: الحد الأدنى للتاريخ ${min} بعد الحد الأقصى ${max}`
+        : `إعدادات المعامل غير صالحة: الحد الأدنى ${min} أكبر من الحد الأقصى ${max}`,
   },
 };
 
 const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩';
+/** FIRST STRONG ISOLATE / POP DIRECTIONAL ISOLATE: keep a date's `-` `/` `:` from being reordered inside RTL text. */
+const FSI = '\u2068';
+const PDI = '\u2069';
 
-/** Bound for a message: numbers via `formatNumber` (Arabic-Indic digits for `ar*`), dates with localized digits. */
-function formatBound(v: unknown, locale: string): string | undefined {
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** Locale-aware Gregorian date + time of an instant in `tz` (Arabic-Indic digits for `ar*`), e.g. `٠١‏/١١‏/٢٠٢٦، ٠١:٣٠`. */
+function formatDateTimeBound(ms: number, locale: string, tz: string): string {
+  const withSeconds = ms % 60_000 !== 0;
+  const key = `${locale}|${tz}|${withSeconds}`;
+  let f = dateTimeFormats.get(key);
+  if (!f) {
+    const opts: Intl.DateTimeFormatOptions = {
+      timeZone: tz,
+      calendar: 'gregory',
+      numberingSystem: isArabicLocale(locale) ? 'arab' : 'latn',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      ...(withSeconds ? { second: '2-digit' as const } : {}),
+    };
+    try {
+      f = new Intl.DateTimeFormat(locale, opts);
+    } catch {
+      f = new Intl.DateTimeFormat(isArabicLocale(locale) ? 'ar' : 'en', opts);
+    }
+    dateTimeFormats.set(key, f);
+  }
+  return f.format(ms);
+}
+
+/**
+ * Bound for a message: numbers via `formatNumber` (Arabic-Indic digits for `ar*`); `date` / `dateRange` bounds as
+ * `YYYY-MM-DD` with localized digits; `datetime` bounds as a locale-aware date and time in the time zone (never a raw
+ * UTC ISO string). In Arabic messages date bounds are wrapped in FSI ... PDI so they are not scrambled in RTL text.
+ */
+function formatBound(v: unknown, locale: string, type: ParameterType, tz: string): string | undefined {
   if (v === undefined) return undefined;
   if (typeof v === 'number') return formatNumber(v, locale);
   const s = String(v);
-  return isArabicLocale(locale) ? s.replace(/[0-9]/g, (d) => ARABIC_INDIC[+d]!) : s;
+  const ar = isArabicLocale(locale);
+  const isolate = (t: string) => (ar ? `${FSI}${t}${PDI}` : t);
+  if (type === 'datetime' && parseIsoDateString(s)) return isolate(formatDateTimeBound(instantOf(s, tz), locale, tz));
+  const text = ar ? s.replace(/[0-9]/g, (d) => ARABIC_INDIC[+d]!) : s;
+  return DATE_TYPES.has(type) ? isolate(text) : text;
 }
 
 /**
  * Localized (ar / en; `ar-*` -> Arabic, anything else -> English) message for an issue, e.g. `يجب إدخال الفرع` /
- * `Branch is required`. Numbers in the message follow the locale's digits (Arabic-Indic for Arabic).
+ * `Branch is required`. Numbers in the message follow the locale's digits (Arabic-Indic for Arabic); date bounds are
+ * bidi-isolated, and date-time bounds are shown as a local date and time in `options.timeZone` (default Asia/Riyadh).
  */
 export function formatParameterIssue(
   issue: Pick<ParameterIssueDetail, 'rule'> & Partial<Pick<ParameterIssueDetail, 'args'>>,
   def: Pick<ParameterDef, 'name' | 'label' | 'type'>,
   locale: LocaleTag = 'en',
+  options?: Pick<ResolveParametersOptions, 'timeZone'>,
 ): string {
   const lang: Lang = uiLanguage(locale);
   const args = issue.args ?? {};
+  const tz = tzOf(options);
   return MESSAGES[lang][issue.rule]({
     label: parameterLabel(def, locale),
     type: def.type,
-    min: formatBound(args.min, locale),
-    max: formatBound(args.max, locale),
+    min: formatBound(args.min, locale, def.type, tz),
+    max: formatBound(args.max, locale, def.type, tz),
   });
 }
 
@@ -647,7 +734,7 @@ export function validateParameterValues(
   const byName = new Map(defs.map((d) => [d.name, d]));
   const errors: ParameterFieldError[] = r.issues.map((i) => {
     const def = byName.get(i.name)!;
-    return { ...i, label: parameterLabel(def, locale), message: formatParameterIssue(i, def, locale) };
+    return { ...i, label: parameterLabel(def, locale), message: formatParameterIssue(i, def, locale, options) };
   });
   const fieldErrors: Record<string, string> = {};
   for (const e of errors) fieldErrors[e.name] = e.message;

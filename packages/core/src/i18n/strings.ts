@@ -8,6 +8,7 @@ type StringKey =
   | 'image'
   | 'loading'
   | 'error'
+  | 'invalidParameters'
   | 'noData'
   | 'fields'
   | 'toolbox'
@@ -238,6 +239,7 @@ const en: Record<StringKey, string> = {
   image: 'Image',
   loading: 'Loading…',
   error: 'Error',
+  invalidParameters: 'Invalid report parameters',
   noData: 'No data',
   fields: 'Fields',
   toolbox: 'Toolbox',
@@ -470,6 +472,7 @@ const ar: Record<StringKey, string> = {
   image: 'صورة',
   loading: 'جارٍ التحميل…',
   error: 'خطأ',
+  invalidParameters: 'قيم معاملات التقرير غير صالحة',
   noData: 'لا توجد بيانات',
   fields: 'الحقول',
   toolbox: 'الأدوات',

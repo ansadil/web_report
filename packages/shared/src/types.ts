@@ -68,8 +68,9 @@ export interface ParameterOptionsSource {
 }
 
 /**
- * Relative date presets for `date` parameters (`default`, `min`, `max`), resolved against "now" in local calendar
- * days when the report runs: e.g. `startOfMonth` on 2026-10-15 -> `2026-10-01`.
+ * Relative date presets for `date` parameters (`default`, `min`, `max`), resolved against "now" in calendar days of
+ * the viewer's `timeZone` (IANA, default `Asia/Riyadh`) when the report runs: e.g. `startOfMonth` on 2026-10-15 ->
+ * `2026-10-01`. Gregorian calendar only; Hijri (Umm al-Qura) periods are not supported (undecided).
  */
 export type RelativeDatePreset =
   | 'today'

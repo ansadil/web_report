@@ -39,15 +39,35 @@ export const templateArgs = {
   remove: { id: v.string() },
 };
 
+/** A scalar report parameter value: string, number, boolean or null. */
+export const reportParamScalar = v.union(v.string(), v.number(), v.boolean(), v.null());
+
+/**
+ * One report parameter value as `ConvexDataAdapter` sends it: a scalar, an array of scalars, or a dateRange
+ * `{ from?, to? }` with at least one end (`YYYY-MM-DD` strings). Nested objects and other shapes are rejected.
+ */
+export const reportParamValue = v.union(
+  reportParamScalar,
+  v.array(reportParamScalar),
+  // dateRange: at least one end (core drops an empty range, so `{}` is never sent)
+  v.object({ from: v.string(), to: v.optional(v.string()) }),
+  v.object({ to: v.string() }),
+);
+
 /**
  * Args validator for the host's report data query / HTTP action that `ConvexDataAdapter` calls. `params` are the
  * report parameter values resolved and validated by core (`resolveParameterValues` / `buildDataQuery`) merged over
  * `dataset.params`: dates as `YYYY-MM-DD`, dateRanges as `{ from?, to? }`, datetimes as ISO strings, select values as
- * the option value. Re-check anything security-relevant (e.g. which branches the caller may see) on the server.
+ * the option value.
+ *
+ * This checks the SHAPE only: `params` must be an object (not a string, `null` or an array) whose values are
+ * {@link reportParamValue}s. It does not know the report's parameter definitions (required fields, `min` / `max`,
+ * select options); re-check anything security-relevant (e.g. which branches the caller may see) on the server.
+ * Hosts whose static `dataset.params` contain nested objects can extend `reportParamValue` in their own validator.
  *
  *   export const rows = query({ args: reportDataArgs, handler: async (ctx, { source, params }) => ... });
  */
-export const reportDataArgs = { source: v.string(), params: v.any() };
+export const reportDataArgs = { source: v.string(), params: v.record(v.string(), reportParamValue) };
 
 /**
  * Builds the public Convex functions `list`, `get`, `listVersions` (queries) and `save`, `remove`

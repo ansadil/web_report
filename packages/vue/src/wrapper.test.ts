@@ -43,12 +43,13 @@ describe('Vue ReportViewer params prop', () => {
     const fontHost = document.createElement('div');
     document.body.appendChild(fontHost);
     const fontApp = createApp({
-      render: () => h(ReportViewer, { schema: null, fontsBaseUrl: 'https://fonts.example/faces/' }),
+      render: () => h(ReportViewer, { schema: null, fontsBaseUrl: 'https://fonts.example/faces/', timeZone: 'UTC' }),
     });
     fontApp.mount(fontHost);
     await nextTick();
-    const viewer = fontHost.querySelector('reports-viewer') as HTMLElement & { fontsBaseUrl?: string };
+    const viewer = fontHost.querySelector('reports-viewer') as HTMLElement & { fontsBaseUrl?: string; timeZone?: string };
     expect(viewer.fontsBaseUrl).toBe('https://fonts.example/faces/');
+    expect(viewer.timeZone).toBe('UTC');
     const builderHost = document.createElement('div');
     document.body.appendChild(builderHost);
     const builderApp = createApp({

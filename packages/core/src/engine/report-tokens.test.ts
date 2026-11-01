@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { interpret } from './interpreter.js';
-import { replaceReportTokens } from './report-tokens.js';
+import { formatReportDate, formatReportHijri, parseReportDate, replaceReportTokens } from './report-tokens.js';
 import { validateReport, type ReportSchemaV1 } from '../schema/report-schema.js';
 
 const now = new Date('2026-11-01T09:00:00Z');
@@ -17,6 +17,21 @@ const parameters = [
     ],
   },
 ];
+
+describe('report locale dates', () => {
+  it('BUG-63 formats an Arabic report date as Eastern digits with م', () => {
+    expect(formatReportDate('2026-10-01', 'ar')).toBe('٠١/١٠/٢٠٢٦م');
+    expect(formatReportDate('2026-10-01', 'ar-SA')).toBe('٠١/١٠/٢٠٢٦م');
+    expect(formatReportDate('2026-10-01', 'en')).toBe('01/10/2026');
+    expect(parseReportDate('٠١/١٠/٢٠٢٦م')).toBe('2026-10-01');
+  });
+
+  it('BUG-64 puts the Hijri equivalent under the Gregorian day', () => {
+    const hijri = formatReportHijri('2026-10-01', 'ar');
+    expect(hijri.startsWith('الموافق ')).toBe(true);
+    expect(hijri).not.toContain('2026');
+  });
+});
 
 describe('replaceReportTokens', () => {
   it('formats the period, the branch label, and both dates for Asia/Riyadh', () => {

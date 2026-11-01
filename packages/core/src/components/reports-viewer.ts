@@ -28,6 +28,7 @@ import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
 import { formatLocalizedNumber, formatZoomPercent } from './builder/status-bar.js';
+import { formatReportDate, formatReportHijri, parseReportDate } from '../engine/report-tokens.js';
 import { DEFAULT_FONTS_BASE_URL } from '../exporters/fonts-manifest.js';
 import { ensureReportFonts } from './web-fonts.js';
 
@@ -177,6 +178,7 @@ export class ReportsViewerElement extends LitElement {
       width: 100%; height: 32px; border: 1px solid var(--rw-border); border-radius: 7px;
       padding: 0 9px; box-sizing: border-box; background: #fff; font: inherit; color: inherit;
     }
+    .hj { font-size: 10.5px; color: #1f5fa8; margin-top: 3px; font-weight: 600; }
     .field-error:empty { display: none; }
     .field-error { color: #b91c1c; font-size: 11px; margin: 3px 0 0; }
     .range { display: grid; gap: 6px; }
@@ -342,6 +344,11 @@ export class ReportsViewerElement extends LitElement {
     return resolveLocale(this.locale, this.schema?.meta);
   }
 
+  /** Date text follows the report template locale, not the viewer chrome. */
+  private get _reportLocale(): LocaleTag {
+    return this.schema?.meta.locale ?? this._locale;
+  }
+
   private get _dir(): 'rtl' | 'ltr' {
     return resolveDir(this.dirOverride, this.schema?.meta, this._locale);
   }
@@ -376,6 +383,7 @@ export class ReportsViewerElement extends LitElement {
   @state() private _fieldErrors: Record<string, string> = {};
   @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
   @state() private _rowCount = 0;
+  @state() private _generatedAt = '';
   private _lastRows: readonly Row[] | null = null;
   private _placeholderParams = false;
 
@@ -506,6 +514,11 @@ export class ReportsViewerElement extends LitElement {
       this._codeIds = [...rendered.codeIds];
       this._rowCount = rows.length;
       this._lastRows = rows;
+      this._generatedAt = new Intl.DateTimeFormat(this._reportLocale, {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: paramOptions.timeZone,
+      }).format(new Date());
       if (!placeholder) {
         this._error = '';
         this._fieldErrors = {};
@@ -880,6 +893,8 @@ export class ReportsViewerElement extends LitElement {
   private _paintParameterFields(): void {
     const host = this._paramFields;
     if (!host) return;
+    const focused = this.shadowRoot?.activeElement;
+    if (focused instanceof HTMLInputElement && focused.dataset.kind === 'date' && host.contains(focused)) return;
     const html = this._parameterFieldsHtml();
     if (host.innerHTML !== html) host.innerHTML = html;
   }
@@ -894,13 +909,23 @@ export class ReportsViewerElement extends LitElement {
     }).join('');
   }
 
+  private _dateFieldHtml(testId: string, name: string, part: '' | 'from' | 'to', raw: string, aria: string): string {
+    const locale = this._reportLocale;
+    const iso = parseReportDate(raw);
+    const shown = iso ? formatReportDate(iso, locale) : raw;
+    const hijri = iso ? formatReportHijri(iso, locale) : '';
+    const partAttr = part ? ` data-part="${part}"` : '';
+    return `<div class="date-field"><input data-testid="param-${escapeHtml(testId)}" data-param="${escapeHtml(name)}" data-kind="date"${partAttr} type="text" inputmode="numeric" value="${escapeHtml(shown)}"${aria}>${hijri ? `<div class="hj">${escapeHtml(hijri)}</div>` : ''}</div>`;
+  }
+
   private _parameterControlHtml(def: ParameterDefinition, value: unknown, errorId: string): string {
     const name = escapeHtml(def.name);
     const aria = errorId ? ` aria-invalid="true" aria-describedby="${errorId}"` : '';
     if (def.type === 'dateRange') {
       const range = value && typeof value === 'object' ? value as { from?: string; to?: string } : {};
-      return `<div class="range"><input data-testid="param-${name}-from" data-param="${name}" data-part="from" type="date" value="${escapeHtml(range.from ?? '')}"${aria}><input data-testid="param-${name}-to" data-param="${name}" data-part="to" type="date" value="${escapeHtml(range.to ?? '')}"${aria}></div>`;
+      return `<div class="range">${this._dateFieldHtml(`${name}-from`, name, 'from', range.from ?? '', aria)}${this._dateFieldHtml(`${name}-to`, name, 'to', range.to ?? '', aria)}</div>`;
     }
+    if (def.type === 'date') return this._dateFieldHtml(name, name, '', value == null ? '' : String(value), aria);
     if (def.type === 'select' || def.type === 'bool') {
       const options = def.type === 'bool'
         ? [{ value: false, label: t(this._locale, 'no') }, { value: true, label: t(this._locale, 'yes') }]
@@ -913,7 +938,7 @@ export class ReportsViewerElement extends LitElement {
       }).join('');
       return `<select data-testid="param-${name}" data-param="${name}"${aria}>${opts}</select>`;
     }
-    const type = def.type === 'number' ? 'number' : def.type === 'date' ? 'date' : def.type === 'datetime' ? 'datetime-local' : 'text';
+    const type = def.type === 'number' ? 'number' : def.type === 'datetime' ? 'datetime-local' : 'text';
     return `<input data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}"${aria}>`;
   }
 
@@ -922,15 +947,18 @@ export class ReportsViewerElement extends LitElement {
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
     const name = target.dataset.param;
     if (!name) return;
+    const raw = target instanceof HTMLInputElement && target.dataset.kind === 'date'
+      ? (parseReportDate(target.value) ?? target.value)
+      : target.value;
     const part = target.dataset.part;
     if (part === 'from' || part === 'to') {
       const current = this._draft[name];
       const range = current && typeof current === 'object' ? { ...(current as { from?: string; to?: string }) } : {};
-      range[part] = target.value;
+      range[part] = raw;
       this._setDraft(name, range);
       return;
     }
-    this._setDraft(name, target.value);
+    this._setDraft(name, raw);
   }
 
   override render(): unknown {
@@ -950,6 +978,7 @@ export class ReportsViewerElement extends LitElement {
             <div class="vinfo" data-testid="param-info">
               <div><span>${t(this._locale, 'paramRecords')}</span><b>${formatLocalizedNumber(this._rowCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
               <div><span>${t(this._locale, 'paramPages')}</span><b>${formatLocalizedNumber(this._pageCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
+              ${this._generatedAt ? html`<div><span>${t(this._locale, 'lastRefresh')}</span><b>${this._generatedAt}</b></div>` : nothing}
             </div>
           </div>
         </aside>

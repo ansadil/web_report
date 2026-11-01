@@ -10,7 +10,6 @@
  * never the raw braces. Date tokens always resolve.
  */
 import {
-  formatDate,
   formatHijri,
   type LocaleTag,
   type ParameterDef,
@@ -56,11 +55,46 @@ function calendarDay(value: unknown): string | undefined {
   return `${match[1]}-${match[2]}-${match[3]}`;
 }
 
+function localizeDigits(text: string, locale: string): string {
+  if (!isArabic(locale)) return text;
+  return text.replace(/\d/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[Number(digit)] ?? digit);
+}
+
+/** Gregorian date in the report locale: Arabic is `٠١/١٠/٢٠٢٦م`. */
+export function formatReportDate(iso: string, locale: LocaleTag): string {
+  const day = calendarDay(iso);
+  if (!day) return iso;
+  const [year, month, date] = day.split('-') as [string, string, string];
+  const body = localizeDigits(`${date}/${month}/${year}`, locale);
+  return isArabic(locale) ? `${body}م` : body;
+}
+
+/** Parse a report-locale date or an ISO day back to `YYYY-MM-DD`. */
+export function parseReportDate(raw: string): string | undefined {
+  const western = raw
+    .replace(/م/g, '')
+    .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .trim();
+  const iso = calendarDay(western);
+  if (iso) return iso;
+  const match = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(western);
+  if (!match) return undefined;
+  const day = match[1]!.padStart(2, '0');
+  const month = match[2]!.padStart(2, '0');
+  return calendarDay(`${match[3]}-${month}-${day}`);
+}
+
+export function formatReportHijri(iso: string, locale: LocaleTag): string {
+  const day = calendarDay(iso);
+  if (!day) return '';
+  const hijri = formatHijri(day, locale);
+  return isArabic(locale) ? `الموافق ${hijri}` : hijri;
+}
+
 function formatCalendar(value: unknown, locale: LocaleTag): string | undefined {
   const iso = calendarDay(value);
   if (!iso) return undefined;
-  const [year, month, day] = iso.split('-').map(Number) as [number, number, number];
-  return formatDate(new Date(year, month - 1, day, 12), locale, { dateStyle: 'medium' });
+  return formatReportDate(iso, locale);
 }
 
 function zonedISODate(now: Date, timeZone: string): string {
@@ -112,10 +146,7 @@ export function replaceReportTokens(text: string, ctx: ReportTokenContext): stri
   const today = zonedISODate(ctx.now, timeZone);
   return text.replace(TOKEN_RE, (token) => {
     if (token === '{التاريخ.هجري}') return formatHijri(today, ctx.locale);
-    if (token === '{التاريخ}') {
-      const [year, month, day] = today.split('-').map(Number) as [number, number, number];
-      return formatDate(new Date(year, month - 1, day, 12), ctx.locale, { dateStyle: 'medium' });
-    }
+    if (token === '{التاريخ}') return formatReportDate(today, ctx.locale);
     if (token === '{المعاملات.الفترة}') return parameterToken('الفترة', ctx);
     return parameterToken('الفرع', ctx);
   });

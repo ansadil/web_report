@@ -64,14 +64,20 @@ const salesByRegion: SampleReport = {
     ],
     bands: {
       reportHeader: {
-        height: 42,
+        height: 40,
         elements: [
-          { id: 'logo', kind: 'image', src: SALES_LOGO, alt: 'الشعار', pos: { x: 2, y: 2, w: 22, h: 16 } },
-          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 28, y: 1, w: 124, h: 10 } },
-          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 28, y: 12, w: 148, h: 8 } },
-          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 28, y: 21, w: 90, h: 7 } },
-          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 28, y: 29, w: 148, h: 8 } },
-          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 160, y: 2, w: 16, h: 16 } },
+          { id: 'logo', kind: 'image', src: SALES_LOGO, alt: 'الشعار', pos: { x: 2, y: 1, w: 18, h: 14 } },
+          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 16, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 22, y: 1, w: 130, h: 8 } },
+          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 158, y: 1, w: 14, h: 14 } },
+          { id: 'c1', kind: 'box', style: { background: '#f5f8fc', border: { top: 1, right: 1, bottom: 1, left: 1, color: '#e3e9f2' } }, pos: { x: 0, y: 18, w: 58, h: 18 } },
+          { id: 'c1l', kind: 'text', value: 'الفترة', style: { fontSize: 10, color: '#64748b', font: 'Cairo' }, pos: { x: 2, y: 19, w: 54, h: 5 } },
+          { id: 'c1v', kind: 'text', value: '{المعاملات.الفترة}', style: { bold: true, fontSize: 10, font: 'Cairo', color: '#15233a' }, pos: { x: 2, y: 24, w: 54, h: 10 } },
+          { id: 'c2', kind: 'box', style: { background: '#f5f8fc', border: { top: 1, right: 1, bottom: 1, left: 1, color: '#e3e9f2' } }, pos: { x: 61, y: 18, w: 58, h: 18 } },
+          { id: 'c2l', kind: 'text', value: 'الفرع', style: { fontSize: 10, color: '#64748b', font: 'Cairo' }, pos: { x: 63, y: 19, w: 54, h: 5 } },
+          { id: 'c2v', kind: 'text', value: '{المعاملات.الفرع}', style: { bold: true, fontSize: 11, font: 'Cairo', color: '#15233a' }, pos: { x: 63, y: 25, w: 54, h: 8 } },
+          { id: 'c3', kind: 'box', style: { background: '#f5f8fc', border: { top: 1, right: 1, bottom: 1, left: 1, color: '#e3e9f2' } }, pos: { x: 122, y: 18, w: 58, h: 18 } },
+          { id: 'c3l', kind: 'text', value: 'تاريخ الطباعة', style: { fontSize: 10, color: '#64748b', font: 'Cairo' }, pos: { x: 124, y: 19, w: 54, h: 5 } },
+          { id: 'c3v', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { bold: true, fontSize: 9, font: 'Cairo', color: '#15233a' }, pos: { x: 124, y: 24, w: 54, h: 10 } },
         ],
       },
       pageHeader: {

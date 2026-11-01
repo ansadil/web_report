@@ -7,13 +7,15 @@ export const propertiesStyles = css`
     .prop-card small { color: var(--rb-muted); }
     .prop-card-icon { width: 26px; height: 26px; border-radius: 6px; background: #fff3ea; color: #f0752a; display: grid; place-items: center; border: 1px solid #fbd5bb; flex: none; font-weight: 700; }
     .ptoggle { display: flex; gap: 4px; margin: 0 10px 6px; }
-    .ptoggle button { flex: 1; border: 1px solid var(--rb-border); background: #fff; border-radius: 6px; height: 26px; cursor: pointer; color: #4a5568; }
+    .ptoggle button { flex: 1; border: 1px solid var(--rb-border); background: #fff; border-radius: 6px; height: 26px; cursor: pointer; color: #4a5568; display: flex; align-items: center; justify-content: center; gap: 5px; }
     .ptoggle button.on { background: #e7f0fb; border-color: #b9d2f1; color: #1f5fa8; font-weight: 600; }
     .prop-tools { display: flex; justify-content: flex-end; gap: 4px; margin: 0 10px 6px; }
     .prop-tools button { border: 1px solid var(--rb-border); background: #fff; border-radius: 6px; height: 24px; padding: 0 8px; cursor: pointer; color: #4a5568; font: inherit; font-size: 11px; }
     .prop-tools button.on { background: #e7f0fb; border-color: #b9d2f1; color: #1f5fa8; font-weight: 600; }
-    .prop-search { margin: 0 10px 6px; }
-    .prop-search input { width: 100%; height: 30px; border: 1px solid var(--rb-border); border-radius: 7px; padding: 0 8px; }
+    .prop-search { margin: 0 10px 6px; position: relative; }
+    .prop-search input { width: 100%; height: 30px; border: 1px solid var(--rb-border); border-radius: 7px; padding: 0 8px; padding-inline-end: 30px; outline: none; }
+    .prop-search input:focus { border-color: #8db7e8; box-shadow: 0 0 0 3px #e3eefb; }
+    .prop-search .search-ic { position: absolute; inset-inline-end: 9px; top: 7px; width: 16px; height: 16px; stroke: #7a8699; fill: none; stroke-width: 1.8; pointer-events: none; }
     .cat { border-top: 1px solid var(--rb-border); }
     .cat-h { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 10px; background: #f7f9fc; font: inherit; font-weight: 700; font-size: 12px; border: 0; cursor: pointer; user-select: none; text-align: start; color: inherit; }
     .cat-h svg { width: 13px; height: 13px; color: var(--rb-muted); transition: transform .15s; flex: none; }
@@ -21,15 +23,21 @@ export const propertiesStyles = css`
     .cat.closed .cat-b { display: none; }
     .cat-h .cnt { margin-inline-start: auto; color: var(--rb-muted); font-weight: 500; font-size: 10.5px; }
     .prow { display: grid; grid-template-columns: minmax(0, 44%) minmax(0, 56%); border-top: 1px solid #eef1f6; min-height: 27px; }
+    /* Author display beats the UA [hidden] rule, so a search hit never hid the row. */
     .prow[hidden] { display: none !important; }
+    .prow.hl { background: #fff8f2; }
     .prow .k { padding: 4px 10px; color: #4a5568; border-inline-end: 1px solid #eef1f6; display: flex; align-items: center; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; }
+    .bool { display: flex; align-items: center; gap: 4px; }
+    .bool input { accent-color: #1f5fa8; width: auto; }
     .prow .v { position: relative; padding: 2px 6px; display: flex; align-items: center; gap: 5px; min-width: 0; width: 100%; }
     .prow .v input, .prow .v select {
       width: 100%; min-width: 0; border: 1px solid transparent; background: transparent; height: 24px;
-      font: inherit; font-size: 12px; color: inherit; text-overflow: ellipsis;
+      font: inherit; font-size: 12px; color: inherit; text-overflow: ellipsis; border-radius: 4px; outline: none;
     }
+    .prow .v input:hover, .prow .v select:hover { border-color: var(--rb-border); }
+    .prow .v input:focus { border-color: #8db7e8; background: #fff; }
     .prow .v select.pick, .prow .v select {
-      appearance: none; padding-inline: 2px 18px; padding-block: 0; cursor: pointer; width: 100%;
+      appearance: none; padding-inline: 2px 18px; padding-block: 0; padding-top: 0; padding-bottom: 0; cursor: pointer; width: 100%;
       /* Content box is 24px inside the 1px border; a taller line-height clips the closed value. */
       height: 26px; min-height: 26px; line-height: 22px; box-sizing: border-box;
       background-image: linear-gradient(45deg, transparent 50%, #64748b 50%), linear-gradient(135deg, #64748b 50%, transparent 50%);
@@ -37,8 +45,16 @@ export const propertiesStyles = css`
       background-size: 4px 4px, 4px 4px;
       background-repeat: no-repeat;
     }
+    .prow .v .pick select { height: 100%; min-height: 0; line-height: inherit; padding: 0; }
     .color-value { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
-    .color-value .swatch { width: 16px; height: 16px; padding: 0; border: 1px solid rgba(0,0,0,.15); border-radius: 4px; flex: none; background: transparent; }
+    .prow .v .color-value input.swatch {
+      appearance: none; -webkit-appearance: none;
+      width: 16px; height: 16px; min-width: 16px; max-width: 16px; min-height: 16px;
+      padding: 0; flex: 0 0 16px; box-sizing: border-box;
+      border: 1px solid rgba(0,0,0,.15); border-radius: 4px; background: transparent;
+    }
+    .prow .v .color-value input.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    .prow .v .color-value input.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
     .color-value .hex { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; direction: ltr; text-align: start; }
     .prow .name-value { direction: ltr; text-align: start; }
     .pick { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; }

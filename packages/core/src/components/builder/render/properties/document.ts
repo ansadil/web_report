@@ -23,7 +23,7 @@ export function renderInspectorChrome(locale: DocumentState['locale'], onFilter:
       <button type="button" title=${t(locale, 'sortAlpha')} @click=${(e: Event) => layoutProps(e, 'alpha')}>A–Z</button>
       <button type="button" class="on" title=${t(locale, 'categorize')} @click=${(e: Event) => layoutProps(e, 'category')}>${t(locale, 'categorize')}</button>
     </div>
-    <div class="prop-search"><input placeholder=${t(locale, 'searchProperties')} @input=${onFilter} /></div>
+    <div class="prop-search"><input placeholder=${t(locale, 'searchProperties')} @input=${onFilter} /><svg class="search-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg></div>
   `;
 }
 

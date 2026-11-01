@@ -226,7 +226,9 @@ type StringKey =
   | 'datasetLabel'
   | 'noSavedReports'
   | 'alignHorizontal'
-  | 'alignVertical';
+  | 'alignVertical'
+  | 'yes'
+  | 'no';
 
 const en: Record<StringKey, string> = {
   export: 'Export',
@@ -456,6 +458,8 @@ const en: Record<StringKey, string> = {
   noSavedReports: 'No saved reports yet',
   alignHorizontal: 'Horizontal alignment',
   alignVertical: 'Vertical alignment',
+  yes: 'Yes',
+  no: 'No',
 };
 
 const ar: Record<StringKey, string> = {
@@ -686,6 +690,8 @@ const ar: Record<StringKey, string> = {
   noSavedReports: 'لا توجد تقارير محفوظة',
   alignHorizontal: 'المحاذاة الأفقية',
   alignVertical: 'المحاذاة الرأسية',
+  yes: 'نعم',
+  no: 'لا',
 };
 
 /** UI strings: `ar` / `ar-*` use Arabic, any other locale falls back to English. */

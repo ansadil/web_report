@@ -131,6 +131,29 @@ function renderSection(
   return `<section class="rw-section rw-${s.band}" data-band="${s.band}" style="${sectionStyle}">${body}</section>`;
 }
 
+/**
+ * Page header and page footer are running bands: they are drawn on every page, not once in the flow.
+ * The body budget shrinks by their heights so a page still fits the content area.
+ */
+function paginateWithRunningBands(sections: readonly RenderSection[], budgetMm: number): RenderSection[][] {
+  let pageHeader: RenderSection | undefined;
+  let pageFooter: RenderSection | undefined;
+  const body: RenderSection[] = [];
+  for (const section of sections) {
+    if (section.band === 'pageHeader' && !pageHeader) pageHeader = section;
+    else if (section.band === 'pageFooter' && !pageFooter) pageFooter = section;
+    else body.push(section);
+  }
+  const chrome = (pageHeader?.height ?? 0) + (pageFooter?.height ?? 0);
+  const bodyBudget = Math.max(1, budgetMm - chrome);
+  const chunks = chunkSectionsForVisualPages(body, bodyBudget);
+  return chunks.map((chunk) => [
+    ...(pageHeader ? [pageHeader] : []),
+    ...chunk,
+    ...(pageFooter ? [pageFooter] : []),
+  ]);
+}
+
 /** Split sections into visual pages using content-area height (page minus margins). Honors pageBreakBefore/After. */
 function chunkSectionsForVisualPages(sections: readonly RenderSection[], budgetMm: number): RenderSection[][] {
   if (sections.length === 0) return [[]];
@@ -199,13 +222,13 @@ export function renderHtml(
   const prefix = opts.idPrefix ?? `rw-${Math.random().toString(36).slice(2, 8)}`;
   const chartIds: string[] = [];
   const codeIds: string[] = [];
-  const chartId = (id: string): string => {
-    const cid = `${prefix}-chart-${id}`;
+  const chartId = (id: string, pageNo: number): string => {
+    const cid = `${prefix}-chart-${id}-p${pageNo}`;
     chartIds.push(cid);
     return cid;
   };
-  const codeId = (id: string): string => {
-    const cid = `${prefix}-code-${id}`;
+  const codeId = (id: string, pageNo: number): string => {
+    const cid = `${prefix}-code-${id}-p${pageNo}`;
     codeIds.push(cid);
     return cid;
   };
@@ -238,13 +261,16 @@ export function renderHtml(
   ].join(';');
 
   const budgetMm = Math.max(10, tree.height - tree.margins.top - tree.margins.bottom);
-  const chunks = chunkSectionsForVisualPages(tree.sections, budgetMm);
+  const chunks = paginateWithRunningBands(tree.sections, budgetMm);
   const pages = Math.max(1, chunks.length);
 
   if (!opts.visualPages) {
     // Continuous scroll: number each section by the visual page it would fall on.
     const sections = chunks
-      .flatMap((chunkSecs, i) => chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })))
+      .flatMap((chunkSecs, i) => {
+        const pageNo = i + 1;
+        return chunkSecs.map((s) => renderSection(s, contentWidth, (id) => chartId(id, pageNo), (id) => codeId(id, pageNo), { page: pageNo, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' }));
+      })
       .join('');
     const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
     const html = `<article class="rw-report" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleScroll}">${watermark}${sections}</article>`;
@@ -253,7 +279,8 @@ export function renderHtml(
 
   const sheets = chunks
     .map((chunkSecs, i) => {
-      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })).join('');
+      const pageNo = i + 1;
+      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, (id) => chartId(id, pageNo), (id) => codeId(id, pageNo), { page: pageNo, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })).join('');
       const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
       return `<div class="rw-page-visual-sheet"><article class="rw-report rw-report-page" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleSheet}">${watermark}${secHtml}</article></div>`;
     })

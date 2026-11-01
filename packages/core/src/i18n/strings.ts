@@ -170,6 +170,7 @@ type StringKey =
   | 'localeLtr'
   | 'localeRtl'
   | 'reportParameters'
+  | 'viewerParameters'
   | 'elements'
   | 'savedState'
   | 'propertyGrid'
@@ -401,6 +402,7 @@ const en: Record<StringKey, string> = {
   localeLtr: 'English · left to right',
   localeRtl: 'Arabic · right to left',
   reportParameters: 'Parameters',
+  viewerParameters: 'Report parameters',
   elements: 'Elements',
   savedState: 'Saved just now',
   propertyGrid: 'Property grid',
@@ -633,6 +635,7 @@ const ar: Record<StringKey, string> = {
   localeLtr: 'English · left to right',
   localeRtl: 'العربية · من اليمين لليسار',
   reportParameters: 'المعاملات',
+  viewerParameters: 'معاملات التقرير',
   elements: 'العناصر',
   savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',

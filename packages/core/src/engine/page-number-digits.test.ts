@@ -21,7 +21,7 @@ function schema(meta: Record<string, unknown>, footer: string): ReportSchemaV1 {
   return r.value;
 }
 
-// The HTML viewer emits the pageFooter band once (on the last visual page), so the footer reads 2/2.
+// Page footer repeats on every visual page. The report header forces a second page, so both «1 of 2» and «2 of 2» are present.
 const html = (s: ReportSchemaV1, visualPages: boolean): string =>
   renderHtml(interpret({ schema: s, rows: [{ x: 1234.5 }] }), { visualPages }).html;
 
@@ -30,11 +30,13 @@ describe('HTML viewer page numbers follow the report number locale', () => {
     it(`ar → Arabic-Indic, like body numbers (visualPages=${visualPages})`, () => {
       const out = html(schema({ locale: 'ar', dir: 'rtl' }, 'صفحة {page} من {pages}'), visualPages);
       expect(out).toContain('١٬٢٣٤٫٥٠');
+      expect(out).toContain('صفحة ١ من ٢');
       expect(out).toContain('صفحة ٢ من ٢');
       expect(out).not.toMatch(/صفحة \d/);
     });
     it(`en → Western (visualPages=${visualPages})`, () => {
       const out = html(schema({ locale: 'en', dir: 'ltr' }, 'Page {page} of {pages}'), visualPages);
+      expect(out).toContain('Page 1 of 2');
       expect(out).toContain('Page 2 of 2');
       expect(out).not.toMatch(/[\u0660-\u0669]/);
     });

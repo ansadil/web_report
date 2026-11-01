@@ -15,6 +15,7 @@ import { t } from '../i18n/strings.js';
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
+import { formatLocalizedNumber, formatZoomPercent } from './builder/status-bar.js';
 import { DEFAULT_FONTS_BASE_URL } from '../exporters/fonts-manifest.js';
 import { ensureReportFonts } from './web-fonts.js';
 
@@ -116,6 +117,37 @@ export class ReportsViewerElement extends LitElement {
     }
     .toolbar button:hover { background: var(--rw-button-hover); }
     .toolbar button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .toolbar button[hidden] { display: none !important; }
+    .viewer-frame {
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
+      min-width: 0;
+    }
+    aside.params {
+      width: 262px;
+      flex: none;
+      box-sizing: border-box;
+      background: var(--rw-surface);
+      border-inline-end: 1px solid var(--rw-border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .params-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--rw-border);
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .params-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 12px 12px; color: var(--rw-muted); }
+    .viewer-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
     .toolbar button.view-tool {
       padding: 4px 6px;
     }
@@ -460,8 +492,9 @@ export class ReportsViewerElement extends LitElement {
   private _renderViewToolbarControls(disabled: boolean): unknown {
     if (this.hideViewControls) return nothing;
     const n = this._pageCount;
-    const zLabel = `${Math.round(this._zoom * 100)}%`;
-    const pageLabel = n === 0 ? '—' : `${this._pageIndex + 1} / ${n}`;
+    const digits = { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? ('locale' as const) };
+    const zLabel = formatZoomPercent(this._zoom, digits);
+    const pageLabel = n === 0 ? '—' : `${formatLocalizedNumber(this._pageIndex + 1, digits)} / ${formatLocalizedNumber(n, digits)}`;
     const pageDisabled = disabled || n === 0;
     return html`
       <button
@@ -650,27 +683,37 @@ export class ReportsViewerElement extends LitElement {
     const disabled = this._phase !== 'ready';
     const items = (this.actions ?? VIEWER_DEFAULT_ACTIONS).filter((a) => a in VIEWER_ACTION_KIND);
     return html`
-      <div class="toolbar" role="toolbar">
-        ${this._renderViewToolbarControls(disabled)}
-        ${this.hideViewControls ? nothing : html`<span class="toolbar-sep" role="separator" aria-hidden="true"></span>`}
-        ${items.map((a) => {
-          const label = t(this._locale, a === 'csv' ? 'excel' : a);
-          return html`<button
-            type="button"
-            data-action=${a}
-            aria-label=${label}
-            title=${label}
-            ?disabled=${disabled}
-            @click=${() => this.exportTo(VIEWER_ACTION_KIND[a])}
-          >${icon(a)}<span class="label">${label}</span></button>`;
-        })}
-        <span class="toolbar-spacer" aria-hidden="true"></span>
-        <span class="status ${this._phase === 'error' ? 'error' : ''}">
-          ${this._phase === 'loading' ? t(this._locale, 'loading') : ''}
-          ${this._phase === 'error' ? `${t(this._locale, 'error')}: ${this._error}` : ''}
-        </span>
+      <div class="viewer-frame">
+        <aside class="params" data-testid="viewer-parameters">
+          <div class="params-head">${t(this._locale, 'viewerParameters')}</div>
+          <div class="params-body"></div>
+        </aside>
+        <div class="viewer-main">
+          <div class="toolbar" role="toolbar">
+            ${items.map((a) => {
+              const label = t(this._locale, a === 'csv' ? 'excel' : a);
+              const frozen = a !== 'print';
+              return html`<button
+                type="button"
+                data-action=${a}
+                aria-label=${label}
+                title=${label}
+                ?hidden=${frozen}
+                ?disabled=${disabled || frozen}
+                @click=${() => { if (!frozen) void this.exportTo(VIEWER_ACTION_KIND[a]); }}
+              >${icon(a)}<span class="label">${label}</span></button>`;
+            })}
+            ${this.hideViewControls ? nothing : html`<span class="toolbar-sep" role="separator" aria-hidden="true"></span>`}
+            ${this._renderViewToolbarControls(disabled)}
+            <span class="toolbar-spacer" aria-hidden="true"></span>
+            <span class="status ${this._phase === 'error' ? 'error' : ''}">
+              ${this._phase === 'loading' ? t(this._locale, 'loading') : ''}
+              ${this._phase === 'error' ? `${t(this._locale, 'error')}: ${this._error}` : ''}
+            </span>
+          </div>
+          <div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>
+        </div>
       </div>
-      <div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>
     `;
   }
 }

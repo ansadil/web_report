@@ -1,8 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit';
 import { property, state, query } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import type { LocaleTag, Row } from '@reports-web/shared';
-import { uiLanguage } from '@reports-web/shared';
+import { escapeHtml, uiLanguage, type LocaleTag, type Row } from '@reports-web/shared';
 import type { ReportSchemaV1 } from '../schema/report-schema.js';
 import { validateReport } from '../schema/report-schema.js';
 import type { DataAdapter } from '../adapters/data/index.js';
@@ -13,10 +12,14 @@ import { interpret } from '../engine/interpreter.js';
 import { renderHtml } from '../engine/renderer-html.js';
 import {
   buildDataQuery,
+  getParameterDefinitions,
+  loadParameterOptions,
   ParameterValidationError,
   parameterValuesEqual,
   resolveParameterValues,
   validateParameterValues,
+  type ParameterDefinition,
+  type ParameterOptionItem,
   type ParameterValues,
 } from '../engine/parameters.js';
 import { t } from '../i18n/strings.js';
@@ -24,6 +27,7 @@ import { DEFAULT_TIME_ZONE, isValidTimeZone, resolveTimeZone } from '../engine/t
 import { logger } from '../logging/logger.js';
 import { icon } from './icons.js';
 import { installDirOverride, resolveDir, resolveLocale } from './direction.js';
+import { formatLocalizedNumber, formatZoomPercent } from './builder/status-bar.js';
 import { DEFAULT_FONTS_BASE_URL } from '../exporters/fonts-manifest.js';
 import { ensureReportFonts } from './web-fonts.js';
 
@@ -69,8 +73,12 @@ export class ReportsViewerElement extends LitElement {
       flex-direction: column;
       align-items: stretch;
       box-sizing: border-box;
+      position: relative;
+      height: 100%;
+      max-height: 100%;
       min-height: 0;
-      background: var(--rw-bg);
+      overflow: hidden;
+      background: #dfe4eb;
       padding: 0;
       font-family: var(--rw-font);
       font-size: 12px;
@@ -84,13 +92,16 @@ export class ReportsViewerElement extends LitElement {
       display: flex;
       gap: 4px;
       margin: 0;
-      padding: 5px 8px;
-      flex-wrap: wrap;
+      padding: 0 10px;
+      height: 42px;
+      min-height: 42px;
+      box-sizing: border-box;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       align-items: center;
       align-self: stretch;
-      background: var(--rw-bg);
+      background: #fff;
       border-bottom: 1px solid var(--rw-border);
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
     }
     .toolbar-sep {
       width: 1px;
@@ -105,9 +116,10 @@ export class ReportsViewerElement extends LitElement {
       min-width: 8px;
     }
     .zoom-label {
-      font-size: 11px;
-      color: var(--rw-muted);
-      min-width: 4em;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--rw-accent);
+      min-width: 7.5em;
       text-align: center;
       flex: none;
     }
@@ -131,33 +143,105 @@ export class ReportsViewerElement extends LitElement {
     }
     .toolbar button:hover { background: var(--rw-button-hover); }
     .toolbar button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .toolbar button[hidden] { display: none !important; }
+    .viewer-frame {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+    aside.params {
+      width: 262px;
+      flex: none;
+      box-sizing: border-box;
+      background: var(--rw-surface);
+      border-inline-end: 1px solid var(--rw-border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .params-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--rw-border);
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .params-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 12px 12px; color: var(--rw-text); }
+    .fld-l { display: block; font-weight: 600; margin: 10px 0 4px; font-size: 12px; }
+    .fld-l small { color: var(--rw-muted); font-weight: 400; margin-inline-start: 4px; }
+    .params-body input, .params-body select {
+      width: 100%; height: 32px; border: 1px solid var(--rw-border); border-radius: 7px;
+      padding: 0 9px; box-sizing: border-box; background: #fff; font: inherit; color: inherit;
+    }
+    .field-error:empty { display: none; }
+    .field-error { color: #b91c1c; font-size: 11px; margin: 3px 0 0; }
+    .range { display: grid; gap: 6px; }
+    button.run {
+      width: 100%; margin-top: 16px; height: 36px; border: 0; border-radius: 8px;
+      background: #0e9384; color: #fff; font-weight: 700; cursor: pointer; font: inherit;
+    }
+    button.reset {
+      width: 100%; margin-top: 6px; height: 32px; border: 1px solid var(--rw-border);
+      border-radius: 8px; background: #fff; color: var(--rw-muted); cursor: pointer; font: inherit;
+    }
+    .vinfo {
+      margin-top: 14px; border-top: 1px solid var(--rw-border); padding-top: 10px;
+      font-size: 11.5px; color: var(--rw-muted); line-height: 1.9;
+    }
+    .vinfo div { display: flex; justify-content: space-between; gap: 8px; }
+    .vinfo b { color: var(--rw-text); font-weight: 700; }
+    .viewer-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     .toolbar button.view-tool {
       padding: 4px 6px;
     }
     .toolbar button.view-tool .label {
-      display: none;
+      display: inline;
     }
-    .status {
+    .status-note {
       font-size: 11px;
       color: var(--rw-muted);
-      max-width: min(40vw, 280px);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      flex: none;
     }
-    .status.error { color: var(--rw-error); }
+    .status.error {
+      flex: none;
+      width: 100%;
+      max-width: none;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+      text-align: start;
+      background: #fef2f2;
+      color: var(--rw-error);
+      border-bottom: 1px solid #fecaca;
+    }
     .surface {
       flex: 1 1 auto;
-      min-height: 120px;
+      min-height: 0;
       max-width: 100%;
       overflow: auto;
       box-sizing: border-box;
-      padding: 8px 10px 12px;
+      padding: 22px 16px 32px;
+      background: #dfe4eb;
     }
     .zoom-host {
       display: block;
       width: max-content;
-      max-width: 100%;
       margin-inline: auto;
     }
     .rw-visual-pages-root {
@@ -288,6 +372,12 @@ export class ReportsViewerElement extends LitElement {
   @state() private _zoom = 1;
   @state() private _pageIndex = 0;
   @state() private _pageCount = 0;
+  @state() private _draft: Record<string, unknown> = {};
+  @state() private _fieldErrors: Record<string, string> = {};
+  @state() private _optionLists: Record<string, readonly ParameterOptionItem[]> = {};
+  @state() private _rowCount = 0;
+  private _lastRows: readonly Row[] | null = null;
+  private _placeholderParams = false;
 
   @query('.surface') private _surface!: HTMLDivElement;
 
@@ -314,6 +404,7 @@ export class ReportsViewerElement extends LitElement {
   override updated(changed: Map<PropertyKey, unknown>): void {
     this._syncHostDir(this._dir);
     if (changed.has('timeZone')) this._checkTimeZone();
+    if (changed.has('schema') || changed.has('locale')) this._resetParameterDraft();
     if (
       changed.has('schema') ||
       changed.has('rows') ||
@@ -328,6 +419,7 @@ export class ReportsViewerElement extends LitElement {
       if (changed.has('fontsBaseUrl') || changed.has('schema')) void ensureReportFonts(this.schema, this.fontsBaseUrl);
       void this._renderReport();
     }
+    this._paintParameterFields();
     if (changed.has('_zoom')) {
       queueMicrotask(() => {
         this._destroyCharts();
@@ -338,6 +430,7 @@ export class ReportsViewerElement extends LitElement {
         });
       });
     }
+    if (changed.has('_error') && this._error) queueMicrotask(() => this.fitSheet());
     if ((changed.has('_html') || changed.has('_phase')) && this._phase === 'ready') {
       queueMicrotask(() => this._syncPageNavState());
     }
@@ -383,12 +476,16 @@ export class ReportsViewerElement extends LitElement {
     };
 
     this._phase = 'loading';
+    const placeholder = this._placeholderParams;
+    this._placeholderParams = false;
     try {
       let rows: readonly Row[];
       // Resolved parameter values for `params.<name>` in expressions (only for templates that declare parameters).
       let params: Readonly<Record<string, unknown>> | undefined;
       const paramOptions = this._paramOptions;
-      if (this.rows) {
+      if (placeholder && this._lastRows) {
+        rows = this._lastRows;
+      } else if (this.rows) {
         rows = this.rows;
         if (finalSchema.parameters?.length) {
           const resolved = resolveParameterValues(finalSchema.parameters, this.params, paramOptions);
@@ -402,11 +499,17 @@ export class ReportsViewerElement extends LitElement {
         // a newer render (e.g. parameter change) superseded this one
         if (abort.signal.aborted) return;
       }
-      const tree = interpret({ schema: finalSchema, rows, ...(params ? { params } : {}) });
+      const tree = interpret({ schema: finalSchema, rows, printedAt: new Date(), timeZone: paramOptions.timeZone, ...(params ? { params } : {}) });
       const rendered = renderHtml(tree, { idPrefix: 'rw-v', visualPages: !this.hidePageBoundaries });
       this._html = rendered.html;
       this._chartIds = [...rendered.chartIds];
       this._codeIds = [...rendered.codeIds];
+      this._rowCount = rows.length;
+      this._lastRows = rows;
+      if (!placeholder) {
+        this._error = '';
+        this._fieldErrors = {};
+      }
       this._phase = 'ready';
       await this.updateComplete;
       this._renderCharts(this._chartIds);
@@ -418,12 +521,13 @@ export class ReportsViewerElement extends LitElement {
       this._error = e instanceof Error ? e.message : String(e);
       if (e instanceof ParameterValidationError) {
         logger.warn('reports-viewer', 'invalid parameters', { issues: e.issues });
-        // `fieldErrors`: name -> message in the report locale, for showing each error next to its field.
+        // `fieldErrors` on the event stay in the report locale. The banner and the fields use the viewer locale.
         const paramOptions = this._paramOptions;
         const { fieldErrors } = validateParameterValues(finalSchema, this.params, { locale: finalSchema.meta.locale, ...paramOptions });
-        // The banner shows localized messages in the viewer's UI locale (never the English `e.message`).
         const ui = this._locale;
-        this._error = parametersBannerText(validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions }).errors, ui);
+        const uiChecked = validateParameterValues(finalSchema, this.params, { locale: ui, ...paramOptions });
+        this._fieldErrors = { ...uiChecked.fieldErrors };
+        this._error = parametersBannerText(uiChecked.errors, ui);
         this.dispatchEvent(new CustomEvent('parameters-error', { detail: { error: e.message, issues: e.issues, fieldErrors } }));
       } else {
         logger.error('reports-viewer', 'render failed', { error: this._error });
@@ -455,6 +559,25 @@ export class ReportsViewerElement extends LitElement {
 
   private _zoomReset(): void {
     this._zoom = 1;
+  }
+
+  /** Scale the sheet so its width and the summary cards fit the canvas. */
+  fitSheet(): void {
+    const surface = this._surface;
+    const sheet = surface?.querySelector<HTMLElement>('.rw-page-visual-sheet') ?? surface?.querySelector<HTMLElement>('.rw-report');
+    if (!surface || !sheet) return;
+    const pad = 16;
+    const availW = Math.max(80, surface.clientWidth - pad);
+    const availH = Math.max(80, surface.clientHeight - pad);
+    const sheetRect = sheet.getBoundingClientRect();
+    const footer = sheet.querySelector<HTMLElement>('[data-band="reportFooter"]');
+    const footerTop = footer ? footer.getBoundingClientRect().top - sheetRect.top : sheetRect.height;
+    const basisW = sheetRect.width / this._zoom;
+    // Keep the summary cards (about 22mm of the report footer) on screen, not the empty page tail.
+    const basisH = (footer ? footerTop / this._zoom + 22 * (96 / 25.4) : sheetRect.height / this._zoom);
+    if (basisW < 1 || basisH < 1) return;
+    const next = Math.min(1, Math.max(ZOOM_MIN, Math.min(availW / basisW, availH / basisH)));
+    this._zoom = this._roundZoom(next);
   }
 
   private _fitWidth(): void {
@@ -516,8 +639,11 @@ export class ReportsViewerElement extends LitElement {
   private _renderViewToolbarControls(disabled: boolean): unknown {
     if (this.hideViewControls) return nothing;
     const n = this._pageCount;
-    const zLabel = `${Math.round(this._zoom * 100)}%`;
-    const pageLabel = n === 0 ? '—' : `${this._pageIndex + 1} / ${n}`;
+    const digits = { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? ('locale' as const) };
+    const zLabel = formatZoomPercent(this._zoom, digits);
+    const pageLabel = n === 0
+      ? '—'
+      : `${t(this._locale, 'page')} ${formatLocalizedNumber(this._pageIndex + 1, digits)} ${t(this._locale, 'of')} ${formatLocalizedNumber(n, digits)}`;
     const pageDisabled = disabled || n === 0;
     return html`
       <button
@@ -699,6 +825,114 @@ export class ReportsViewerElement extends LitElement {
     }
   }
 
+  private _definitions(): ParameterDefinition[] {
+    return getParameterDefinitions(this.schema, { locale: this._locale, ...this._paramOptions });
+  }
+
+  private _resetParameterDraft(): void {
+    const draft: Record<string, unknown> = {};
+    for (const def of this._definitions()) {
+      if (def.defaultValue !== undefined) draft[def.name] = def.defaultValue;
+    }
+    this._draft = draft;
+    this._fieldErrors = {};
+    this._error = '';
+    void this._loadParamOptions();
+  }
+
+  private async _loadParamOptions(): Promise<void> {
+    const lists: Record<string, readonly ParameterOptionItem[]> = {};
+    for (const def of this._definitions()) {
+      if (def.type !== 'select') continue;
+      try {
+        lists[def.name] = await loadParameterOptions(def.def, this.dataAdapter, { locale: this._locale });
+      } catch {
+        lists[def.name] = def.options ?? [];
+      }
+    }
+    this._optionLists = lists;
+  }
+
+  private _setDraft(name: string, value: unknown): void {
+    this._draft = { ...this._draft, [name]: value };
+  }
+
+  private _applyParameters(): void {
+    const result = validateParameterValues(this.schema, this._draft, { locale: this._locale, ...this._paramOptions });
+    this._fieldErrors = { ...result.fieldErrors };
+    if (!result.ok) {
+      this._error = parametersBannerText(result.errors, this._locale);
+      this._placeholderParams = true;
+      if (this._lastRows) void this._renderReport();
+      this.dispatchEvent(new CustomEvent('parameters-error', {
+        detail: { error: this._error, issues: result.errors, fieldErrors: result.fieldErrors },
+        bubbles: true,
+        composed: true,
+      }));
+      return;
+    }
+    this._error = '';
+    this.params = { ...result.values };
+  }
+
+  @query('.param-fields') private _paramFields?: HTMLDivElement;
+
+  private _paintParameterFields(): void {
+    const host = this._paramFields;
+    if (!host) return;
+    const html = this._parameterFieldsHtml();
+    if (host.innerHTML !== html) host.innerHTML = html;
+  }
+
+  private _parameterFieldsHtml(): string {
+    return this._definitions().map((def) => {
+      const error = this._fieldErrors[def.name] ?? '';
+      const errId = `param-error-${escapeHtml(def.name)}`;
+      const value = this._draft[def.name] ?? def.defaultValue ?? '';
+      const required = def.required ? ` <small>(${escapeHtml(t(this._locale, 'paramRequired'))})</small>` : '';
+      return `<label class="fld-l">${escapeHtml(def.label)}${required}</label>${this._parameterControlHtml(def, value, error ? errId : '')}<p id="${errId}" class="field-error">${escapeHtml(error)}</p>`;
+    }).join('');
+  }
+
+  private _parameterControlHtml(def: ParameterDefinition, value: unknown, errorId: string): string {
+    const name = escapeHtml(def.name);
+    const aria = errorId ? ` aria-invalid="true" aria-describedby="${errorId}"` : '';
+    if (def.type === 'dateRange') {
+      const range = value && typeof value === 'object' ? value as { from?: string; to?: string } : {};
+      return `<div class="range"><input data-testid="param-${name}-from" data-param="${name}" data-part="from" type="date" value="${escapeHtml(range.from ?? '')}"${aria}><input data-testid="param-${name}-to" data-param="${name}" data-part="to" type="date" value="${escapeHtml(range.to ?? '')}"${aria}></div>`;
+    }
+    if (def.type === 'select' || def.type === 'bool') {
+      const options = def.type === 'bool'
+        ? [{ value: false, label: t(this._locale, 'no') }, { value: true, label: t(this._locale, 'yes') }]
+        : (this._optionLists[def.name] ?? def.options ?? []);
+      const current = value == null ? '' : String(value);
+      const opts = options.map((option) => {
+        const raw = String(option.value);
+        const selected = raw === current ? ' selected' : '';
+        return `<option value="${escapeHtml(raw)}"${selected}>${escapeHtml(option.label)}</option>`;
+      }).join('');
+      return `<select data-testid="param-${name}" data-param="${name}"${aria}>${opts}</select>`;
+    }
+    const type = def.type === 'number' ? 'number' : def.type === 'date' ? 'date' : def.type === 'datetime' ? 'datetime-local' : 'text';
+    return `<input data-testid="param-${name}" data-param="${name}" type="${type}" value="${escapeHtml(value == null ? '' : String(value))}"${aria}>`;
+  }
+
+  private _onParamInput(event: Event): void {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+    const name = target.dataset.param;
+    if (!name) return;
+    const part = target.dataset.part;
+    if (part === 'from' || part === 'to') {
+      const current = this._draft[name];
+      const range = current && typeof current === 'object' ? { ...(current as { from?: string; to?: string }) } : {};
+      range[part] = target.value;
+      this._setDraft(name, range);
+      return;
+    }
+    this._setDraft(name, target.value);
+  }
+
   override render(): unknown {
     if (this.noToolbar) {
       return html`<div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>`;
@@ -706,27 +940,43 @@ export class ReportsViewerElement extends LitElement {
     const disabled = this._phase !== 'ready';
     const items = (this.actions ?? VIEWER_DEFAULT_ACTIONS).filter((a) => a in VIEWER_ACTION_KIND);
     return html`
-      <div class="toolbar" role="toolbar">
-        ${this._renderViewToolbarControls(disabled)}
-        ${this.hideViewControls ? nothing : html`<span class="toolbar-sep" role="separator" aria-hidden="true"></span>`}
-        ${items.map((a) => {
-          const label = t(this._locale, a === 'csv' ? 'excel' : a);
-          return html`<button
-            type="button"
-            data-action=${a}
-            aria-label=${label}
-            title=${label}
-            ?disabled=${disabled}
-            @click=${() => this.exportTo(VIEWER_ACTION_KIND[a])}
-          >${icon(a)}<span class="label">${label}</span></button>`;
-        })}
-        <span class="toolbar-spacer" aria-hidden="true"></span>
-        <span class="status ${this._phase === 'error' ? 'error' : ''}">
-          ${this._phase === 'loading' ? t(this._locale, 'loading') : ''}
-          ${this._phase === 'error' ? `${t(this._locale, 'error')}: ${this._error}` : ''}
-        </span>
+      <div class="viewer-frame">
+        <aside class="params" data-testid="viewer-parameters">
+          <div class="params-head">${t(this._locale, 'viewerParameters')}</div>
+          <div class="params-body" @input=${(e: Event) => this._onParamInput(e)} @change=${(e: Event) => this._onParamInput(e)}>
+            <div class="param-fields"></div>
+            <button type="button" class="run" data-testid="run-report" @click=${() => this._applyParameters()}>${t(this._locale, 'runReport')}</button>
+            <button type="button" class="reset" data-testid="reset-params" @click=${() => this._resetParameterDraft()}>${t(this._locale, 'resetParams')}</button>
+            <div class="vinfo" data-testid="param-info">
+              <div><span>${t(this._locale, 'paramRecords')}</span><b>${formatLocalizedNumber(this._rowCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
+              <div><span>${t(this._locale, 'paramPages')}</span><b>${formatLocalizedNumber(this._pageCount, { locale: this._locale, digits: this.schema?.meta.pageNumberDigits ?? 'locale' })}</b></div>
+            </div>
+          </div>
+        </aside>
+        <div class="viewer-main">
+          <div class="toolbar" role="toolbar">
+            ${items.map((a) => {
+              const label = t(this._locale, a === 'csv' ? 'excel' : a);
+              const frozen = a !== 'print';
+              return html`<button
+                type="button"
+                data-action=${a}
+                aria-label=${label}
+                title=${label}
+                ?hidden=${frozen}
+                ?disabled=${disabled || frozen}
+                @click=${() => { if (!frozen) void this.exportTo(VIEWER_ACTION_KIND[a]); }}
+              >${icon(a)}<span class="label">${label}</span></button>`;
+            })}
+            ${this.hideViewControls ? nothing : html`<span class="toolbar-sep" role="separator" aria-hidden="true"></span>`}
+            ${this._renderViewToolbarControls(disabled)}
+            <span class="toolbar-spacer" aria-hidden="true"></span>
+            <span class="status-note">${this._phase === 'loading' ? t(this._locale, 'loading') : ''}</span>
+          </div>
+          ${this._error ? html`<div class="status error" data-testid="error-banner" dir=${this._dir} title=${this._error} role="alert">${this._error}</div>` : nothing}
+          <div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>
+        </div>
       </div>
-      <div class="surface" dir=${this._dir}>${this._renderZoomWrap()}</div>
     `;
   }
 }

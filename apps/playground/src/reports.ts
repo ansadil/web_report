@@ -8,6 +8,12 @@ export interface SampleReport {
   build(): ReportSchemaV1;
 }
 
+const SALES_LOGO =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#1f5fa8"/><path d="M10 52h44M16 52V30l16-12 16 12v22M28 52V40h8v12" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>',
+  );
+
 const salesByRegion: SampleReport = {
   id: 'sales-by-region',
   name: { en: 'Monthly Sales', ar: 'تقرير المبيعات الشهري' },
@@ -19,6 +25,22 @@ const salesByRegion: SampleReport = {
     meta: { name: 'تقرير المبيعات الشهري', locale: 'ar', dir: 'rtl' },
     page: { size: 'A4', orientation: 'portrait', margins: { top: 15, right: 15, bottom: 15, left: 15 } },
     dataset: { adapter: 'rest-json', source: 'sales' },
+    parameters: [
+      { name: 'from', type: 'date', required: true, label: { ar: 'الفترة من', en: 'From' }, default: '2026-10-01' },
+      { name: 'to', type: 'date', label: { ar: 'الفترة إلى', en: 'To' }, default: '2026-10-31' },
+      {
+        name: 'branch',
+        type: 'select',
+        required: true,
+        label: { ar: 'الفرع', en: 'Branch' },
+        default: 'all',
+        options: [
+          { value: 'all', label: { ar: 'جميع الفروع', en: 'All branches' } },
+          { value: 'ruh', label: { ar: 'الرياض', en: 'Riyadh' } },
+          { value: 'jed', label: { ar: 'جدة', en: 'Jeddah' } },
+        ],
+      },
+    ],
     fields: [
       { name: 'region', type: 'string', label: 'المنطقة', group: 'العميل' },
       { name: 'date', type: 'date', label: 'التاريخ', group: 'العميل' },
@@ -42,19 +64,23 @@ const salesByRegion: SampleReport = {
     ],
     bands: {
       reportHeader: {
-        height: 24,
+        height: 42,
         elements: [
-          { id: 'logo', kind: 'image', src: 'logo', alt: 'الشعار', pos: { x: 2, y: 3, w: 26, h: 18 } },
-          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 32, y: 3, w: 112, h: 10 } },
-          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 32, y: 14, w: 112, h: 7 } },
-          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 156, y: 3, w: 18, h: 18 } },
+          { id: 'logo', kind: 'image', src: SALES_LOGO, alt: 'الشعار', pos: { x: 2, y: 2, w: 22, h: 16 } },
+          { id: 'title', kind: 'text', value: 'تقرير المبيعات الشهري', style: { bold: true, fontSize: 18, align: 'center', color: '#15233a', font: 'Cairo' }, pos: { x: 28, y: 1, w: 124, h: 10 } },
+          { id: 'sub', kind: 'text', value: 'الفترة: {المعاملات.الفترة} — الفرع: {المعاملات.الفرع}', style: { align: 'center', fontSize: 11, color: '#4a5568', font: 'Cairo' }, pos: { x: 28, y: 12, w: 148, h: 8 } },
+          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 28, y: 21, w: 90, h: 7 } },
+          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 28, y: 29, w: 148, h: 8 } },
+          { id: 'qr', kind: 'qr', value: 'https://example.sa/sales', pos: { x: 160, y: 2, w: 16, h: 16 } },
         ],
       },
       pageHeader: {
-        height: 10,
+        height: 8,
         elements: [
-          { id: 'co', kind: 'text', value: 'شركة المثال التجارية', style: { bold: true, fontSize: 12, font: 'Cairo' }, pos: { x: 2, y: 2, w: 90, h: 6 } },
-          { id: 'dt', kind: 'text', value: '{التاريخ.هجري} — {التاريخ}', style: { align: 'end', fontSize: 11, color: '#1d5a9e', font: 'Cairo' }, pos: { x: 100, y: 2, w: 78, h: 6 } },
+          { id: 'h1', kind: 'text', value: 'الصنف', style: { bold: true, color: '#fff', background: '#1f5fa8', font: 'Cairo' }, pos: { x: 0, y: 0.5, w: 70, h: 7 } },
+          { id: 'h2', kind: 'text', value: 'الكمية', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 70, y: 0.5, w: 30, h: 7 } },
+          { id: 'h3', kind: 'text', value: 'السعر', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 100, y: 0.5, w: 30, h: 7 } },
+          { id: 'h4', kind: 'text', value: 'الإجمالي', style: { bold: true, color: '#fff', background: '#1f5fa8', align: 'center', font: 'Cairo' }, pos: { x: 130, y: 0.5, w: 50, h: 7 } },
         ],
       },
       detail: {
@@ -78,12 +104,14 @@ const salesByRegion: SampleReport = {
         ],
       },
       reportFooter: {
-        height: 70,
+        height: 34,
         elements: [
           { id: 'rf0', kind: 'line', orientation: 'horizontal', thickness: 0.5, pos: { x: 0, y: 0, w: 180, h: 0.5 } },
-          { id: 'rf1', kind: 'text', value: 'الإجمالي الكلي', style: { bold: true, fontSize: 12, align: 'end', font: 'Cairo' }, pos: { x: 60, y: 3, w: 70, h: 6 } },
-          { id: 'rf2', kind: 'aggregate', fn: 'sum', field: 'amount', scope: 'report', format: 'decimal2', style: { bold: true, fontSize: 12, align: 'end', background: '#dbeafe', color: '#1e40af' }, pos: { x: 130, y: 3, w: 50, h: 6 } },
-          { id: 'rf5', kind: 'chart', type: 'bar', labelsField: 'region', valueField: 'amount', title: 'المبيعات حسب المنطقة', pos: { x: 0, y: 20, w: 180, h: 45 } },
+          { id: 'rf1', kind: 'text', value: 'الإجمالي الكلي', style: { bold: true, fontSize: 11, color: '#0f172a', background: '#f8fafc', font: 'Cairo', border: { top: 1, right: 1, bottom: 1, left: 1, color: '#e3e9f2' } }, pos: { x: 0, y: 2, w: 58, h: 12 } },
+          { id: 'rf4', kind: 'aggregate', fn: 'count', field: 'amount', scope: 'report', format: 'integer', style: { bold: true, fontSize: 13, align: 'center', color: '#15233a', background: '#f8fafc', font: 'Cairo', border: { top: 1, right: 1, bottom: 1, left: 1, color: '#e3e9f2' } }, pos: { x: 62, y: 2, w: 56, h: 12 } },
+          { id: 'rf3', kind: 'text', value: 'عدد السجلات', style: { fontSize: 10, color: '#64748b', font: 'Cairo' }, pos: { x: 64, y: 3, w: 52, h: 4 } },
+          { id: 'rf2', kind: 'aggregate', fn: 'sum', field: 'amount', scope: 'report', format: 'decimal2', style: { bold: true, fontSize: 13, align: 'end', background: '#0e9384', color: '#fff', font: 'Cairo' }, pos: { x: 122, y: 2, w: 58, h: 12 } },
+          { id: 'rf5', kind: 'chart', type: 'bar', labelsField: 'region', valueField: 'amount', title: 'المبيعات حسب المنطقة', pos: { x: 0, y: 16, w: 180, h: 16 } },
         ],
       },
     },

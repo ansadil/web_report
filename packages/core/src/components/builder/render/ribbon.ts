@@ -61,6 +61,7 @@ export interface RibbonCallbacks {
   onSamples: () => void;
   onArrange: (mode: ArrangeMode) => void;
   onStyle: (patch: Partial<Style>) => void;
+  onPreviewPrint?: () => void;
 }
 
 const TABS: { id: RibbonTab; label: 'ribbonFile' | 'ribbonHome' | 'ribbonInsert' | 'ribbonLayout' | 'ribbonPage' | 'ribbonView' | 'preview' }[] = [
@@ -311,7 +312,23 @@ export function renderRibbon(state: RibbonState, cb: RibbonCallbacks) {
           )}
         </div>
         <div class="ribbon-pane" role="tabpanel" id="ribbon-panel-preview" aria-labelledby="ribbon-tab-preview" tabindex=${state.tab === 'preview' ? '0' : '-1'} ?hidden=${state.tab !== 'preview'}>
-          <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-tab" @click=${cb.actions.onPreview}>${icon('eye')}<span>${t(state.locale, 'preview')}</span></button>
+          ${cluster(
+            state.locale,
+            'ribbonGroupPreview',
+            html`
+              <button type="button" class="ribbon-big c-teal" data-testid="ribbon-btn-preview-tab" @click=${cb.actions.onPreview}>${icon('eye')}<span>${t(state.locale, 'runReport')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-back-designer" @click=${() => cb.onTab('home')}>${icon('undo')}<span>${t(state.locale, 'backToDesigner')}</span></button>
+            `,
+          )}
+          ${cluster(
+            state.locale,
+            'ribbonGroupOutput',
+            html`
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-print" @click=${() => cb.onPreviewPrint?.()}>${icon('print')}<span>${t(state.locale, 'print')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-pdf" disabled>${icon('download')}<span>${t(state.locale, 'pdf')}</span></button>
+              <button type="button" class="ribbon-cmd" data-testid="ribbon-btn-preview-excel" disabled>${icon('download')}<span>${t(state.locale, 'excel')}</span></button>
+            `,
+          )}
         </div>
       </div>
     </div>

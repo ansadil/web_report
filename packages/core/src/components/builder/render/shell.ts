@@ -162,6 +162,7 @@ export function renderBuilder(state: BuilderViewState, cb: BuilderViewCallbacks)
     <div class="status-host">
       ${renderStatusBar(state.status, { onIn: cb.actions.onZoomIn, onOut: cb.actions.onZoomOut, onReset: cb.actions.onZoomReset, onSet: cb.onSetZoom })}
     </div>
+    <slot name="preview"></slot>
   `;
 }
 

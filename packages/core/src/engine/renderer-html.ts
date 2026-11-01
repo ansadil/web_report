@@ -3,18 +3,19 @@ import type { Style } from '../schema/report-schema.js';
 import type { RenderElement, RenderSection, RenderTree, RenderWatermark } from './interpreter.js';
 import { replacePageTokens, type PageTokenContext } from './page-tokens.js';
 
-function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: number; h: number }): string {
+function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: number; h: number }, text = false): string {
   const css: string[] = [
     'position:absolute',
     `inset-inline-start:${pos.x}mm`,
     `top:${pos.y}mm`,
     `width:${pos.w}mm`,
-    `height:${pos.h}mm`,
-    'overflow:hidden',
+    text ? `min-height:${pos.h}mm` : `height:${pos.h}mm`,
+    text ? 'height:auto' : 'overflow:hidden',
     'box-sizing:border-box',
-    'display:flex',
-    'align-items:center',
+    text ? 'display:block' : 'display:flex',
+    text ? 'line-height:1.7' : 'align-items:center',
   ];
+  if (text) css.push('overflow:visible', 'white-space:normal');
   if (style) {
     if (style.font) css.push(`font-family:${style.font}`);
     if (style.fontSize) css.push(`font-size:${style.fontSize}pt`);
@@ -23,7 +24,10 @@ function styleToCss(style: Style | undefined, pos: { x: number; y: number; w: nu
     if (style.underline) css.push('text-decoration:underline');
     if (style.color) css.push(`color:${style.color}`);
     if (style.background) css.push(`background:${style.background}`);
-    if (style.align) css.push(`justify-content:${style.align === 'end' ? 'flex-end' : style.align === 'center' ? 'center' : style.align === 'justify' ? 'space-between' : 'flex-start'}`);
+    if (style.align) {
+      const align = style.align === 'end' ? 'end' : style.align === 'center' ? 'center' : style.align === 'justify' ? 'justify' : 'start';
+      css.push(text ? `text-align:${align}` : `justify-content:${style.align === 'end' ? 'flex-end' : style.align === 'center' ? 'center' : style.align === 'justify' ? 'space-between' : 'flex-start'}`);
+    }
     if (style.padding != null) css.push(`padding:${style.padding}mm`);
     if (style.border) {
       const b = style.border;
@@ -56,7 +60,7 @@ function renderElementToHtml(
   codeId: (id: string) => string,
   pageCtx?: PageTokenContext,
 ): string {
-  const style = styleToCss(el.style, el.pos);
+  const style = styleToCss(el.style, el.pos, el.kind === 'text');
   switch (el.kind) {
     case 'text': {
       const text = pageCtx ? replacePageTokens(el.text ?? '', pageCtx) : (el.text ?? '');
@@ -131,6 +135,43 @@ function renderSection(
   return `<section class="rw-section rw-${s.band}" data-band="${s.band}" style="${sectionStyle}">${body}</section>`;
 }
 
+/**
+ * Page header and page footer are running bands: they are drawn on every page, not once in the flow.
+ * The body budget shrinks by their heights so a page still fits the content area.
+ */
+function paginateWithRunningBands(sections: readonly RenderSection[], budgetMm: number): RenderSection[][] {
+  let pageHeader: RenderSection | undefined;
+  let pageFooter: RenderSection | undefined;
+  const body: RenderSection[] = [];
+  for (const section of sections) {
+    if (section.band === 'pageHeader' && !pageHeader) pageHeader = section;
+    else if (section.band === 'pageFooter' && !pageFooter) pageFooter = section;
+    else body.push(section);
+  }
+  const chrome = (pageHeader?.height ?? 0) + (pageFooter?.height ?? 0);
+  const bodyBudget = Math.max(1, budgetMm - chrome);
+  const chunks = chunkSectionsForVisualPages(body, bodyBudget);
+  return chunks.map((chunk) => {
+    // A report header belongs above the repeating column header on the first page.
+    const leading: RenderSection[] = [];
+    const rest: RenderSection[] = [];
+    let seenBody = false;
+    for (const section of chunk) {
+      if (!seenBody && section.band === 'reportHeader') leading.push(section);
+      else {
+        seenBody = true;
+        rest.push(section);
+      }
+    }
+    return [
+      ...leading,
+      ...(pageHeader ? [pageHeader] : []),
+      ...rest,
+      ...(pageFooter ? [pageFooter] : []),
+    ];
+  });
+}
+
 /** Split sections into visual pages using content-area height (page minus margins). Honors pageBreakBefore/After. */
 function chunkSectionsForVisualPages(sections: readonly RenderSection[], budgetMm: number): RenderSection[][] {
   if (sections.length === 0) return [[]];
@@ -199,13 +240,13 @@ export function renderHtml(
   const prefix = opts.idPrefix ?? `rw-${Math.random().toString(36).slice(2, 8)}`;
   const chartIds: string[] = [];
   const codeIds: string[] = [];
-  const chartId = (id: string): string => {
-    const cid = `${prefix}-chart-${id}`;
+  const chartId = (id: string, pageNo: number): string => {
+    const cid = `${prefix}-chart-${id}-p${pageNo}`;
     chartIds.push(cid);
     return cid;
   };
-  const codeId = (id: string): string => {
-    const cid = `${prefix}-code-${id}`;
+  const codeId = (id: string, pageNo: number): string => {
+    const cid = `${prefix}-code-${id}-p${pageNo}`;
     codeIds.push(cid);
     return cid;
   };
@@ -218,7 +259,7 @@ export function renderHtml(
     'background:#fff',
     'color:#111',
     'margin:0 auto 6mm',
-    'box-shadow:0 1px 4px rgba(0,0,0,0.15)',
+    'box-shadow:0 2px 4px rgba(15,25,45,.08), 0 12px 34px rgba(15,25,45,.14)',
     `direction:${tree.dir}`,
     'position:relative',
     'overflow:hidden',
@@ -231,20 +272,23 @@ export function renderHtml(
     'background:#fff',
     'color:#111',
     'margin:0 auto',
-    'box-shadow:0 1px 4px rgba(0,0,0,0.15)',
+    'box-shadow:0 2px 4px rgba(15,25,45,.08), 0 12px 34px rgba(15,25,45,.14)',
     `direction:${tree.dir}`,
     'position:relative',
     'overflow:hidden',
   ].join(';');
 
   const budgetMm = Math.max(10, tree.height - tree.margins.top - tree.margins.bottom);
-  const chunks = chunkSectionsForVisualPages(tree.sections, budgetMm);
+  const chunks = paginateWithRunningBands(tree.sections, budgetMm);
   const pages = Math.max(1, chunks.length);
 
   if (!opts.visualPages) {
     // Continuous scroll: number each section by the visual page it would fall on.
     const sections = chunks
-      .flatMap((chunkSecs, i) => chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })))
+      .flatMap((chunkSecs, i) => {
+        const pageNo = i + 1;
+        return chunkSecs.map((s) => renderSection(s, contentWidth, (id) => chartId(id, pageNo), (id) => codeId(id, pageNo), { page: pageNo, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' }));
+      })
       .join('');
     const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
     const html = `<article class="rw-report" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleScroll}">${watermark}${sections}</article>`;
@@ -253,7 +297,8 @@ export function renderHtml(
 
   const sheets = chunks
     .map((chunkSecs, i) => {
-      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, chartId, codeId, { page: i + 1, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })).join('');
+      const pageNo = i + 1;
+      const secHtml = chunkSecs.map((s) => renderSection(s, contentWidth, (id) => chartId(id, pageNo), (id) => codeId(id, pageNo), { page: pageNo, pages, locale: tree.locale, digits: tree.pageNumberDigits ?? 'locale' })).join('');
       const watermark = tree.watermark ? renderWatermark(tree.watermark) : '';
       return `<div class="rw-page-visual-sheet"><article class="rw-report rw-report-page" data-locale="${tree.locale}" data-dir="${tree.dir}" style="${pageStyleSheet}">${watermark}${secHtml}</article></div>`;
     })

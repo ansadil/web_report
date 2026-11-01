@@ -127,6 +127,9 @@ type StringKey =
   | 'ribbonGroupInsert'
   | 'ribbonGroupPage'
   | 'ribbonGroupZoom'
+  | 'ribbonGroupPreview'
+  | 'ribbonGroupOutput'
+  | 'backToDesigner'
   | 'ribbonGroupArrange'
   | 'ribbonGroupDistribute'
   | 'ribbonGroupSize'
@@ -171,6 +174,13 @@ type StringKey =
   | 'localeLtr'
   | 'localeRtl'
   | 'reportParameters'
+  | 'viewerParameters'
+  | 'of'
+  | 'runReport'
+  | 'resetParams'
+  | 'paramRequired'
+  | 'paramRecords'
+  | 'paramPages'
   | 'elements'
   | 'savedState'
   | 'propertyGrid'
@@ -359,6 +369,9 @@ const en: Record<StringKey, string> = {
   ribbonGroupInsert: 'Insert',
   ribbonGroupPage: 'Page setup',
   ribbonGroupZoom: 'Zoom',
+  ribbonGroupPreview: 'Preview',
+  ribbonGroupOutput: 'Output',
+  backToDesigner: 'Back to designer',
   ribbonGroupArrange: 'Align',
   ribbonGroupDistribute: 'Distribute',
   ribbonGroupSize: 'Size',
@@ -403,6 +416,13 @@ const en: Record<StringKey, string> = {
   localeLtr: 'English · left to right',
   localeRtl: 'Arabic · right to left',
   reportParameters: 'Parameters',
+  viewerParameters: 'Report parameters',
+  of: 'of',
+  runReport: 'Run report',
+  resetParams: 'Reset',
+  paramRequired: 'Required',
+  paramRecords: 'Records',
+  paramPages: 'Pages',
   elements: 'Elements',
   savedState: 'Saved just now',
   propertyGrid: 'Property grid',
@@ -592,6 +612,9 @@ const ar: Record<StringKey, string> = {
   ribbonGroupInsert: 'إدراج',
   ribbonGroupPage: 'إعداد الصفحة',
   ribbonGroupZoom: 'التكبير',
+  ribbonGroupPreview: 'المعاينة',
+  ribbonGroupOutput: 'الإخراج',
+  backToDesigner: 'العودة للمصمم',
   ribbonGroupArrange: 'محاذاة',
   ribbonGroupDistribute: 'توزيع',
   ribbonGroupSize: 'الحجم',
@@ -636,6 +659,13 @@ const ar: Record<StringKey, string> = {
   localeLtr: 'English · left to right',
   localeRtl: 'العربية · من اليمين لليسار',
   reportParameters: 'المعاملات',
+  viewerParameters: 'معاملات التقرير',
+  of: 'من',
+  runReport: 'عرض التقرير',
+  resetParams: 'إعادة تعيين',
+  paramRequired: 'إلزامي',
+  paramRecords: 'عدد السجلات',
+  paramPages: 'عدد الصفحات',
   elements: 'العناصر',
   savedState: 'تم الحفظ قبل لحظات',
   propertyGrid: 'جدول الخصائص',

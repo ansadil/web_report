@@ -16,7 +16,7 @@
 | M4 — `<reports-builder>` WYSIWYG | ✅ | DnD + Properties Panel + 8/8 element kinds + Save/Load |
 | M5 — Exporters | ✅ | PDF (multi-page, page-breaks) + Excel + CSV + PNG + Print: 3 اختبارات + روند تريب 5 |
 | M6 — React + Vue wrappers | ✅ | 3 + 3 = 6 اختبارات SSR/تسجيل WC |
-| M7 — Playground + أمثلة | ✅ | Vite playground ينبني (1.68MB)؛ Laravel Blade + Next.js App Router examples |
+| M7 — Playground + أمثلة | ✅ | Vite playground ينبني (1.68MB)؛ Laravel Blade + Next.js App Router + Nuxt examples |
 | Page Break | ✅ | اختبار يولّد PDF متعدد الصفحات |
 | Theme System | ✅ | CSS variables `--rw-*` و `--rb-*` |
 | Templates | ✅ | blank / tabular / grouped (مع 4 اختبارات) |
@@ -131,7 +131,8 @@ reports_web/
 │
 ├── examples/
 │   ├── laravel-blade/                 Blade views + controllers description
-│   └── nextjs-app-router/             Next 15 App Router pages (Viewer + Builder)
+│   ├── nextjs-app-router/             Next 15 App Router pages (Viewer + Builder)
+│   └── nuxt/                          Nuxt 3 SSR shell + ClientOnly Viewer/Builder
 │
 ├── PROJECT_MAP.md                     ← هذا الملف
 ├── README.md
@@ -356,6 +357,27 @@ export function ViewerClient({ schema }) {
 ```
 
 ملفات كاملة: `examples/nextjs-app-router/app/reports/{page,ViewerClient,builder/page,builder/BuilderClient}.tsx`.
+
+### Nuxt 3
+
+```vue
+<!-- app.vue -->
+<template>
+  <ClientOnly>
+    <Demo />
+  </ClientOnly>
+</template>
+
+<!-- demo.vue (client) -->
+<script setup lang="ts">
+import { ReportViewer, ReportBuilder } from '@reports-web/vue';
+</script>
+<template>
+  <ReportViewer :schema="schema" locale="ar" dir="rtl" :rows="rows" fonts-base-url="/fonts/" />
+</template>
+```
+
+ملفات كاملة: `examples/nuxt/{app,demo}.vue`.
 
 ---
 

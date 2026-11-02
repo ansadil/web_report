@@ -1,6 +1,6 @@
 # Reports Web
 
-> Embeddable reporting tool for web projects (Laravel, Next.js, or any JS host).
+> Embeddable reporting tool for web projects (Laravel, Next.js, Nuxt, or any JS host).
 
 Packages are **0.1.0** (pre-1.0). The license is **proprietary** — see `LICENSE`. This is not open-source software.
 

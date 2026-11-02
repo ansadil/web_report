@@ -58,6 +58,12 @@ export const ReportBuilder = defineComponent({
       { deep: true },
     );
 
-    return () => h('reports-builder', { ref: elRef });
+    // Pass fonts-base-url as an attribute so Lit sees it before connectedCallback
+    // loads fonts (property assignment in onMounted is too late for the first fetch).
+    return () =>
+      h('reports-builder', {
+        ref: elRef,
+        ...(props.fontsBaseUrl != null ? { 'fonts-base-url': props.fontsBaseUrl } : {}),
+      });
   },
 });
